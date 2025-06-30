@@ -418,10 +418,61 @@ export const updateBlogPost = async (documentId: string, postData: UpdateBlogPos
     try { return await databases.updateDocument<BlogPost>( databaseId, blogCollectionId, documentId, filteredUpdateData ); }
     catch (error) { if (filteredUpdateData.slug && error instanceof AppwriteException && error.code === 409 && error.message.toLowerCase().includes('slug')) { const slugErr = new Error(`Slug "${filteredUpdateData.slug}" already taken.`); handleAppwriteError(slugErr, `updating blog post ${documentId} (slug conflict)`, false); throw slugErr; } handleAppwriteError(error, `updating blog post ${documentId}`); throw error; }
 };
-export const deleteBlogPost = async (documentId: string, imageFileId?: string, imageBucketId?: string): Promise<void> => {
-    if (!blogCollectionId) throw new Error("Blog Collection ID not configured."); if (!documentId) throw new Error("Document ID required for delete."); if (imageFileId && !imageBucketId) /*console.warn(`deleteBlogPost: imageFileId provided without imageBucketId.`);*/
-    try { if (imageFileId && imageBucketId) { try { await storage.deleteFile(imageBucketId, imageFileId); } catch (fileError) { handleAppwriteError(fileError, `deleting image file ${imageFileId}`, false); /*console.warn(`Proceeding to delete blog doc ${documentId}.`);*/ } } await databases.deleteDocument(databaseId, blogCollectionId, documentId); }
-    catch (error) { handleAppwriteError(error, `deleting blog post ${documentId}`); throw error; }
+export const deleteBlogPost = async (documentId: string, imageFileId?: string): Promise<void> => {
+    // 1. Validate Inputs
+    if (!blogCollectionId) {
+        console.error("Delete Error: Blog Collection ID is not configured. Check your .env file for VITE_PUBLIC_APPWRITE_BLOG_COLLECTION_ID.");
+        throw new Error("Client-side configuration error: Blog Collection ID is missing.");
+    }
+    if (!documentId) {
+        console.error("Delete Error: A document ID is required to delete a post.");
+        throw new Error("Document ID was not provided for deletion.");
+    }
+
+    // Note: To delete a file, you need its bucket ID. Add this to your .env if you use Appwrite storage for blog images.
+    const imageBucketId = import.meta.env.VITE_PUBLIC_APPWRITE_BLOG_IMAGE_BUCKET_ID as string | undefined;
+
+    // console.log(`[Delete Workflow] Starting deletion for post document: ${documentId}`);
+
+    try {
+        // 2. Delete the associated image file first (if applicable)
+        if (imageFileId && imageBucketId) {
+            console.log(`[Delete Workflow] Attempting to delete associated image: ${imageFileId} from bucket: ${imageBucketId}`);
+            try {
+                await storage.deleteFile(imageBucketId, imageFileId);
+                // console.log(`[Delete Workflow] Successfully deleted image file.`);
+            } catch (fileError) {
+                // Log the file deletion error but continue, as the main goal is to delete the document.
+                console.warn(`[Delete Workflow] Could not delete associated image file. This might be okay if the file was already removed or permissions differ. Error:`, fileError);
+            }
+        }
+
+        // 3. Delete the database document
+        console.log(`[Delete Workflow] Attempting to delete document from collection: ${blogCollectionId}`);
+        await databases.deleteDocument(databaseId, blogCollectionId, documentId);
+
+        // If the above line does not throw, the deletion was successful on Appwrite's end.
+        // console.log(`[Delete Workflow] Successfully deleted document ${documentId}.`);
+
+    } catch (error) {
+        // 4. Catch and re-throw errors with more specific messages
+        console.error(`[Delete Workflow] Appwrite SDK Error during deletion of document ${documentId}:`, error);
+
+        if (error instanceof AppwriteException) {
+            // Provide user-friendly messages based on common error codes
+            if (error.code === 401) {
+                throw new Error(`Permission Denied (401): You do not have permission to delete this post. Please check the document's permissions in the Appwrite console.`);
+            }
+            if (error.code === 404) {
+                throw new Error(`Not Found (404): The post you are trying to delete does not exist or was already deleted.`);
+            }
+            // For any other Appwrite error, include the code and message
+            throw new Error(`Appwrite Error (${error.code}): ${error.message}`);
+        }
+
+        // Re-throw any other types of errors (e.g., network errors)
+        throw error;
+    }
 };
 
 
