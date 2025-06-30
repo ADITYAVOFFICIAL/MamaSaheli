@@ -1,4 +1,11 @@
+User-agent: *
+Allow: /
+
+# Specific user agents for good measure, including Google Analytics.
 User-agent: Googlebot
+Allow: /
+
+User-agent: Google-Analytics
 Allow: /
 
 User-agent: Bingbot
@@ -8,7 +15,4 @@ User-agent: Twitterbot
 Allow: /
 
 User-agent: facebookexternalhit
-Allow: /
-
-User-agent: *
 Allow: /
