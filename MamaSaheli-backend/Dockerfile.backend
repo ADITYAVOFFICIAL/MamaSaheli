@@ -1,0 +1,20 @@
+# Use the official Bun image as the base
+FROM oven/bun:1-alpine
+
+# Set the working directory inside the container
+WORKDIR /app/MamaSaheli-backend
+
+# Copy package management files first to leverage Docker cache
+COPY MamaSaheli-backend/package.json MamaSaheli-backend/bun.lockb ./
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Copy the backend source code
+COPY MamaSaheli-backend/ .
+
+# The port the backend server will run on (from your .env file)
+EXPOSE 8081
+
+# Command to start the backend service
+CMD ["bun", "run", "start"]

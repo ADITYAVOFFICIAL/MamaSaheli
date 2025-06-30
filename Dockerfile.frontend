@@ -1,0 +1,39 @@
+# ---- Stage 1: Build the React App ----
+FROM oven/bun:1-alpine as builder
+
+WORKDIR /app
+
+# Copy package management files
+COPY package.json bun.lockb ./
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Copy the rest of the frontend source code
+COPY . .
+
+# Build the application
+# Build arguments will be passed in from docker-compose.yml
+ARG VITE_PUBLIC_APPWRITE_ENDPOINT
+ARG VITE_PUBLIC_APPWRITE_PROJECT_ID
+ARG VITE_PUBLIC_APPWRITE_BLOG_DATABASE_ID
+ARG VITE_PUBLIC_GROQ_API_KEY
+ARG VITE_PUBLIC_GOOGLE_MAPS_API_KEY
+# Add other VITE_PUBLIC_* args here as needed
+
+RUN bun run build
+
+# ---- Stage 2: Serve with Nginx ----
+FROM nginx:stable-alpine
+
+# Copy the static build output from the builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy the custom Nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port 80 for Nginx
+EXPOSE 80
+
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
