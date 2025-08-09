@@ -39,7 +39,7 @@ import {
     ProductRecommendation,
     VALID_PRODUCT_CATEGORIES,
     ProductCategory
-} from '@/lib/groqProduct';
+} from '@/lib/geminiProduct';
 
 // --- Helper Component: Skeleton Loader ---
 const ProductCardSkeleton: React.FC = () => (

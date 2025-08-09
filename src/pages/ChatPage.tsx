@@ -53,7 +53,7 @@ import groqService, {
   ChatCompletionContentPart,
   ImageContentPart,
   Groq // Import Groq namespace for types like Groq.Chat.Completions...
-} from '@/lib/groq'; // Ensure path is correct
+} from '@/lib/gemini'; // Ensure path is correct
 import { useAuthStore } from '@/store/authStore';
 
 // --- Type Definitions ---

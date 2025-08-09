@@ -16,7 +16,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { UserProfile, getUserProfile } from '@/lib/appwrite';
 // --- Import general Groq service for the API call ---
-import groqService, { ChatCompletionMessageParam } from '@/lib/groq';
+import groqService, { ChatCompletionMessageParam } from '@/lib/gemini';
 // --- Import the specific prompt function from the new file ---
 import { createSymptomCheckerPrompt } from '@/lib/groqSym'; // <--- UPDATED IMPORT
 

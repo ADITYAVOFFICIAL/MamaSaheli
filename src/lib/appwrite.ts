@@ -14,7 +14,7 @@ import {
     Functions
 } from 'appwrite';
 import { formatDistanceToNow, parseISO } from 'date-fns'; // Import date-fns
-import { ProductRecommendation } from './groqProduct';
+import { ProductRecommendation } from './geminiProduct';
 // --- Configuration ---
 // Ensure your .env.local file (or environment variables) has these defined
 const endpoint: string = import.meta.env.VITE_PUBLIC_APPWRITE_ENDPOINT as string;
