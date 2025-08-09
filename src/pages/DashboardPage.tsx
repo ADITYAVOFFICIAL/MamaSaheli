@@ -9,7 +9,7 @@ import {
     Bike, GraduationCap, Inbox, Pill, PlusCircle, BarChart3, Utensils, Dumbbell,
     BookOpen, CheckSquare, Sparkles, RefreshCw
 } from 'lucide-react';
-
+import SamsungHealthMock from '@/components/dashboard/SamsungHealthMock';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -424,7 +424,6 @@ const DashboardPage: React.FC = () => {
                                     )}
                                 </CardContent>
                             </Card>
-
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <Card className="border border-mamasaheli-primary/30 shadow-sm h-full bg-white dark:bg-gray-800 dark:border-gray-700">
                                      <CardHeader className="bg-mamasaheli-primary/5 border-b border-mamasaheli-primary/10 dark:bg-gray-700/30 dark:border-gray-600">
@@ -493,6 +492,7 @@ const DashboardPage: React.FC = () => {
                                              )}
                                         </CardContent>
                                     </Card>
+                                    
                                     <Card className="border border-mamasaheli-secondary/30 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700">
                                         <CardHeader className="bg-mamasaheli-secondary/5 border-b border-mamasaheli-secondary/10 dark:bg-gray-700/30 dark:border-gray-600">
                                             <CardTitle className="flex items-center text-mamasaheli-secondary dark:text-blue-400 text-lg font-semibold"><GraduationCap className="mr-2 h-5 w-5" />Next Class/Activity</CardTitle>
@@ -546,6 +546,7 @@ const DashboardPage: React.FC = () => {
                                     </CardContent>
                                 </Card>
                             </div>
+<SamsungHealthMock/>
 
                              <MedReminder
                                 reminders={medReminders}
