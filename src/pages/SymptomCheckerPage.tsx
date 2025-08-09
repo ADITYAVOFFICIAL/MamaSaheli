@@ -16,9 +16,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { UserProfile, getUserProfile } from '@/lib/appwrite';
 // --- Import general Groq service for the API call ---
-import groqService, { ChatCompletionMessageParam } from '@/lib/gemini';
-// --- Import the specific prompt function from the new file ---
-import { createSymptomCheckerPrompt } from '@/lib/groqSym'; // <--- UPDATED IMPORT
+import { createSymptomCheckerPrompt } from '@/lib/geminiSym';
+import geminiService, { AppChatMessage } from '@/lib/gemini';
 
 const SymptomCheckerPage: React.FC = () => {
     const { user, isAuthenticated } = useAuthStore();
@@ -62,39 +61,23 @@ const SymptomCheckerPage: React.FC = () => {
             setError("Please describe your symptoms before checking.");
             return;
         }
-        // Check if the general Groq service (for sending messages) is available
-        if (!groqService || typeof groqService.sendMessage !== 'function') {
-             setError("AI service is not available or configured correctly. Please check configuration.");
-             console.error("Groq service or sendMessage function missing.");
-             return;
+        if (typeof createSymptomCheckerPrompt !== 'function' || typeof geminiService.sendMessage !== 'function') {
+            setError("Symptom checker AI service is not available or configured correctly. Please contact support.");
+            return;
         }
-        // Check if the specific prompt function was imported correctly
-        if (typeof createSymptomCheckerPrompt !== 'function') {
-             setError("Symptom checker prompt generation failed. Please contact support.");
-             console.error("createSymptomCheckerPrompt function not available.");
-             return;
-        }
-
-
         setIsLoadingResponse(true);
         setError(null);
         setAiResponse(null);
-
         try {
-            // --- Use the imported prompt function ---
-            const systemPrompt = createSymptomCheckerPrompt(symptomsInput, profile); // <--- USE IMPORTED FUNCTION
-
-            const messages: ChatCompletionMessageParam[] = [
+            const systemPrompt = createSymptomCheckerPrompt(symptomsInput, profile);
+            const messages: AppChatMessage[] = [
                 { role: 'system', content: systemPrompt },
+                { role: 'user', content: symptomsInput },
             ];
-
-            // Use the sendMessage function from the main groqService
-            const response = await groqService.sendMessage(messages);
-
+            const response = await geminiService.sendMessage(messages);
             setAiResponse(response);
-
         } catch (apiError: unknown) {
-            console.error("Error getting symptom information from Groq:", apiError);
+            console.error("Error getting symptom information from Gemini:", apiError);
             const errorMessage = apiError instanceof Error ? apiError.message : "An unknown error occurred.";
             setError(`Failed to get information: ${errorMessage}`);
             toast({

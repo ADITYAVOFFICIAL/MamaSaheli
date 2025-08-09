@@ -197,7 +197,9 @@ const DashboardPage: React.FC = () => {
     const classTypes = useMemo(() => ['yoga_class', 'childbirth_class', 'fitness_class'] as const, []);
     type ClassAppointmentType = typeof classTypes[number];
 
+    const [dashboardCriticalError, setDashboardCriticalError] = useState<string | null>(null);
     const fetchData = useCallback(async (options: { forceFeedRefresh?: boolean } = {}) => {
+        setDashboardCriticalError(null);
         if (!isAuthenticated || !user?.$id) {
             setIsLoading(false); setIsLoadingProfile(false); setIsLoadingAppointments(false);
             setIsLoadingHealthData(false); setIsLoadingMedReminders(false); setIsLoadingFeed(false);
@@ -238,7 +240,7 @@ const DashboardPage: React.FC = () => {
             if (coreDataResults[0].status === 'fulfilled') {
                 fetchedProfile = coreDataResults[0].value as UserProfile | null;
                 setProfile(fetchedProfile);
-            } else { console.error('Error fetching profile:', coreDataResults[0].reason); setProfile(null); toast({ title: "Profile Load Failed", variant: "destructive" }); }
+            } else { console.error('Error fetching profile:', coreDataResults[0].reason); setProfile(null); toast({ title: "Profile Load Failed", variant: "destructive" }); setDashboardCriticalError("Failed to load your profile. Please try again later."); }
             setIsLoadingProfile(false);
 
             if (coreDataResults[1].status === 'fulfilled') {
@@ -250,12 +252,12 @@ const DashboardPage: React.FC = () => {
                     .sort((a, b) => compareAsc(a.dateTime, b.dateTime));
                 setUpcomingDoctorAppointments(allUpcoming.filter(app => doctorTypes.includes(app.appointmentType)));
                 setUpcomingClassAppointments(allUpcoming.filter(app => app.appointmentType && classTypes.includes(app.appointmentType as ClassAppointmentType)));
-            } else { console.error('Error fetching appointments:', coreDataResults[1].reason); setUpcomingDoctorAppointments([]); setUpcomingClassAppointments([]); toast({ title: "Appointments Load Failed", variant: "destructive" }); }
+            } else { console.error('Error fetching appointments:', coreDataResults[1].reason); setUpcomingDoctorAppointments([]); setUpcomingClassAppointments([]); toast({ title: "Appointments Load Failed", variant: "destructive" }); setDashboardCriticalError("Failed to load your appointments. Please try again later."); }
             setIsLoadingAppointments(false);
 
-            if (coreDataResults[2].status === 'fulfilled') fetchedBp = coreDataResults[2].value as BloodPressureReading[] ?? []; else console.error('Error fetching BP:', coreDataResults[2].reason);
-            if (coreDataResults[3].status === 'fulfilled') fetchedSugar = coreDataResults[3].value as BloodSugarReading[] ?? []; else console.error('Error fetching Sugar:', coreDataResults[3].reason);
-            if (coreDataResults[4].status === 'fulfilled') fetchedWeight = coreDataResults[4].value as WeightReading[] ?? []; else console.error('Error fetching Weight:', coreDataResults[4].reason);
+            if (coreDataResults[2].status === 'fulfilled') fetchedBp = coreDataResults[2].value as BloodPressureReading[] ?? []; else { console.error('Error fetching BP:', coreDataResults[2].reason); setDashboardCriticalError("Failed to load blood pressure readings."); }
+            if (coreDataResults[3].status === 'fulfilled') fetchedSugar = coreDataResults[3].value as BloodSugarReading[] ?? []; else { console.error('Error fetching Sugar:', coreDataResults[3].reason); setDashboardCriticalError("Failed to load blood sugar readings."); }
+            if (coreDataResults[4].status === 'fulfilled') fetchedWeight = coreDataResults[4].value as WeightReading[] ?? []; else { console.error('Error fetching Weight:', coreDataResults[4].reason); setDashboardCriticalError("Failed to load weight readings."); }
             setBpReadings(fetchedBp);
             setSugarReadings(fetchedSugar);
             setWeightReadings(fetchedWeight);
@@ -264,7 +266,7 @@ const DashboardPage: React.FC = () => {
             if (coreDataResults[5].status === 'fulfilled') {
                 fetchedReminders = coreDataResults[5].value as MedicationReminder[] ?? [];
                 setMedReminders(fetchedReminders);
-            } else { console.error('Error fetching Reminders:', coreDataResults[5].reason); setMedReminders([]); toast({ title: "Reminders Load Failed", variant: "destructive" }); }
+            } else { console.error('Error fetching Reminders:', coreDataResults[5].reason); setMedReminders([]); toast({ title: "Reminders Load Failed", variant: "destructive" }); setDashboardCriticalError("Failed to load medication reminders."); }
             setIsLoadingMedReminders(false);
 
             if (fetchedProfile || options.forceFeedRefresh) {
@@ -299,17 +301,21 @@ const DashboardPage: React.FC = () => {
             toast({ title: "Dashboard Load Failed", description: `${errorMessage}. Please refresh.`, variant: "destructive" });
             setProfile(null); setUpcomingDoctorAppointments([]); setUpcomingClassAppointments([]);
             setBpReadings([]); setSugarReadings([]); setWeightReadings([]); setMedReminders([]);
-            setDashboardFeedContent(null); setFeedError(null);
+            setDashboardFeedContent(null); setFeedError(errorMessage);
+            setDashboardCriticalError("A critical error occurred while loading your dashboard. Please refresh the page or try again later.");
             setIsLoadingProfile(false); setIsLoadingAppointments(false); setIsLoadingHealthData(false);
             setIsLoadingMedReminders(false); setIsLoadingFeed(false);
         } finally {
             setIsLoading(false);
         }
-    }, [user, isAuthenticated, toast, doctorTypes, classTypes, profile, isLoadingFeed, upcomingDoctorAppointments, upcomingClassAppointments]);
+    }, [user, isAuthenticated, toast, doctorTypes, classTypes]);
 
+    // Only fetch on mount or when user/auth state changes, not on isLoading
     useEffect(() => {
-        fetchData();
-    }, [user, isAuthenticated, fetchData]);
+        if (typeof isAuthenticated === 'boolean' && isAuthenticated && user && user.$id) {
+            fetchData();
+        }
+    }, [user, user?.$id, isAuthenticated, fetchData]);
 
     const handleEditAppointment = useCallback((appointment: Appointment) => { setEditingAppointment(appointment); setIsEditModalOpen(true); }, []);
     const handleDeleteAppointmentClick = useCallback((appointmentId: string) => { setAppointmentToDelete(appointmentId); setIsDeleteDialogOpen(true); }, []);
@@ -345,10 +351,21 @@ const DashboardPage: React.FC = () => {
                         </p>
                     </div>
 
-                    {isLoading && !profile && (
+
+                    {isLoading && !profile && !dashboardCriticalError && (
                         <div className="flex justify-center items-center h-64">
                             <Loader2 className="h-12 w-12 animate-spin text-mamasaheli-primary" />
                             <span className="ml-4 text-lg text-gray-600 dark:text-gray-400">Loading Dashboard...</span>
+                        </div>
+                    )}
+                    {dashboardCriticalError && (
+                        <div className="flex flex-col items-center justify-center h-64">
+                            <Alert variant="destructive" className="max-w-lg w-full text-center">
+                                <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
+                                <AlertTitle>Dashboard Error</AlertTitle>
+                                <AlertDescription>{dashboardCriticalError}</AlertDescription>
+                            </Alert>
+                            <Button className="mt-4" onClick={() => fetchData()}>Retry</Button>
                         </div>
                     )}
 

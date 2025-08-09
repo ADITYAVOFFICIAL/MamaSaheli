@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 
 interface LoadingHistoryProps {
   isLoading: boolean;
-  messages: any[];
+  messages: unknown[];
   currentSessionId: string | null;
   isStartingChat: boolean;
 }

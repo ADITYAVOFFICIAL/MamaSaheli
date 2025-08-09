@@ -309,10 +309,15 @@ const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = ({
   };
 
 
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   // --- Render Logic ---
 
   // Avoid rendering during SSR or initial hydration mismatch
-  if (isMobile === undefined) {
+  if (!isClient) {
     return null; // Or a placeholder/skeleton if preferred
   }
 
@@ -320,33 +325,40 @@ const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = ({
   if (isMobile) {
     return (
       <>
-        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="fixed top-[calc(env(safe-area-inset-top,0px)+12px)] left-4 z-50 h-9 w-9 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-sm md:hidden" // Position fixed for mobile, hide on md+
-              aria-label="Open Chat History"
-            >
-              <History className="h-5 w-5 text-mamasaheli-primary" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-72" align="start">
-            <DropdownMenuLabel className="flex items-center">
-                <History className="h-4 w-4 mr-2 text-mamasaheli-primary" />
+        {/* Slide-in sidebar for mobile/tablet */}
+        <div className={cn(
+          "fixed inset-0 z-40 flex md:hidden transition-transform duration-300",
+          isDropdownOpen ? "translate-x-0" : "-translate-x-full"
+        )} style={{ pointerEvents: isDropdownOpen ? 'auto' : 'none' }}>
+          <div className="w-72 max-w-[90vw] h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-xl flex flex-col">
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-mamasaheli-primary flex items-center">
+                <History className="h-5 w-5 mr-2" />
                 Chat History
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-                {/* Render loading/error/empty/list inside dropdown */}
-                {renderContent(true)}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Render Delete Confirmation Dialog (needed for mobile too) */}
+              </h2>
+              <Button variant="ghost" size="icon" onClick={() => setIsDropdownOpen(false)} aria-label="Close Sidebar">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">{renderContent(true)}</div>
+            </ScrollArea>
+          </div>
+          {/* Overlay to close sidebar */}
+          <div className="flex-1 bg-black/30 dark:bg-black/60" onClick={() => setIsDropdownOpen(false)} />
+        </div>
+        {/* Floating open button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="fixed top-[calc(env(safe-area-inset-top,0px)+12px)] left-4 z-50 h-9 w-9 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-sm md:hidden"
+          aria-label="Open Chat History"
+          onClick={() => setIsDropdownOpen(true)}
+        >
+          <History className="h-5 w-5 text-mamasaheli-primary" />
+        </Button>
+        {/* Delete Confirmation Dialog (needed for mobile too) */}
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          {/* Dialog Content remains the same */}
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center text-red-600 dark:text-red-400">

@@ -21,7 +21,10 @@ interface PreChatFormProps {
   specificConcerns: string;
   setSpecificConcerns: (v: string) => void;
   feelingOptions: string[];
-  userProfile: any;
+  userProfile: {
+    weeksPregnant?: number;
+    [key: string]: unknown;
+  };
   handleStartChat: () => void;
   error: string | null;
 }
@@ -44,7 +47,7 @@ const PreChatForm: React.FC<PreChatFormProps> = ({
   handleStartChat,
   error
 }) => (
-  <Card className="w-full max-w-3xl mx-auto mt-8 animate-fade-in border border-mamasaheli-primary/20 dark:border-gray-700/50 shadow-lg">
+  <Card className="w-full max-w-3xl mx-auto animate-fade-in border border-mamasaheli-primary/20 dark:border-gray-700/50 shadow-lg flex flex-col flex-1 min-h-[60vh] md:min-h-[70vh] justify-center">
     <CardHeader>
       <CardTitle className="text-2xl sm:text-3xl font-bold text-mamasaheli-primary dark:text-mamasaheli-light text-center">
         MamaSaheli Assistant

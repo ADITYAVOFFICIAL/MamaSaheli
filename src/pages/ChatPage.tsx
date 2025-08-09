@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate } from 'react-router-dom';
 import { format, isAfter, parseISO } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -51,11 +52,10 @@ import {
   getChatSessionsList, // Assume this returns ChatSessionInfo[] or similar
 } from '@/lib/appwrite'; // Ensure paths are correct
 
-// --- Groq Imports ---
-import groqService, {
+// --- Gemini Imports ---
+import geminiService, {
   UserPreferences, AdditionalChatContext,
   AppChatMessage,
-  GeminiChatMessage,
   GeminiImagePart
 } from '@/lib/gemini';
 import type { ElementType } from 'react';
@@ -200,7 +200,7 @@ const calculateTrimester = (weeks: number | undefined | null): 1 | 2 | 3 | null 
 };
 
 // Formats Appwrite history (ChatHistoryMessage[]) for Gemini API (AppChatMessage[])
-const formatHistoryForGroq = (history: ChatHistoryMessage[]): AppChatMessage[] => {
+const formatHistoryForGemini = (history: ChatHistoryMessage[]): AppChatMessage[] => {
     return history.map(msg => {
       const contentValue: string = msg.content || "";
       const role = msg.role === 'model' ? 'assistant' : 'user';
@@ -208,26 +208,11 @@ const formatHistoryForGroq = (history: ChatHistoryMessage[]): AppChatMessage[] =
     }).filter(msg => msg.content);
 };
 
-// Formats Appwrite history (ChatHistoryMessage[]) for UI display (ChatUIMessage[])
-const formatHistoryForUI = (history: ChatHistoryMessage[]): ChatUIMessage[] => {
-    return history
-      .map((msg): ChatUIMessage | null => {
-        const content = msg.content || "[Empty Content]";
-        const part: ChatMessagePart = { type: 'text', content };
-        let role: 'user' | 'model' | null = null;
-        if (msg.role === 'user') role = 'user';
-        else if (msg.role === 'model') role = 'model';
-        else return null;
-        return { role, parts: [part] };
-      })
-      .filter((msg): msg is ChatUIMessage =>
-          msg !== null && msg.parts.some(p => p.content.trim())
-      );
-};
+
 
 // Formats Gemini API messages (AppChatMessage[]) for UI display (ChatUIMessage[])
-const formatGroqMessagesForUI = (groqMessages: AppChatMessage[]): ChatUIMessage[] => {
-    return groqMessages
+const formatGeminiMessagesForUI = (geminiMessages: AppChatMessage[]): ChatUIMessage[] => {
+    return geminiMessages
       .map((gm): ChatUIMessage | null => {
         const uiParts: ChatMessagePart[] = [];
         if (typeof gm.content === 'string') {
@@ -327,6 +312,14 @@ const ChatPage: React.FC = () => {
      "Good", "Okay", "Tired", "Anxious", "Excited", "Nauseous", "Uncomfortable", "Other (Specify in concerns)"
    ];
 
+  const [isClient, setIsClient] = useState(false);
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile sidebar
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   // --- Fetch Initial Context ---
   const fetchInitialContext = useCallback(async () => {
     if (!user?.$id) {
@@ -336,7 +329,7 @@ const ChatPage: React.FC = () => {
     setIsContextLoading(true);
     setError(null); // Clear previous errors
     // Reset context state before fetching
-    setUserProfile(null); setLatestBp(null); setLatestSugar(null); setLatestWeight(null); setUpcomingAppointments([]); setPregnancyTrimester(null); setAge(''); setWeeksPregnant(''); setPreExistingConditions('');
+    setUserProfile(null); setLatestBp(null); setLatestSugar(null); setLatestWeight(null); setUpcomingAppointments([]); setPregnancyTrimester(null);
 
     try {
       // Fetch user data concurrently
@@ -367,10 +360,9 @@ const ChatPage: React.FC = () => {
       setPregnancyTrimester(calculateTrimester(profile?.weeksPregnant));
 
       // Pre-fill form fields from profile if available
-      if (profile?.age) setAge(String(profile.age));
-      // Only set weeksPregnant if it wasn't manually entered in the form yet for this session attempt
-      if (profile?.weeksPregnant !== undefined && !weeksPregnant) setWeeksPregnant(String(profile.weeksPregnant));
-      if (profile?.preExistingConditions) setPreExistingConditions(profile.preExistingConditions);
+      setAge(profile?.age ? String(profile.age) : '');
+      setWeeksPregnant(profile?.weeksPregnant !== undefined ? String(profile.weeksPregnant) : '');
+      setPreExistingConditions(profile?.preExistingConditions || '');
 
     } catch (error: unknown) {
       // console.error("Error fetching context:", error);
@@ -382,7 +374,7 @@ const ChatPage: React.FC = () => {
     } finally {
       setIsContextLoading(false); // Ensure loading state is turned off
     }
-  }, [user?.$id, toast, weeksPregnant]);
+  }, [user?.$id, toast]);
 
   // --- Effects ---
 
@@ -405,10 +397,12 @@ const ChatPage: React.FC = () => {
     // Exclude navigate from deps: fetch only depends on auth state/user ID
   }, [fetchInitialContext, isAuthenticated, user?.$id]);
 
-  // Scroll to bottom when messages or streaming response update
+  // Scroll to bottom when messages or streaming response update (only if not mobile)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingResponse]);
+    if (!isMobile) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, streamingResponse, isMobile]);
 
   // Create/revoke object URL for image preview
   useEffect(() => {
@@ -472,7 +466,7 @@ const ChatPage: React.FC = () => {
     setPregnancyTrimester(calculateTrimester(effectiveWeeks)); // Update trimester based on start weeks
 
     try {
-      // Prepare data for Groq service
+      // Prepare data for Gemini service
       const userPrefs: UserPreferences = {
         feeling: feeling.trim(), // Use selected feeling
         age: ageNum,
@@ -488,12 +482,12 @@ const ChatPage: React.FC = () => {
         previousConcerns: [] // No previous concerns for a new chat session
       };
 
-      // Get initial messages (system prompt + initial user/assistant exchange) from Groq service
-      const initialApiMessages = groqService.startChat(userPrefs, userProfile, additionalContext);
+      // Get initial messages (system prompt + initial user/assistant exchange) from Gemini service
+      const initialApiMessages = geminiService.startChat(userPrefs, userProfile, additionalContext);
       setChatHistoryForApi(initialApiMessages); // Store the full history (including system prompt)
 
       // Format messages for UI display (excluding system message)
-      const formattedInitialUiMessages = formatGroqMessagesForUI(
+      const formattedInitialUiMessages = formatGeminiMessagesForUI(
         initialApiMessages.filter(m => m.role === 'user' || m.role === 'assistant')
       );
       setMessages(formattedInitialUiMessages); // Update UI state
@@ -570,8 +564,8 @@ const ChatPage: React.FC = () => {
     // 1. Process Image (if attached)
     if (pendingImageFile && pendingImagePreviewUrl) {
       try {
-        // Convert file to the format Groq API expects
-        imageApiPart = await groqService.fileToApiImagePart(pendingImageFile);
+        // Convert file to the format Gemini API expects
+        imageApiPart = await geminiService.fileToApiImagePart(pendingImageFile);
         if ('inlineData' in imageApiPart && imageApiPart.inlineData) {
           apiMessageParts.push({ type: 'image_url', image_url: { url: `data:${imageApiPart.inlineData.mimeType};base64,${imageApiPart.inlineData.data}` } });
         }
@@ -596,7 +590,7 @@ const ChatPage: React.FC = () => {
 
     // 3. Prepare User Message and Update History
     const userMessageForUi: ChatUIMessage = { role: 'user', parts: uiMessageParts };
-    // Create the user message object for the Groq API
+    // Create the user message object for the Gemini API
   const newUserApiMessage: AppChatMessage = { role: 'user', content: apiMessageParts };
 
     // Add user message to UI immediately for responsiveness
@@ -608,7 +602,7 @@ const ChatPage: React.FC = () => {
     setChatHistoryForApi(updatedHistoryForApi);
     // console.log("Updated main API history state with new user message.");
 
-    // 4. Prepare History *Specifically for THIS API Call* (Handle Groq Image+System Incompatibility)
+    // 4. Prepare History *Specifically for THIS API Call* (Handle Gemini Image+System Incompatibility)
   let historyForThisApiCall: AppChatMessage[];
 
     // Check if ANY message in the *entire* history being sent contains an image
@@ -618,7 +612,7 @@ const ChatPage: React.FC = () => {
 
     if (historyContainsImage) {
         // If an image exists anywhere in the history, filter out the system message for this API call
-        // This is a workaround for Groq models that don't support system prompts with images
+        // This is a workaround for Gemini models that don't support system prompts with images
         historyForThisApiCall = updatedHistoryForApi.filter(msg => msg.role !== 'system');
         // console.warn("History contains an image. Sending API request WITHOUT the system prompt due to API limitations.");
     } else {
@@ -626,7 +620,7 @@ const ChatPage: React.FC = () => {
         historyForThisApiCall = updatedHistoryForApi;
         // console.log("History is text-only. Sending API request WITH the system prompt.");
     }
-    // --- End of Groq Incompatibility Workaround ---
+    // --- End of Gemini Incompatibility Workaround ---
 
     // 5. Save User Message to Database
     // Combine text and a placeholder for the image if present for storage
@@ -651,16 +645,16 @@ const ChatPage: React.FC = () => {
     let streamErrorOccurred = false; // Flag to track if the stream callback reported an error
     let finalModelMessageSaved = false; // Flag to track if the final model response was saved
 
-    // console.log(`Sending ${historyForThisApiCall.length} messages to Groq stream API (history includes image=${historyContainsImage})...`);
+    // console.log(`Sending ${historyForThisApiCall.length} messages to Gemini stream API (history includes image=${historyContainsImage})...`);
     try {
-      await groqService.sendMessageStream(
+      await geminiService.sendMessageStream(
         historyForThisApiCall, // *** Use the correctly prepared history ***
         (chunk) => { // onChunk callback
           accumulatedResponse += chunk;
           setStreamingResponse(accumulatedResponse); // Update UI with streaming text
         },
         (streamError) => { // onError callback
-          // console.error("Groq stream error callback:", streamError);
+          // console.error("Gemini stream error callback:", streamError);
           streamErrorOccurred = true;
           // Provide more specific user feedback for known issues
           const errorMsg = streamError.message && (streamError.message.includes('prompting with images is incompatible') || streamError.message.includes('system message') || streamError.message.includes('system messages'))
@@ -672,7 +666,7 @@ const ChatPage: React.FC = () => {
           setIsLoading(false); setStreamingResponse('');
         },
         async () => { // onComplete callback (stream finished)
-          // console.log("Groq stream completed.");
+          // console.log("Gemini stream completed.");
           setIsLoading(false); // Turn off loading indicator
 
           if (!streamErrorOccurred && accumulatedResponse.trim()) {
@@ -705,7 +699,7 @@ const ChatPage: React.FC = () => {
               const userMessageHadImage = apiMessageParts.some(p => typeof p === 'object' && p.type === 'image_url');
               if (userMessageHadImage && !finalModelMessageSaved) {
                   // If user sent an image and got no text back, add an acknowledgement message
-                  const ackMsg = "[Image received. I cannot analyze medical images, but let me know if you have questions about general appearance or other topics.]";
+                  const ackMsg = "[Image received. As an AI assistant, I cannot provide a medical opinion or diagnosis based on an image. Please share this with your healthcare provider for an accurate assessment.]";
                   setMessages(prev => [...prev, { role: 'model', parts: [{ type: 'text', content: ackMsg }] }]);
                    // Optionally save this acknowledgement to DB
                    try { await saveChatMessage(user.$id, 'model', ackMsg, currentSessionId); } catch(e) {console.warn("Could not save empty response acknowledgement", e)}
@@ -782,23 +776,23 @@ const ChatPage: React.FC = () => {
         previousConcerns: extractCommonConcerns(appwriteHistory) // Extract from loaded history
       };
 
-      const systemPromptText = groqService.createSystemPrompt(currentPrefs, currentProfile, currentContext);
+      const systemPromptText = geminiService.createSystemPrompt(currentPrefs, currentProfile, currentContext);
   const systemMessage: AppChatMessage = { role: 'system', content: systemPromptText };
 
-      // 4. Format the loaded DB history for the Groq API
-      const loadedApiHistory = formatHistoryForGroq(appwriteHistory);
+      // 4. Format the loaded DB history for the Gemini API
+      const loadedApiHistory = formatHistoryForGemini(appwriteHistory);
 
       // 5. Combine system prompt + loaded history for the main API state
       const finalApiHistory = [systemMessage, ...loadedApiHistory];
       setChatHistoryForApi(finalApiHistory);
       // console.log(`Loaded session ${sessionId}. Set API history with ${finalApiHistory.length} messages (incl. system).`);
 
-      // 6. Format the loaded DB history for UI display
-      if (appwriteHistory.length === 0) {
+      // 6. Format the loaded history for UI display
+      if (loadedApiHistory.length === 0) {
           toast({ title: "Empty Session Loaded", description: "No messages found in this chat history.", variant: "default" });
           setMessages([]); // Ensure UI is empty
       } else {
-          const uiMessages = formatHistoryForUI(appwriteHistory); // Use the corrected formatter
+          const uiMessages = formatGeminiMessagesForUI(loadedApiHistory);
           setMessages(uiMessages);
           // console.log(`Displayed ${uiMessages.length} messages in the UI.`);
       }
@@ -918,7 +912,7 @@ const ChatPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return; // No file selected
 
-    // Validation (aligned with groqService.fileToApiImagePart)
+    // Validation (aligned with geminiService.fileToApiImagePart)
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
     const maxSize = 20 * 1024 * 1024; // 20 MB
 
@@ -1305,40 +1299,98 @@ const ChatPage: React.FC = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <div className="flex h-[calc(100vh-var(--header-height,60px))] bg-gray-100 dark:bg-gray-950">
-            {user && isAuthenticated && (
+          <div className="flex h-[calc(100vh-var(--header-height,60px))] bg-gray-100 dark:bg-gray-950 relative">
+            {/* Responsive Sidebar: show as overlay on mobile, fixed on desktop */}
+            {isClient && user && !isMobile && (
               <ChatHistorySidebar
+                userId={user.$id}
                 onSelectSession={handleLoadSession}
                 currentSessionId={currentSessionId}
-                className="flex-shrink-0 border-r border-gray-200 dark:border-gray-800 hidden md:flex"
                 onSessionDeleted={handleSessionDeleted}
-                userId={user.$id}
+                className="flex-shrink-0"
               />
             )}
-            <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
-              <div className="max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-6 flex flex-col h-full w-full">
-                {showPreChat ? (
-                  <PreChatForm
-                    isContextLoading={isContextLoading}
-                    isStartingChat={isStartingChat}
-                    feeling={feeling}
-                    setFeeling={setFeeling}
-                    age={age}
-                    setAge={setAge}
-                    weeksPregnant={weeksPregnant}
-                    setWeeksPregnant={setWeeksPregnant}
-                    preExistingConditions={preExistingConditions}
-                    setPreExistingConditions={setPreExistingConditions}
-                    specificConcerns={specificConcerns}
-                    setSpecificConcerns={setSpecificConcerns}
-                    feelingOptions={feelingOptions}
-                    userProfile={userProfile}
-                    handleStartChat={handleStartChat}
-                    error={error}
-                  />
-                ) : (
-                  <div className="flex-1 flex flex-col overflow-hidden h-full">
-                    <div className={`flex-1 flex flex-col overflow-hidden border-2 ${getTrimesterBorderColor()} dark:bg-gray-800/80 dark:border-gray-700/80 shadow-md rounded-lg`}>
+            {/* Mobile: Floating open button and overlay sidebar */}
+            {isClient && user && isMobile && (
+              <>
+                {/* Floating open button */}
+                <button
+                  type="button"
+                  className="fixed top-[calc(env(safe-area-inset-top,0px)+12px)] left-4 z-50 h-9 w-9 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-sm md:hidden flex items-center justify-center"
+                  aria-label="Open Chat History"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <svg className="h-5 w-5 text-mamasaheli-primary" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M3 12h18M3 17h18" /></svg>
+                </button>
+                {/* Overlay sidebar */}
+                {sidebarOpen && (
+                  <div className="fixed inset-0 z-40 flex md:hidden transition-transform duration-300">
+                    <div className="w-72 max-w-[90vw] h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-xl flex flex-col">
+                      <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+                        <h2 className="text-lg font-semibold text-mamasaheli-primary flex items-center">
+                          <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M3 12h18M3 17h18" /></svg>
+                          Chat History
+                        </h2>
+                        <button type="button" className="h-7 w-7 p-1 text-gray-500 hover:text-mamasaheli-primary" aria-label="Close Sidebar" onClick={() => setSidebarOpen(false)}>
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        <ChatHistorySidebar
+                          userId={user.$id}
+                          onSelectSession={async (sid) => {
+                            // Show loading in chat area
+                            setIsLoading(true);
+                            const prevSessionId = currentSessionId;
+                            try {
+                              await handleLoadSession(sid);
+                              setSidebarOpen(false); // Only close if successful
+                            } catch (e) {
+                              // If error, keep sidebar open and show error in chat area
+                              setSidebarOpen(true);
+                              setCurrentSessionId(prevSessionId); // Restore previous session if needed
+                            } finally {
+                              setIsLoading(false);
+                            }
+                          }}
+                          currentSessionId={currentSessionId}
+                          onSessionDeleted={handleSessionDeleted}
+                        />
+                      </div>
+                    </div>
+                    {/* Overlay to close sidebar */}
+                    <div className="flex-1 bg-black/30 dark:bg-black/60" onClick={() => setSidebarOpen(false)} />
+                  </div>
+                )}
+              </>
+            )}
+            {/* Main Chat Area */}
+            <div className="flex-1 flex flex-col min-w-0 h-full">
+              <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900 min-w-0 h-full">
+                <div className="max-w-4xl mx-auto px-1 sm:px-4 py-2 sm:py-6 flex flex-col h-full w-full gap-2 sm:gap-4 flex-grow">
+                  {showPreChat ? (
+                    <div className="flex-1 flex flex-col justify-center h-full">
+                      <PreChatForm
+                        isContextLoading={isContextLoading}
+                        isStartingChat={isStartingChat}
+                        feeling={feeling}
+                        setFeeling={setFeeling}
+                        age={age}
+                        setAge={setAge}
+                        weeksPregnant={weeksPregnant}
+                        setWeeksPregnant={setWeeksPregnant}
+                        preExistingConditions={preExistingConditions}
+                        setPreExistingConditions={setPreExistingConditions}
+                        specificConcerns={specificConcerns}
+                        setSpecificConcerns={setSpecificConcerns}
+                        feelingOptions={feelingOptions}
+                        userProfile={userProfile}
+                        handleStartChat={handleStartChat}
+                        error={error}
+                      />
+                    </div>
+                  ) : (
+                    <div className={`flex-1 flex flex-col overflow-hidden border-2 ${getTrimesterBorderColor()} dark:bg-gray-800/80 dark:border-gray-700/80 shadow-md rounded-lg min-h-0`}>
                       <ChatHeader
                         pregnancyTrimester={pregnancyTrimester}
                         currentSessionId={currentSessionId}
@@ -1351,7 +1403,7 @@ const ChatPage: React.FC = () => {
                         isExportingPdf={isExportingPdf}
                         messagesLength={messages.length}
                       />
-                      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 scroll-smooth bg-gray-50/70 dark:bg-gray-800/70">
+                      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 scroll-smooth bg-gray-50/70 dark:bg-gray-800/70 min-h-0">
                         <LoadingHistory isLoading={isLoading} messages={messages} currentSessionId={currentSessionId} isStartingChat={isStartingChat} />
                         <ChatMessages
                           messages={messages}
@@ -1387,8 +1439,8 @@ const ChatPage: React.FC = () => {
                         />
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>

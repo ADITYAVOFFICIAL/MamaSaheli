@@ -156,7 +156,7 @@ const Hero: React.FC = () => {
 
               <img
                 // Consider fetching image URL via props or using a static import
-                src="./filay.jpeg"
+                src="./hero.png"
                 alt="Supportive pregnancy journey with MamaSaheli"
                 className="w-full h-auto rounded-3xl shadow-xl relative z-10 aspect-square md:aspect-[4/3] object-cover transform transition-transform duration-500 hover:scale-105"
               />

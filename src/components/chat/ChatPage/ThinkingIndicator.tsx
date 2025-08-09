@@ -2,10 +2,15 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
+interface Message {
+  role: string;
+  // Add other properties as needed, e.g. content: string;
+}
+
 interface ThinkingIndicatorProps {
   isLoading: boolean;
   streamingResponse: string;
-  messages: any[];
+  messages: Message[];
 }
 
 const ThinkingIndicator: React.FC<ThinkingIndicatorProps> = ({ isLoading, streamingResponse, messages }) => (

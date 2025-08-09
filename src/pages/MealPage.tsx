@@ -232,7 +232,7 @@ const MealPage: FC = () => {
             setMealSuggestions(content.meals || []); // Update only meal suggestions
         }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         const msg = err.message || "Failed to generate meal suggestions.";
         if (isMounted.current) {
             setError(msg); // Set general error
