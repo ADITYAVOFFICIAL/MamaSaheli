@@ -25,8 +25,8 @@ import 'react-markdown-editor-lite/lib/index.css'; // Base styles for the editor
 import { Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 
 // --- AI Formatting ---
-// *** MODIFIED: Import the Groq formatting function ***
-import { formatContentWithGroq } from '@/lib/groqf'; // Your Groq formatting function
+// Updated: Import the Gemini formatting function
+import { formatContentWithGemini } from '@/lib/geminif';
 
 // --- Helper Function (Consider moving to a utils file if used elsewhere) ---
 
@@ -190,7 +190,7 @@ const EditBlogPage: React.FC = () => {
     };
 
     // --- AI Formatting Handler ---
-    // Memoized function to format content using AI
+    // Memoized function to format content using Gemini AI
     const handleFormatContent = useCallback(async (): Promise<void> => {
         if (!contentMd?.trim()) {
             toast({ title: "Nothing to Format", description: "Content is empty.", variant: "default" });
@@ -198,19 +198,17 @@ const EditBlogPage: React.FC = () => {
         }
         setIsFormatting(true);
         try {
-            // console.log("Attempting Groq AI formatting for existing content...");
-            // *** MODIFIED: Use the Groq formatting function ***
-            const formattedContent = await formatContentWithGroq(contentMd);
+            // Use the Gemini formatting function
+            const formattedContent = await formatContentWithGemini(contentMd);
             setContentMd(formattedContent);
             toast({
                 title: "Content Formatted",
-                description: "Content has been automatically formatted using Groq AI.", // Updated toast message
+                description: "Content has been automatically formatted using Gemini AI.",
                 variant: "default"
             });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Could not format content via AI.";
             toast({ title: "Formatting Error", description: message, variant: "destructive" });
-            // console.error("Groq AI formatting error:", error); // Updated error message
         } finally {
             setIsFormatting(false);
         }
@@ -427,7 +425,7 @@ const EditBlogPage: React.FC = () => {
                                             size="sm"
                                             onClick={handleFormatContent}
                                             disabled={isFormatting || isLoading || !contentMd?.trim()}
-                                            title="Auto-format content using Groq AI" // Updated tooltip
+                                            title="Auto-format content using Gemini AI" // Updated tooltip
                                              className="dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                                         >
                                             {isFormatting ? (

@@ -23,8 +23,8 @@ import ReactMarkdown from 'react-markdown'; // Renderer for the preview pane
 import 'react-markdown-editor-lite/lib/index.css'; // Base styles for the editor
 
 // --- AI Formatting ---
-// *** MODIFIED: Import the Groq formatting function ***
-import { formatContentWithGroq } from '@/lib/groqf'; // Assuming groqFormatter.ts is in src/lib/
+// Updated: Import the Gemini formatting function
+import { formatContentWithGemini } from '@/lib/geminif';
 
 // --- Helper Function ---
 
@@ -142,14 +142,13 @@ const CreateBlogPage: React.FC = () => {
         }
         setIsFormatting(true); // Show loading indicator on the button
         try {
-            // console.log("Attempting to format content with Groq AI...");
-            // *** MODIFIED: Use the Groq formatting function ***
-            const formattedContent = await formatContentWithGroq(contentMd);
+            // Use the Gemini formatting function
+            const formattedContent = await formatContentWithGemini(contentMd);
             setContentMd(formattedContent); // Update editor content
             toast({
                 title: "Content Formatted",
-                description: "Content has been automatically formatted using Groq AI.",
-                variant: "default" // Use "default" or "success" if available
+                description: "Content has been automatically formatted using Gemini AI.",
+                variant: "default"
             });
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : "Could not format content via AI.";

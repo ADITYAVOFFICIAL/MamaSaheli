@@ -3,11 +3,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
-  ClassAttributes,
-  AnchorHTMLAttributes,
   useMemo,
-  ChangeEvent,
-  ElementType, // Added for icon type in starters
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, isAfter, parseISO } from 'date-fns';
@@ -19,7 +15,16 @@ import { v4 as uuidv4 } from 'uuid';
 
 // --- UI Imports ---
 import MainLayout from '@/components/layout/MainLayout';
-import ChatHistorySidebar, { ChatHistorySidebarProps } from '@/components/chat/ChatHistorySidebar'; // Assume props are defined here
+import ChatHistorySidebar from '@/components/chat/ChatHistorySidebar';
+import PreChatForm from '@/components/chat/ChatPage/PreChatForm';
+import ChatHeader from '@/components/chat/ChatPage/ChatHeader';
+import ChatMessages from '@/components/chat/ChatPage/ChatMessages';
+import ChatInput from '@/components/chat/ChatPage/ChatInput';
+import ImagePreview from '@/components/chat/ChatPage/ImagePreview';
+import StreamingResponse from '@/components/chat/ChatPage/StreamingResponse';
+import ThinkingIndicator from '@/components/chat/ChatPage/ThinkingIndicator';
+import LoadingHistory from '@/components/chat/ChatPage/LoadingHistory';
+import ErrorDisplay from '@/components/chat/ChatPage/ErrorDisplay';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -49,15 +54,15 @@ import {
 // --- Groq Imports ---
 import groqService, {
   UserPreferences, AdditionalChatContext,
-  ChatCompletionMessageParam,
-  ChatCompletionContentPart,
-  ImageContentPart,
-  Groq // Import Groq namespace for types like Groq.Chat.Completions...
-} from '@/lib/gemini'; // Ensure path is correct
+  AppChatMessage,
+  GeminiChatMessage,
+  GeminiImagePart
+} from '@/lib/gemini';
+import type { ElementType } from 'react';
 import { useAuthStore } from '@/store/authStore';
 
 // --- Type Definitions ---
-type AnchorProps = ClassAttributes<HTMLAnchorElement> & AnchorHTMLAttributes<HTMLAnchorElement> & { node?: any };
+// AnchorProps and other types moved to split components as needed
 
 // --- Fix for TS2687: Add readonly modifier for consistency ---
 declare global {
@@ -194,121 +199,79 @@ const calculateTrimester = (weeks: number | undefined | null): 1 | 2 | 3 | null 
   return null; // Weeks outside expected range
 };
 
-// Formats Appwrite history (ChatHistoryMessage[]) for Groq API (ChatCompletionMessageParam[])
-const formatHistoryForGroq = (history: ChatHistoryMessage[]): ChatCompletionMessageParam[] => {
+// Formats Appwrite history (ChatHistoryMessage[]) for Gemini API (AppChatMessage[])
+const formatHistoryForGroq = (history: ChatHistoryMessage[]): AppChatMessage[] => {
     return history.map(msg => {
-      const contentValue: string = msg.content || ""; // Ensure content is a string
-      // Map Appwrite role ('user'/'model') to Groq role ('user'/'assistant')
+      const contentValue: string = msg.content || "";
       const role = msg.role === 'model' ? 'assistant' : 'user';
-      // Assuming content is always text for now. Image handling might need adjustments
-      // if Appwrite stores image references differently.
-      return { role: role, content: contentValue } as ChatCompletionMessageParam;
-    }).filter(msg => msg.content); // Filter out messages with empty content
+      return { role, content: contentValue } as AppChatMessage;
+    }).filter(msg => msg.content);
 };
 
 // Formats Appwrite history (ChatHistoryMessage[]) for UI display (ChatUIMessage[])
-// --- Fix for TS2322: Ensure role is correctly typed ---
 const formatHistoryForUI = (history: ChatHistoryMessage[]): ChatUIMessage[] => {
     return history
-      .map((msg): ChatUIMessage | null => { // Return null for invalid messages
+      .map((msg): ChatUIMessage | null => {
         const content = msg.content || "[Empty Content]";
-        // TODO: Implement logic to detect if 'content' represents an image (e.g., URL, special marker)
-        const part: ChatMessagePart = { type: 'text', content: content };
-
-        // --- Fix for TS2322: Explicitly map role and ensure it's valid ---
+        const part: ChatMessagePart = { type: 'text', content };
         let role: 'user' | 'model' | null = null;
-        if (msg.role === 'user') {
-          role = 'user';
-        } else if (msg.role === 'model') {
-          role = 'model';
-        } else {
-          // console.warn(`Invalid role encountered in history: ${msg.role}. Skipping message.`);
-          return null; // Skip messages with roles other than user/model
-        }
-
-        return { role: role, parts: [part] };
+        if (msg.role === 'user') role = 'user';
+        else if (msg.role === 'model') role = 'model';
+        else return null;
+        return { role, parts: [part] };
       })
       .filter((msg): msg is ChatUIMessage =>
-          msg !== null && msg.parts.some(p => p.content.trim()) // Ensure msg is not null and has content
+          msg !== null && msg.parts.some(p => p.content.trim())
       );
 };
 
-// Formats Groq API messages (ChatCompletionMessageParam[]) for UI display (ChatUIMessage[])
-const formatGroqMessagesForUI = (groqMessages: ChatCompletionMessageParam[]): ChatUIMessage[] => {
+// Formats Gemini API messages (AppChatMessage[]) for UI display (ChatUIMessage[])
+const formatGroqMessagesForUI = (groqMessages: AppChatMessage[]): ChatUIMessage[] => {
     return groqMessages
-      .map((gm): ChatUIMessage | null => { // Return null for invalid messages
+      .map((gm): ChatUIMessage | null => {
         const uiParts: ChatMessagePart[] = [];
-
-        // Handle different content types from Groq
         if (typeof gm.content === 'string') {
           uiParts.push({ type: 'text', content: gm.content });
         } else if (Array.isArray(gm.content)) {
-          // Iterate through content parts (text or image_url)
-          (gm.content as ChatCompletionContentPart[]).forEach(part => {
-            if (part.type === 'text') {
-              uiParts.push({ type: 'text', content: part.text });
-            } else if (part.type === 'image_url') {
-              // Represent image sent to API as text in UI for initial messages
+          gm.content.forEach(part => {
+            if (typeof part === 'string') {
+              uiParts.push({ type: 'text', content: part });
+            } else if ('image_url' in part) {
               uiParts.push({ type: 'text', content: '[Image Content Sent]' });
-              // If you store the base64/URL used, you could potentially display it:
-              // uiParts.push({ type: 'image', content: part.image_url.url, alt: 'Sent Image' });
             } else {
-              // Handle potential future content part types
-               uiParts.push({ type: 'text', content: '[Unknown Part Type]' });
+              uiParts.push({ type: 'text', content: '[Unknown Part Type]' });
             }
           });
         } else if (gm.content === null) {
-          // Handle null content (e.g., if AI finishes without response)
           uiParts.push({ type: 'text', content: '[AI response content was empty]' });
         } else {
-          // Handle unexpected content format
           uiParts.push({ type: 'text', content: '[Invalid Content Format Received]' });
         }
-
-        // Ensure we have at least one part, even if empty (though filtering should catch this)
         if (uiParts.length === 0) {
             uiParts.push({type: 'text', content: '[Empty Message Structure]'});
         }
-
-        // Map Groq role ('assistant'/'user') to UI role ('model'/'user')
         let role: 'user' | 'model' | null = null;
-        if (gm.role === 'user') {
-            role = 'user';
-        } else if (gm.role === 'assistant') {
-            role = 'model';
-        } else if (gm.role === 'system') {
-            return null; // Don't display system messages in the UI
-        } else {
-            //  console.warn(`Invalid role from Groq message: ${gm.role}. Skipping.`);
-             return null;
-        }
-
-        return { role: role, parts: uiParts };
+        if (gm.role === 'user') role = 'user';
+        else if (gm.role === 'assistant') role = 'model';
+        else if (gm.role === 'system') return null;
+        else return null;
+        return { role, parts: uiParts };
       })
       .filter((msg): msg is ChatUIMessage =>
-          msg !== null && msg.parts.some(p => p.content.trim()) // Ensure msg is not null and has content
+          msg !== null && msg.parts.some(p => p.content.trim())
       );
 };
 
-// Extracts text content from a Groq message, representing images as placeholders
-const getTextContentFromMessage = (msg: ChatCompletionMessageParam): string | null => {
+// Extracts text content from a Gemini message, representing images as placeholders
+const getTextContentFromMessage = (msg: AppChatMessage): string | null => {
     if (typeof msg.content === 'string') {
-      return msg.content.trim() || null; // Return null if only whitespace
+      return msg.content.trim() || null;
     } else if (Array.isArray(msg.content)) {
-      // Extract text parts
-      const textParts = msg.content
-        .filter((part): part is Groq.Chat.Completions.ChatCompletionContentPartText => part.type === 'text')
-        .map(part => part.text)
-        .join(' ');
-      // Create placeholders for image parts
-      const imageParts = msg.content
-        .filter(part => part.type === 'image_url')
-        .map((part, index) => `[Image ${index + 1}]`); // Placeholder like "[Image 1]"
-      // Combine text and image placeholders
+      const textParts = msg.content.filter(part => typeof part === 'string').join(' ');
+      const imageParts = msg.content.filter(part => typeof part !== 'string').map((_, idx) => `[Image ${idx + 1}]`);
       const combined = [textParts, ...imageParts].filter(Boolean).join(' ');
-      return combined.trim() || null; // Return null if combined result is empty
+      return combined.trim() || null;
     }
-    // Return null if content is neither string nor array (or is null)
     return null;
 };
 
@@ -320,7 +283,7 @@ const ChatPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false); // General loading (sending msg, loading history)
   const [isStartingChat, setIsStartingChat] = useState<boolean>(false); // Specific loading for starting a new chat
   const [isContextLoading, setIsContextLoading] = useState<boolean>(true); // Loading initial user profile/data
-  const [chatHistoryForApi, setChatHistoryForApi] = useState<ChatCompletionMessageParam[]>([]); // Holds full history for Groq API
+  const [chatHistoryForApi, setChatHistoryForApi] = useState<AppChatMessage[]>([]); // Holds full history for Gemini API
   const [messages, setMessages] = useState<ChatUIMessage[]>([]); // Holds messages formatted for UI display
   const [inputMessage, setInputMessage] = useState<string>('');
   const [streamingResponse, setStreamingResponse] = useState<string>(''); // Holds incoming streaming text
@@ -419,7 +382,7 @@ const ChatPage: React.FC = () => {
     } finally {
       setIsContextLoading(false); // Ensure loading state is turned off
     }
-  }, [user?.$id, toast]); // Include weeksPregnant dependency to avoid overwriting manual entry
+  }, [user?.$id, toast, weeksPregnant]);
 
   // --- Effects ---
 
@@ -601,15 +564,17 @@ const ChatPage: React.FC = () => {
     setError(null); // Clear previous errors
     setStreamingResponse(''); // Clear previous streaming response
     const uiMessageParts: ChatMessagePart[] = []; // Parts for the UI message
-    const apiMessageParts: ChatCompletionContentPart[] = []; // Parts for the API message
-    let imageApiPart: ImageContentPart | null = null; // To hold processed image data
+  const apiMessageParts: (string | { type: 'image_url'; image_url: { url: string } })[] = []; // Parts for the API message
+  let imageApiPart: GeminiImagePart | null = null; // To hold processed image data
 
     // 1. Process Image (if attached)
     if (pendingImageFile && pendingImagePreviewUrl) {
       try {
         // Convert file to the format Groq API expects
         imageApiPart = await groqService.fileToApiImagePart(pendingImageFile);
-        apiMessageParts.push(imageApiPart); // Add to API parts
+        if ('inlineData' in imageApiPart && imageApiPart.inlineData) {
+          apiMessageParts.push({ type: 'image_url', image_url: { url: `data:${imageApiPart.inlineData.mimeType};base64,${imageApiPart.inlineData.data}` } });
+        }
         // Add image part for UI display (using preview URL)
         uiMessageParts.push({ type: 'image', content: pendingImagePreviewUrl, alt: pendingImageFile.name });
       } catch (err: unknown) {
@@ -623,7 +588,7 @@ const ChatPage: React.FC = () => {
     // 2. Process Text (if provided)
     if (messageText) {
       uiMessageParts.push({ type: 'text', content: messageText }); // Add text part for UI
-      apiMessageParts.push({ type: 'text', text: messageText }); // Add text part for API
+  apiMessageParts.push(messageText); // Add text part for API (just the string)
     }
 
     // Should not happen due to initial check, but safety first
@@ -632,7 +597,7 @@ const ChatPage: React.FC = () => {
     // 3. Prepare User Message and Update History
     const userMessageForUi: ChatUIMessage = { role: 'user', parts: uiMessageParts };
     // Create the user message object for the Groq API
-    const newUserApiMessage: ChatCompletionMessageParam = { role: 'user', content: apiMessageParts };
+  const newUserApiMessage: AppChatMessage = { role: 'user', content: apiMessageParts };
 
     // Add user message to UI immediately for responsiveness
     setMessages(prev => [...prev, userMessageForUi]);
@@ -644,12 +609,12 @@ const ChatPage: React.FC = () => {
     // console.log("Updated main API history state with new user message.");
 
     // 4. Prepare History *Specifically for THIS API Call* (Handle Groq Image+System Incompatibility)
-    let historyForThisApiCall: ChatCompletionMessageParam[];
+  let historyForThisApiCall: AppChatMessage[];
 
     // Check if ANY message in the *entire* history being sent contains an image
-    const historyContainsImage = updatedHistoryForApi.some(msg =>
-        Array.isArray(msg.content) && msg.content.some(part => part.type === 'image_url')
-    );
+  const historyContainsImage = updatedHistoryForApi.some(msg =>
+    Array.isArray(msg.content) && msg.content.some(part => typeof part === 'object' && part.type === 'image_url')
+  );
 
     if (historyContainsImage) {
         // If an image exists anywhere in the history, filter out the system message for this API call
@@ -713,7 +678,7 @@ const ChatPage: React.FC = () => {
           if (!streamErrorOccurred && accumulatedResponse.trim()) {
             // Stream completed successfully with content
             const finalResponse = accumulatedResponse.trim();
-            const modelApiMessage: ChatCompletionMessageParam = { role: 'assistant', content: finalResponse };
+            const modelApiMessage: AppChatMessage = { role: 'assistant', content: finalResponse };
 
             // Update the main API history state to include the assistant's final response
             setChatHistoryForApi(prev => [...prev, modelApiMessage]);
@@ -737,7 +702,7 @@ const ChatPage: React.FC = () => {
               // Stream completed successfully but produced no text content
               // console.warn("Stream completed successfully but produced no text content.");
               // Check if the user message just sent contained an image
-              const userMessageHadImage = apiMessageParts.some(p => p.type === 'image_url');
+              const userMessageHadImage = apiMessageParts.some(p => typeof p === 'object' && p.type === 'image_url');
               if (userMessageHadImage && !finalModelMessageSaved) {
                   // If user sent an image and got no text back, add an acknowledgement message
                   const ackMsg = "[Image received. I cannot analyze medical images, but let me know if you have questions about general appearance or other topics.]";
@@ -818,7 +783,7 @@ const ChatPage: React.FC = () => {
       };
 
       const systemPromptText = groqService.createSystemPrompt(currentPrefs, currentProfile, currentContext);
-      const systemMessage: ChatCompletionMessageParam = { role: 'system', content: systemPromptText };
+  const systemMessage: AppChatMessage = { role: 'system', content: systemPromptText };
 
       // 4. Format the loaded DB history for the Groq API
       const loadedApiHistory = formatHistoryForGroq(appwriteHistory);
@@ -1234,7 +1199,7 @@ const ChatPage: React.FC = () => {
       setIsRecording(false); // Ensure state is reset
       recognitionRef.current = null; // Clear ref
     }
-  }, [isRecording, isLoading, toast, pendingImageFile, handleSendMessage]); // Added handleSendMessage if auto-send on end is desired
+  }, [isRecording, isLoading, toast, pendingImageFile]);
 
 
   // Memoized function to generate conversation starter prompts.
@@ -1315,23 +1280,21 @@ const ChatPage: React.FC = () => {
     return (
       <MainLayout>
         <TooltipProvider delayDuration={100}>
-          {/* Hidden file input for image uploads */}
           <input
-              type="file"
-              accept="image/png, image/jpeg, image/webp, image/gif, image/heic, image/heif" // Allowed types
-              ref={imageInputRef}
-              className="hidden"
-              onChange={handleImageUpload}
-              aria-hidden="true" // Hide from accessibility tree
-           />
-
-          {/* PDF Export Confirmation Dialog */}
+            type="file"
+            accept="image/png, image/jpeg, image/webp, image/gif, image/heic, image/heif"
+            ref={imageInputRef}
+            className="hidden"
+            onChange={handleImageUpload}
+            aria-hidden="true"
+          />
+          {/* PDF Export Confirmation Dialog remains unchanged */}
           <Dialog open={showPdfConfirm} onOpenChange={setShowPdfConfirm}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Export Chat to PDF</DialogTitle>
                 <DialogDescription>
-                   This generates a PDF of the visible chat messages. Very long chats might be truncated in the image capture. Ensure all desired content is visible before exporting.
+                  This generates a PDF of the visible chat messages. Very long chats might be truncated in the image capture. Ensure all desired content is visible before exporting.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="flex flex-col sm:flex-row justify-end gap-2 mt-4">
@@ -1342,373 +1305,93 @@ const ChatPage: React.FC = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
-          {/* Main Chat Layout (Sidebar + Chat Area) */}
           <div className="flex h-[calc(100vh-var(--header-height,60px))] bg-gray-100 dark:bg-gray-950">
-            {/* Sidebar (conditionally rendered based on auth and screen size) */}
             {user && isAuthenticated && (
               <ChatHistorySidebar
                 onSelectSession={handleLoadSession}
                 currentSessionId={currentSessionId}
-                className="flex-shrink-0 border-r border-gray-200 dark:border-gray-800 hidden md:flex" // Hide on smaller screens (md breakpoint)
+                className="flex-shrink-0 border-r border-gray-200 dark:border-gray-800 hidden md:flex"
                 onSessionDeleted={handleSessionDeleted}
-                // --- Fix for TS2322: Pass userId, assuming ChatHistorySidebarProps expects it.
-                // --- Ensure ChatHistorySidebarProps in its file includes `userId: string;`
                 userId={user.$id}
               />
             )}
-
-            {/* Chat Area */}
             <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
-              {/* Inner container for padding and max-width */}
               <div className="max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-6 flex flex-col h-full w-full">
-
-                {/* Conditional Rendering: Pre-Chat Form or Active Chat */}
                 {showPreChat ? (
-                  // --- Pre-Chat Form ---
-                  <Card className="w-full max-w-3xl mx-auto mt-8 animate-fade-in border border-mamasaheli-primary/20 dark:border-gray-700/50 shadow-lg">
-    <CardHeader> {/* Default padding (usually p-6) applies here */}
-      <CardTitle className="text-2xl sm:text-3xl font-bold text-mamasaheli-primary dark:text-mamasaheli-light text-center">
-        MamaSaheli Assistant
-      </CardTitle>
-      <CardDescription className="text-center text-gray-600 dark:text-gray-400 mt-1">
-        Let's personalize your chat experience.
-      </CardDescription>
-    </CardHeader>
-    {/* Using specific padding here is fine if you need different padding than the header/footer */}
-    <CardContent className="space-y-5 px-6 pb-6 pt-4">
-      {isContextLoading && (
-        <div className="flex justify-center items-center py-4">
-          <Loader2 className="h-6 w-6 animate-spin text-mamasaheli-primary dark:text-mamasaheli-light" aria-label="Loading profile" />
-          <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">Loading your profile...</span>
-        </div>
-      )}
-      {!isContextLoading && (
-        <>
-          {/* Feeling Dropdown */}
-          <div className="space-y-1.5">
-            <Label htmlFor="feeling-select" className="dark:text-gray-300 font-medium">
-              How are you feeling today? *
-            </Label>
-            <Select value={feeling} onValueChange={setFeeling} required>
-              <SelectTrigger id="feeling-select" className="w-full dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 focus:ring-mamasaheli-primary/50">
-                <SelectValue placeholder="Select how you feel" />
-              </SelectTrigger>
-              <SelectContent className="dark:bg-gray-800 dark:text-gray-200">
-                {feelingOptions.map((option) => (
-                  <SelectItem key={option} value={option} className="dark:focus:bg-gray-700">
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {feeling === "Other (Specify in concerns)" && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 pt-1">
-                Please add details in the "Specific Concerns" box below.
-              </p>
-            )}
-          </div>
-          {/* Age Input */}
-          <div className="space-y-1.5">
-            <Label htmlFor="age" className="dark:text-gray-300 font-medium">
-              Your Age *
-            </Label>
-            <Input
-              id="age"
-              type="number"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              placeholder="Enter your current age"
-              required
-              min="11"
-              max="99"
-              className="dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 focus:ring-mamasaheli-primary/50"
-            />
-          </div>
-          {/* Weeks Pregnant Input */}
-          <div className="space-y-1.5">
-            <Label htmlFor="weeksPregnant" className="dark:text-gray-300 font-medium">
-              Weeks Pregnant (Optional)
-            </Label>
-            <Input
-              id="weeksPregnant"
-              type="number"
-              value={weeksPregnant}
-              onChange={(e) => setWeeksPregnant(e.target.value)}
-              // Display profile value in placeholder if available and form field is empty
-              placeholder={
-                userProfile?.weeksPregnant !== undefined && !weeksPregnant
-                  ? `Current in profile: ${userProfile.weeksPregnant}`
-                  : "e.g., 12"
-              }
-              min="0"
-              max="45"
-              className="dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 focus:ring-mamasaheli-primary/50"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Leave blank to use profile value (if set).
-            </p>
-          </div>
-          {/* Pre-existing Conditions Textarea */}
-          <div className="space-y-1.5">
-            <Label htmlFor="preExistingConditions" className="dark:text-gray-300 font-medium">
-              Pre-existing Conditions (Optional)
-            </Label>
-            <Textarea
-              id="preExistingConditions"
-              value={preExistingConditions}
-              onChange={(e) => setPreExistingConditions(e.target.value)}
-              placeholder="e.g., gestational diabetes, hypertension, none"
-              rows={2}
-              maxLength={300}
-              className="dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 resize-none focus:ring-mamasaheli-primary/50"
-            />
-          </div>
-          {/* Specific Concerns Textarea */}
-          <div className="space-y-1.5">
-            <Label htmlFor="specificConcerns" className="dark:text-gray-300 font-medium">
-              Specific Concerns Today (Optional)
-            </Label>
-            <Textarea
-              id="specificConcerns"
-              value={specificConcerns}
-              onChange={(e) => setSpecificConcerns(e.target.value)}
-              placeholder="Anything specific on your mind? e.g., back pain, questions about nutrition, details if feeling 'Other'"
-              rows={2}
-              maxLength={300}
-              className="dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 resize-none focus:ring-mamasaheli-primary/50"
-            />
-          </div>
-        </>
-      )}
-    </CardContent>
-    <CardFooter className="flex justify-end px-6 pb-5 pt-4"> {/* Adjusted padding slightly */}
-      {/* Start Chat Button */}
-      <Button
-        onClick={handleStartChat}
-        disabled={isStartingChat || isContextLoading || !feeling || !age.trim()}
-        className="bg-mamasaheli-primary hover:bg-mamasaheli-dark dark:bg-mamasaheli-primary dark:hover:bg-mamasaheli-dark min-w-[120px] transition-colors"
-      >
-        {isStartingChat ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-            Starting...
-          </>
-        ) : (
-          <>
-            <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
-            Start Chat
-          </>
-        )}
-      </Button>
-    </CardFooter>
-    {/* Error display within the pre-chat card */}
-    {error && showPreChat && (
-      <p className="text-red-600 dark:text-red-400 text-sm px-6 py-4 text-center border-t dark:border-gray-700/50">
-        {error}
-      </p>
-    )}
-  </Card>
-
+                  <PreChatForm
+                    isContextLoading={isContextLoading}
+                    isStartingChat={isStartingChat}
+                    feeling={feeling}
+                    setFeeling={setFeeling}
+                    age={age}
+                    setAge={setAge}
+                    weeksPregnant={weeksPregnant}
+                    setWeeksPregnant={setWeeksPregnant}
+                    preExistingConditions={preExistingConditions}
+                    setPreExistingConditions={setPreExistingConditions}
+                    specificConcerns={specificConcerns}
+                    setSpecificConcerns={setSpecificConcerns}
+                    feelingOptions={feelingOptions}
+                    userProfile={userProfile}
+                    handleStartChat={handleStartChat}
+                    error={error}
+                  />
                 ) : (
-
-                  // --- Active Chat View ---
                   <div className="flex-1 flex flex-col overflow-hidden h-full">
-                    <Card className={`flex-1 flex flex-col overflow-hidden border-2 ${getTrimesterBorderColor()} dark:bg-gray-800/80 dark:border-gray-700/80 shadow-md rounded-lg`}>
-                      {/* Chat Header */}
-                      <CardHeader className="p-2 px-3 sm:px-4 flex flex-row justify-between items-center border-b bg-white dark:bg-gray-800 dark:border-gray-700 shrink-0 rounded-t-lg">
-                        {/* Title and Context Info */}
-                        <div className="flex flex-col">
-                          <CardTitle className="text-base sm:text-lg font-semibold text-mamasaheli-primary dark:text-mamasaheli-light">MamaSaheli Assistant</CardTitle>
-                           {/* Display Trimester or Session ID */}
-                           {pregnancyTrimester && (<CardDescription className="text-xs text-gray-500 dark:text-gray-400">Trimester {pregnancyTrimester} Context {currentSessionId ? `(Session ...${currentSessionId.slice(-4)})` : ''}</CardDescription>)}
-                           {!pregnancyTrimester && currentSessionId && (<CardDescription className="text-xs text-gray-500 dark:text-gray-400">Session ...{currentSessionId.slice(-4)}</CardDescription>)}
-                           {!currentSessionId && (<CardDescription className="text-xs text-gray-500 dark:text-gray-400">New Chat</CardDescription>)}
-                        </div>
-                        {/* Action Buttons */}
-                        <div className="flex gap-1">
-                          {/* Clear Chat View Button */}
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleClearChat} disabled={isLoading || messages.length === 0} className="h-7 w-7 sm:h-8 sm:w-8 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 rounded-full" aria-label="Clear chat view"><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Clear Chat View</p></TooltipContent></Tooltip>
-                          {/* New Chat / Restart Button */}
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleRestartChat} disabled={isLoading || isStartingChat} className="h-7 w-7 sm:h-8 sm:w-8 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 rounded-full" aria-label="Start new chat"><RefreshCw className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>New Chat</p></TooltipContent></Tooltip>
-                          {/* Export PDF Button */}
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setShowPdfConfirm(true)} disabled={isLoading || messages.length === 0 || isExportingPdf} className="h-7 w-7 sm:h-8 sm:w-8 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 rounded-full" aria-label="Export chat as PDF"><Share2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Export as PDF</p></TooltipContent></Tooltip>
-                        </div>
-                      </CardHeader>
-
-                      {/* Chat Message Area */}
-                      <CardContent ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 scroll-smooth bg-gray-50/70 dark:bg-gray-800/70">
-                        {/* Loading Indicator for History */}
-                        {isLoading && messages.length === 0 && currentSessionId && !isStartingChat && (
-                          <div className="flex justify-center items-center h-full text-sm text-gray-500 dark:text-gray-400"><Loader2 className="h-5 w-5 animate-spin mr-2" aria-hidden="true"/>Loading chat history...</div>
-                        )}
-
-                        {/* Display Messages */}
-                        {messages.map((message, index) => {
-                           // Basic validation for message structure (already filtered in formatters, but good practice)
-                           if (!message || !message.role || !Array.isArray(message.parts)) {
-                              //  console.warn("Skipping render of invalid message structure:", message);
-                               return null;
-                           }
-                           // Create a more robust key using index and session ID
-                           const uniqueKey = `${currentSessionId || 'new'}-${message.role}-${index}`;
-
-                          return (
-                            <div
-                              key={uniqueKey}
-                              className={`flex items-start space-x-2 animate-fade-in ${message.role === 'user' ? 'justify-end pl-8 sm:pl-10' : 'justify-start pr-8 sm:pr-10'}`}
-                            >
-                              {/* AI Icon (Model) */}
-                              {message.role === 'model' && (<Bot className="h-5 w-5 text-mamasaheli-primary/80 dark:text-mamasaheli-light/80 mt-1 flex-shrink-0 self-start" aria-label="AI Icon" />)}
-
-                              {/* Message Bubble */}
-                              <div className={`relative group max-w-[85%] rounded-xl shadow-sm flex flex-col ${ message.role === 'user' ? 'bg-mamasaheli-primary text-white rounded-br-none items-end' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-none border border-gray-200 dark:border-gray-600 items-start' }`} >
-                                {/* Render Message Parts (Text/Image) */}
-                                {message.parts.map((part, partIndex) => (
-                                  <div key={`${uniqueKey}-part-${partIndex}`} className={`px-3 py-1 sm:px-4 sm:py-1.5 first:pt-2 last:pb-2 w-full ${part.type === 'image' ? 'my-1 flex justify-center' : ''}`} >
-                                    {/* Text Part */}
-                                    {part.type === 'text' && part.content ? (
-                                      <div className={`prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-li:my-0.5 ${message.role === 'user' ? 'text-white prose-a:text-blue-200 hover:prose-a:text-blue-100' : 'prose-a:text-mamasaheli-primary hover:prose-a:text-mamasaheli-dark dark:prose-a:text-mamasaheli-light dark:hover:prose-a:text-blue-300'}`}>
-                                        {/* Use ReactMarkdown for rendering markdown content */}
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }: AnchorProps) => (<a target="_blank" rel="noopener noreferrer" {...props} />) }} >
-                                          {part.content}
-                                        </ReactMarkdown>
-                                      </div>
-                                    ) : null}
-                                    {/* Image Part */}
-                                    {part.type === 'image' && part.content ? (
-                                      <img
-                                        src={part.content}
-                                        alt={part.alt || 'User uploaded image'}
-                                        className="max-w-full h-auto max-h-60 object-contain rounded-md border border-gray-300 dark:border-gray-600 my-1 bg-gray-100 dark:bg-gray-600"
-                                        // Basic error handling for broken image links
-                                        onError={(e) => {
-                                          // console.warn(`Failed to load image: ${part.content}`);
-                                          const target = e.target as HTMLImageElement;
-                                          target.alt = 'Image failed to load';
-                                          // Optionally replace with a placeholder or hide
-                                          // target.style.display = 'none'; // Hide broken image
-                                          // Insert a text placeholder instead
-                                          const errorDiv = document.createElement('div');
-                                          errorDiv.textContent = '[Image load error]';
-                                          errorDiv.className = 'text-xs text-red-500 italic p-2 bg-red-50 dark:bg-red-900/50 rounded';
-                                          target.parentNode?.replaceChild(errorDiv, target); // Replace img with error text
-                                        }} />
-                                    ) : null}
-                                  </div>
-                                ))}
-                                {/* Bookmark Button (for model messages with text content) */}
-                                {message.role === 'model' && message.parts.some(p => p.type === 'text' && p.content?.trim()) && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost" size="icon"
-                                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity h-6 w-6 p-1 rounded-full bg-white/70 dark:bg-gray-600/70 hover:bg-white dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-500"
-                                        onClick={() => handleBookmarkClick(message.parts.find(p => p.type === 'text')?.content || '')}
-                                        aria-label="Bookmark this message"
-                                        disabled={isLoading} // Disable while loading/bookmarking
-                                       >
-                                        <Bookmark className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top"><p>Bookmark</p></TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </div>
-
-                              {/* User Icon */}
-                              {message.role === 'user' && (<User className="h-5 w-5 text-gray-500 dark:text-gray-400 mt-1 flex-shrink-0 self-start" aria-label="User Icon" />)}
-                            </div>
-                          );
-                        })}
-
-                        {/* Streaming Response Area */}
-                        {streamingResponse && (
-                          <div className="flex items-start space-x-2 justify-start pr-8 sm:pr-10 animate-fade-in">
-                            <Bot className="h-5 w-5 text-mamasaheli-primary/80 dark:text-mamasaheli-light/80 mt-1 flex-shrink-0 self-start" aria-label="AI Icon"/>
-                            <div className="relative max-w-[85%] rounded-xl shadow-sm flex flex-col bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-none border border-gray-200 dark:border-gray-600 items-start">
-                              <div className="px-3 py-1 sm:px-4 sm:py-1.5 first:pt-2 last:pb-2 w-full">
-                                {/* Render streaming markdown */}
-                                <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-a:text-mamasaheli-primary hover:prose-a:text-mamasaheli-dark dark:prose-a:text-mamasaheli-light dark:hover:prose-a:text-blue-300 whitespace-pre-wrap">
-                                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }: AnchorProps) => (<a target="_blank" rel="noopener noreferrer" {...props} />) }} >
-                                      {streamingResponse}
-                                    </ReactMarkdown>
-                                  {/* Blinking cursor simulation at the end of streaming text */}
-                                  <span className="inline-block animate-pulse ml-1">▍</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Thinking Indicator (shown only when loading and user was the last message) */}
-                        {isLoading && !streamingResponse && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-                          <div className="flex items-center justify-center py-2 text-sm text-gray-500 dark:text-gray-400"><Loader2 className="h-4 w-4 animate-spin mr-2" aria-hidden="true"/>MamaSaheli is thinking...</div>
-                        )}
-
-                        {/* Error Display Area (within chat scroll) */}
-                        {error && !showPreChat && (
-                          <div className="flex items-center p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700/40 rounded-lg text-red-700 dark:text-red-300 text-sm shadow-sm my-2 mx-1">
-                            <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" aria-hidden="true"/>
-                            <span className="flex-1 break-words">{error}</span>
-                             {/* Button to dismiss the error message */}
-                             <Button variant="ghost" size="icon" onClick={() => setError(null)} className="h-6 w-6 p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-800/50 rounded-full -mr-1 ml-2 flex-shrink-0" aria-label="Dismiss error"><X className="h-4 w-4"/></Button>
-                          </div>
-                        )}
-
-                        {/* Scroll Anchor: Empty div at the bottom to scroll into view */}
+                    <div className={`flex-1 flex flex-col overflow-hidden border-2 ${getTrimesterBorderColor()} dark:bg-gray-800/80 dark:border-gray-700/80 shadow-md rounded-lg`}>
+                      <ChatHeader
+                        pregnancyTrimester={pregnancyTrimester}
+                        currentSessionId={currentSessionId}
+                        getTrimesterBorderColor={getTrimesterBorderColor}
+                        handleClearChat={handleClearChat}
+                        handleRestartChat={handleRestartChat}
+                        setShowPdfConfirm={setShowPdfConfirm}
+                        isLoading={isLoading}
+                        isStartingChat={isStartingChat}
+                        isExportingPdf={isExportingPdf}
+                        messagesLength={messages.length}
+                      />
+                      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 scroll-smooth bg-gray-50/70 dark:bg-gray-800/70">
+                        <LoadingHistory isLoading={isLoading} messages={messages} currentSessionId={currentSessionId} isStartingChat={isStartingChat} />
+                        <ChatMessages
+                          messages={messages}
+                          currentSessionId={currentSessionId}
+                          isLoading={isLoading}
+                          handleBookmarkClick={handleBookmarkClick}
+                          error={error}
+                          showPreChat={showPreChat}
+                          setError={setError}
+                        />
+                        <StreamingResponse streamingResponse={streamingResponse} />
+                        <ThinkingIndicator isLoading={isLoading} streamingResponse={streamingResponse} messages={messages} />
+                        <ErrorDisplay error={error} showPreChat={showPreChat} setError={setError} />
                         <div ref={messagesEndRef} className="h-0" />
-                      </CardContent>
-
-                      {/* Conversation Starters (conditionally rendered) */}
+                      </div>
                       {renderConversationStarters}
-
-                      {/* Input Area */}
-                      <CardFooter className="border-t p-2 sm:p-3 bg-white dark:bg-gray-800 dark:border-gray-700 shrink-0 flex flex-col items-stretch rounded-b-lg">
-                        {/* Image Preview Area */}
-                        {pendingImagePreviewUrl && (
-                          <div className="mb-2 ml-10 sm:ml-12 relative self-start">
-                            <div className="rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden inline-block bg-gray-100 dark:bg-gray-700 p-1 shadow-sm">
-                              <img src={pendingImagePreviewUrl} alt="Image upload preview" className="max-h-24 sm:max-h-32 w-auto object-cover rounded" />
-                              {/* Remove Image Button */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="destructive" size="icon" className="absolute top-0 right-0 m-0.5 bg-black/60 hover:bg-black/80 text-white rounded-full h-5 w-5 p-0.5 opacity-80 hover:opacity-100" onClick={handleRemovePendingImage} aria-label="Remove attached image">
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top"><p>Remove Image</p></TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </div>
-                        )}
-                        {/* Main Input Row */}
-                        <div className="flex items-center gap-2">
-                           {/* Attach Image Button */}
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleImageAttachClick} disabled={isLoading || !!pendingImageFile || isRecording} className="text-gray-500 hover:text-mamasaheli-primary dark:text-gray-400 dark:hover:text-mamasaheli-light h-8 w-8 sm:h-9 sm:w-9 rounded-full flex-shrink-0" aria-label="Attach image"><ImagePlus className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>Attach Image</p></TooltipContent></Tooltip>
-                          {/* Text Input */}
-                          <Input
-                              value={inputMessage}
-                              onChange={(e) => setInputMessage(e.target.value)}
-                              onKeyDown={handleKeyDown} // Handle Enter key
-                              placeholder={ isRecording ? "Listening... Click mic to stop" : pendingImageFile ? "Add comment (optional) and send..." : "Type your message or question..." }
-                              disabled={isLoading || isRecording} // Disable while loading or recording
-                              className="flex-1 h-9 sm:h-10 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 focus:ring-mamasaheli-primary/50"
-                              aria-label="Chat message input"
-                              maxLength={2000} // Limit input length
-                           />
-                          {/* Voice Input Button */}
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleVoiceInput} disabled={isLoading || !!pendingImageFile} className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex-shrink-0 text-gray-500 hover:text-mamasaheli-primary dark:text-gray-400 dark:hover:text-mamasaheli-light ${ isRecording ? 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 animate-pulse' : '' }`} aria-label={isRecording ? "Stop voice recording" : "Start voice input"}><Mic className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{isRecording ? "Stop Recording" : "Voice Input"}</p></TooltipContent></Tooltip>
-                          {/* Send Button */}
-                          <Tooltip><TooltipTrigger asChild><Button onClick={() => handleSendMessage()} disabled={isLoading || isRecording || (!inputMessage.trim() && !pendingImageFile)} className="bg-mamasaheli-primary hover:bg-mamasaheli-dark dark:bg-mamasaheli-primary dark:hover:bg-mamasaheli-dark h-9 w-9 sm:h-10 sm:w-10 p-0 flex-shrink-0 rounded-full transition-colors" aria-label="Send message">{isLoading && !isStartingChat ? (<Loader2 className="h-5 w-5 animate-spin" />) : (<Send className="h-5 w-5" />)}</Button></TooltipTrigger><TooltipContent><p>Send</p></TooltipContent></Tooltip>
-                        </div>
-                      </CardFooter>
-                    </Card>
+                      <div className="border-t p-2 sm:p-3 bg-white dark:bg-gray-800 dark:border-gray-700 shrink-0 flex flex-col items-stretch rounded-b-lg">
+                        <ImagePreview
+                          pendingImagePreviewUrl={pendingImagePreviewUrl}
+                          handleRemovePendingImage={handleRemovePendingImage}
+                          pendingImageFile={pendingImageFile}
+                        />
+                        <ChatInput
+                          inputMessage={inputMessage}
+                          setInputMessage={setInputMessage}
+                          handleKeyDown={handleKeyDown}
+                          handleSendMessage={handleSendMessage}
+                          handleImageAttachClick={handleImageAttachClick}
+                          handleVoiceInput={handleVoiceInput}
+                          isLoading={isLoading}
+                          isRecording={isRecording}
+                          pendingImageFile={pendingImageFile}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div> {/* End Inner container */}
-            </div> {/* End Chat Area */}
-          </div> {/* End Main Chat Layout */}
+              </div>
+            </div>
+          </div>
         </TooltipProvider>
       </MainLayout>
     );

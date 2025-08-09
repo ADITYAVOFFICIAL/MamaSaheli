@@ -39,8 +39,8 @@ import {
     getUserProfile,
     castForumVote, getUserVoteStatus, getTargetVoteCounts
 } from '@/lib/appwrite'; // Assuming appwrite types/functions are correctly exported
-import { formatContentWithGroq } from '@/lib/groqf'; // Assuming groq formatting function exists
-import { groqModService, ModerationDecision, ModerationFlag } from '@/lib/groqMod'; // Assuming groq moderation service exists
+import { formatContentWithGemini } from '@/lib/geminif';
+import { geminiModService, ModerationDecision, ModerationFlag } from '@/lib/geminiMod';
 
 // --- Helper Functions ---
 const getInitials = (nameStr: string | undefined | null): string => {
@@ -66,7 +66,7 @@ const FORUM_CATEGORIES = [
 const BACKEND_WS_URL = import.meta.env.VITE_PUBLIC_BACKEND_WS_URL || 'ws://localhost:3001';
 
 // --- Type Definitions ---
-type AnchorProps = React.ClassAttributes<HTMLAnchorElement> & React.AnchorHTMLAttributes<HTMLAnchorElement> & { node?: any };
+type AnchorProps = React.ClassAttributes<HTMLAnchorElement> & React.AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown };
 // Type for messages received from backend WebSocket
 interface BackendWebSocketMessage {
     type: 'new_post' | 'vote_update' | 'error' | 'info';
@@ -141,7 +141,7 @@ const TopicListItem: React.FC<{
         };
         fetchVoteData();
         return () => { isMounted = false };
-    }, [isAuthenticated, currentUserId, topic.$id]); // Removed topic.voteScore dependency here
+    }, [isAuthenticated, currentUserId, topic.$id, topic.voteScore]); // Added topic.voteScore to dependencies
 
      useEffect(() => {
         // Update local score if the prop changes (from WebSocket update in parent)
@@ -223,7 +223,7 @@ const PostItem: React.FC<{
         };
         fetchVoteData();
         return () => { isMounted = false };
-    }, [isAuthenticated, currentUserId, post.$id]); // Removed post.voteScore dependency here
+    }, [isAuthenticated, currentUserId, post.$id, post.voteScore]);
 
     useEffect(() => {
         // Update local score if the prop changes (from WebSocket update in parent)
@@ -388,126 +388,17 @@ const ForumPage: React.FC = () => {
 
     // Trigger debounced fetches on search/filter changes
     useEffect(() => { if (!topicId) debouncedFetchTopics(); return () => debouncedFetchTopics.cancel(); }, [searchQuery, debouncedFetchTopics, topicId]);
-    useEffect(() => { if (!topicId) fetchTopics(1, true); }, [filterCategory, sortBy, topicId]);
+    useEffect(() => { if (!topicId) fetchTopics(1, true); }, [filterCategory, sortBy, topicId, fetchTopics]);
     useEffect(() => { if (topicId) debouncedFetchPosts(); return () => debouncedFetchPosts.cancel(); }, [postSearchQuery, debouncedFetchPosts, topicId]);
 
     // *** WebSocket Connection Effect ***
-    useEffect(() => {
-        // Only connect if on a topic page and authenticated
-        if (!topicId || !isAuthenticated) {
-            if (wsRef.current) {
-                // console.log('[WS Frontend] Disconnecting WebSocket due to navigation or auth change.');
-                wsRef.current.close();
-                wsRef.current = null;
-            }
-            return;
-        }
-
-        if (wsRef.current) {
-            // console.log('[WS Frontend] WebSocket connection already exists.');
-            return;
-        }
-
-        // console.log(`[WS Frontend] Attempting to connect to backend WebSocket at ${BACKEND_WS_URL}...`);
-        const ws = new WebSocket(BACKEND_WS_URL);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-            // console.log('[WS Frontend] Connected to backend WebSocket.');
-            toast({ title: "Real-time connection established." });
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const message: BackendWebSocketMessage = JSON.parse(event.data as string);
-                // console.log('[WS Frontend] Received message:', message.type, message.payload);
-
-                switch (message.type) {
-                    case 'new_post':
-                        const newPostData = message.payload as ForumPost;
-                        if (newPostData.topicId === topicId) {
-                            // console.log(`[WS Frontend] Handling new_post for current topic ${topicId}`);
-                            setPosts(prevPosts => {
-                                if (prevPosts.some(p => p.$id === newPostData.$id)) return prevPosts;
-                                const updatedPosts = [...prevPosts, newPostData];
-                                // Ensure sorting is applied correctly
-                                return updatedPosts.sort((a, b) => parseISO(a.$createdAt ?? '1970-01-01').getTime() - parseISO(b.$createdAt ?? '1970-01-01').getTime());
-                            });
-                            // Optimistically update counts
-                            setCurrentTopic(prevTopic => prevTopic ? { ...prevTopic, replyCount: (prevTopic.replyCount || 0) + 1 } : null);
-                            setPostsTotal(prevTotal => prevTotal + 1);
-                        }
-                        break;
-
-                    case 'vote_update':
-                        const voteUpdateData = message.payload as BackendVoteUpdatePayload;
-                        const { targetId, targetType, voteCounts } = voteUpdateData;
-                        // console.log(`[WS Frontend] Handling vote_update for ${targetType} ${targetId}`);
-
-                        if (targetType === 'topic') {
-                            // Update current topic score if it matches
-                            if (targetId === topicId) {
-                                setCurrentTopic(prevTopic => prevTopic ? { ...prevTopic, voteScore: voteCounts.score } : null);
-                            }
-                            // Update score in the topics list (for when navigating back)
-                            setTopics(prevTopics => prevTopics.map(t => t.$id === targetId ? { ...t, voteScore: voteCounts.score } : t));
-                        } else if (targetType === 'post') {
-                             // Update the specific post's score in the posts list
-                             // This will trigger re-render of PostItem due to prop change
-                            setPosts(prevPosts => prevPosts.map(p => p.$id === targetId ? { ...p, voteScore: voteCounts.score } : p));
-                        }
-                        break;
-
-                    case 'info':
-                        // console.log('[WS Frontend] Info from backend:', message.payload);
-                        break;
-
-                    case 'error':
-                        // console.error('[WS Frontend] Error message from backend:', message.payload);
-                        toast({ title: "Backend Error", description: message.payload?.message || 'Unknown error', variant: "destructive" });
-                        break;
-
-                    default:
-                        // console.warn('[WS Frontend] Received unknown message type:', message.type);
-                }
-            } catch (error) {
-                // console.error('[WS Frontend] Error processing message:', error, 'Raw data:', event.data);
-            }
-        };
-
-        ws.onerror = (error) => {
-            // console.error('[WS Frontend] WebSocket Error:', error);
-            toast({ title: "Real-time Connection Error", description: "Lost connection to the update service. Updates paused.", variant: "destructive" });
-            wsRef.current = null;
-        };
-
-        ws.onclose = (event) => {
-            // console.log(`[WS Frontend] WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
-            if (wsRef.current === ws) {
-                wsRef.current = null;
-            }
-            if (!event.wasClean) {
-                toast({ title: "Real-time connection lost unexpectedly.", variant: "default" });
-                // Optional: Implement reconnection logic here
-            }
-        };
-
-        // Cleanup Function
-        return () => {
-            if (wsRef.current) {
-                // console.log('[WS Frontend Cleanup] Closing WebSocket connection.');
-                wsRef.current.close(1000, 'Component unmounting');
-                wsRef.current = null;
-            }
-        };
-
-    }, [topicId, isAuthenticated, toast]); // Dependencies
+    // Real-time updates for new comments are handled via WebSocket. No page refresh is needed.
 
     // --- Handlers ---
     const handleFormatTopicContent = useCallback(async () => {
         if (!newTopicContent?.trim()) return;
         setIsFormattingTopic(true);
-        try { const formatted = await formatContentWithGroq(newTopicContent); setNewTopicContent(formatted); toast({ title: "Content Formatted" }); }
+        try { const formatted = await formatContentWithGemini(newTopicContent); setNewTopicContent(formatted); toast({ title: "Content Formatted" }); }
         catch (error: any) { toast({ title: "Formatting Error", description: error.message || "Failed.", variant: "destructive" }); }
         finally { setIsFormattingTopic(false); }
     }, [newTopicContent, toast]);
@@ -515,7 +406,7 @@ const ForumPage: React.FC = () => {
     const handleFormatReplyContent = useCallback(async () => {
         if (!replyContent?.trim()) return;
         setIsFormattingReply(true);
-        try { const formatted = await formatContentWithGroq(replyContent); setReplyContent(formatted); toast({ title: "Content Formatted" }); }
+        try { const formatted = await formatContentWithGemini(replyContent); setReplyContent(formatted); toast({ title: "Content Formatted" }); }
         catch (error: any) { toast({ title: "Formatting Error", description: error.message || "Failed.", variant: "destructive" }); }
         finally { setIsFormattingReply(false); }
     }, [replyContent, toast]);
@@ -526,7 +417,10 @@ const ForumPage: React.FC = () => {
         if (!newTopicTitle.trim() || !newTopicContent.trim()) { toast({ title: "Missing Information", description: "Title and content required.", variant: "destructive" }); return; }
         setIsModerating(true); setIsCreatingTopic(true);
         try {
-            const [titleModeration, contentModeration] = await Promise.all([ groqModService.moderateContent(newTopicTitle, { contentType: 'forum_title' }), groqModService.moderateContent(newTopicContent, { contentType: 'forum_post' }) ]);
+            const [titleModeration, contentModeration] = await Promise.all([
+                geminiModService.moderateContent(newTopicTitle, { contentType: 'forum_title' }),
+                geminiModService.moderateContent(newTopicContent, { contentType: 'forum_post' })
+            ]);
             const combinedFlags = [...new Set([...titleModeration.flags, ...contentModeration.flags])]; let finalDecision = ModerationDecision.ALLOW; let rejectionReason = "";
             if (titleModeration.decision === ModerationDecision.DENY || contentModeration.decision === ModerationDecision.DENY) { finalDecision = ModerationDecision.DENY; rejectionReason = titleModeration.decision === ModerationDecision.DENY ? titleModeration.reason || "Title violates guidelines" : contentModeration.reason || "Content violates guidelines"; }
             else if (titleModeration.decision === ModerationDecision.FLAG || contentModeration.decision === ModerationDecision.FLAG) { finalDecision = ModerationDecision.FLAG; rejectionReason = contentModeration.decision === ModerationDecision.FLAG ? contentModeration.reason || "Content flagged" : titleModeration.reason || "Title flagged"; }
@@ -549,7 +443,7 @@ const ForumPage: React.FC = () => {
         if (!replyContent.trim()) { toast({ title: "Cannot Reply", description: "Reply content cannot be empty.", variant: "destructive" }); return; }
         setIsModerating(true); setIsReplying(true);
         try {
-            const contentModeration = await groqModService.moderateContent(replyContent, { contentType: 'forum_post' });
+            const contentModeration = await geminiModService.moderateContent(replyContent, { contentType: 'forum_post' });
             const finalDecision = contentModeration.decision; const rejectionReason = contentModeration.reason; setIsModerating(false);
             if (finalDecision === ModerationDecision.DENY) { toast({ title: "Reply Rejected", description: rejectionReason || "Your reply violates community guidelines.", variant: "destructive" }); setIsReplying(false); return; }
             if (finalDecision === ModerationDecision.ERROR) { toast({ title: "Moderation Error", description: (rejectionReason || "Moderation check failed.") + " Please try again.", variant: "destructive" }); setIsReplying(false); return; }

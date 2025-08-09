@@ -43,9 +43,9 @@ import ReactMarkdown, { Options as ReactMarkdownOptions } from 'react-markdown';
 // Appwrite & AI Service Imports
 import { getUserProfile, UserProfile } from '@/lib/appwrite';
 // --- Import specialized meal service types/functions ---
-import { groqMealService, MealIdea, MealGenerationOptions } from '@/lib/groqMeal';
+import { geminiMealService, MealIdea, MealGenerationOptions } from '@/lib/geminiMeal';
 // --- Import specialized exercise service types/functions ---
-import { groqExeService, ExerciseSuggestion, ExerciseGenerationOptions as ExeGenerationOptions } from '@/lib/groqExe'; // Using alias ExeGenerationOptions for clarity
+import { geminiExeService, ExerciseSuggestion, ExerciseGenerationOptions as ExeGenerationOptions } from '@/lib/geminiExe'; // Using alias ExeGenerationOptions for clarity
 
 // Helper Function for Profile Completeness
 const isProfileComplete = (profile: UserProfile | null): boolean => {
@@ -221,12 +221,12 @@ const MealPage: FC = () => {
         };
 
         // Check for the correct function existence
-        if (!groqMealService?.generatePersonalizedMeals) {
+        if (!geminiMealService?.generatePersonalizedMeals) {
             throw new Error("Meal suggestion service is unavailable.");
         }
 
         // Call the correct specialized function
-        const content = await groqMealService.generatePersonalizedMeals(userProfile, options);
+        const content = await geminiMealService.generatePersonalizedMeals(userProfile, options);
 
         if (isMounted.current) {
             setMealSuggestions(content.meals || []); // Update only meal suggestions
@@ -269,12 +269,12 @@ const MealPage: FC = () => {
         };
 
         // Check for the correct function existence
-        if (!groqExeService?.generateExerciseSuggestions) {
+        if (!geminiExeService?.generateExerciseSuggestions) {
             throw new Error("Exercise suggestion service is unavailable.");
         }
 
         // Call the correct specialized function
-        const content = await groqExeService.generateExerciseSuggestions(userProfile, options);
+        const content = await geminiExeService.generateExerciseSuggestions(userProfile, options);
 
         if (isMounted.current) {
             setExerciseSuggestions(content.exercises || []); // Update only exercise suggestions

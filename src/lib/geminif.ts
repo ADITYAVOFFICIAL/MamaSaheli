@@ -18,7 +18,7 @@ import geminiService, { AppChatMessage } from './gemini';
 const formattingGenerationConfig: GenerationConfig = {
     // Lower temperature for more deterministic and consistent formatting results
     temperature: 0.15,
-    maxOutputTokens: 4096, // Sufficient for long blog posts
+    maxOutputTokens: 8096, // Sufficient for long blog posts
     topP: 0.9,
 };
 
@@ -31,7 +31,7 @@ const formattingGenerationConfig: GenerationConfig = {
 const createFormattingPrompt = (rawText: string): string => {
     return `
 You are a highly meticulous text formatting assistant specializing in GitHub Flavored Markdown (GFM).
-Your sole task is to convert the provided raw text into clean, readable, well-structured, and semantically accurate Markdown.
+Your sole task is to convert the provided raw text into clean, readable, well-structured, and semantically accurate Markdown but before understand the text and format accordingly.
 
 Apply the following formatting rules diligently and intelligently:
 

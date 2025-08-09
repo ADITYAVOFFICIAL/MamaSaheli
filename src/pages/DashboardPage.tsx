@@ -1,24 +1,21 @@
-// src/pages/DashboardPage.tsx
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { format, compareAsc, parseISO } from 'date-fns';
-import ReactMarkdown from 'react-markdown'; // <-- Import ReactMarkdown
-import remarkGfm from 'remark-gfm';       // <-- Import remarkGfm
-import rehypeRaw from 'rehype-raw';         // <-- Import rehypeRaw
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import {
     Calendar, Clock, Baby, Activity, FilePlus, MessageSquare, ArrowRight,
     AlertTriangle, Heart, Stethoscope, Salad, User, Edit, Trash2, Loader2, ListChecks,
     Bike, GraduationCap, Inbox, Pill, PlusCircle, BarChart3, Utensils, Dumbbell,
-    BookOpen, CheckSquare, Sparkles, RefreshCw // <-- Added Sparkles & RefreshCw
+    BookOpen, CheckSquare, Sparkles, RefreshCw
 } from 'lucide-react';
 
-// --- UI Components ---
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // <-- Import Alert components
-import { Skeleton } from '@/components/ui/skeleton'; // <-- Import Skeleton
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -29,11 +26,9 @@ import MedCharts from '@/components/dashboard/MedCharts';
 import MedReminder from '@/components/dashboard/MedReminder';
 import AddMedReminderModal from '@/components/dashboard/AddMedReminderModal';
 
-// --- State Management & Hooks ---
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
 
-// --- Appwrite SDK & Types ---
 import {
     UserProfile, getUserProfile,
     Appointment, getUserAppointments, updateAppointment, deleteAppointment,
@@ -43,13 +38,10 @@ import {
     getMedicationReminders, createMedicationReminder, deleteMedicationReminder,
 } from '@/lib/appwrite';
 
-// --- Custom Health Utilities ---
 import { Trimester, HealthTip, selectHealthTip, defaultHealthTip } from '@/lib/healthTips';
 
-// --- NEW: Import Groq Dashboard Service ---
-import { generateDashboardFeed } from '@/lib/groqDash'; // <-- Import the new service
+import { generateDashboardFeed } from '@/lib/geminiDash';
 
-// --- Helper Component: User Stats (Keep existing component) ---
 const UserStatsCards: React.FC<{ profile: UserProfile | null; appointmentsCount: number }> = ({ profile, appointmentsCount }) => {
     const profileCompleteness = useMemo(() => {
         if (!profile) return 0;
@@ -145,8 +137,6 @@ const UserStatsCards: React.FC<{ profile: UserProfile | null; appointmentsCount:
     );
 };
 
-
-// --- Helper Function: Parse Appointment DateTime (Keep existing function) ---
 const parseAppointmentDateTime = (app: Appointment): Date | null => {
     if (!app?.date || !app?.time) return null;
     try {
@@ -173,9 +163,7 @@ const parseAppointmentDateTime = (app: Appointment): Date | null => {
     }
 };
 
-// --- Main Dashboard Component ---
 const DashboardPage: React.FC = () => {
-    // --- Existing State ---
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [upcomingDoctorAppointments, setUpcomingDoctorAppointments] = useState<Appointment[]>([]);
     const [upcomingClassAppointments, setUpcomingClassAppointments] = useState<Appointment[]>([]);
@@ -198,24 +186,19 @@ const DashboardPage: React.FC = () => {
     const [isDeleteMedReminderDialogOpen, setIsDeleteMedReminderDialogOpen] = useState<boolean>(false);
     const [medReminderToDelete, setMedReminderToDelete] = useState<string | null>(null);
 
-    // --- NEW State for Dashboard Feed ---
     const [dashboardFeedContent, setDashboardFeedContent] = useState<string | null>(null);
     const [isLoadingFeed, setIsLoadingFeed] = useState<boolean>(false);
     const [feedError, setFeedError] = useState<string | null>(null);
 
-    // --- Hooks ---
     const { user, isAuthenticated } = useAuthStore();
     const { toast } = useToast();
 
-    // --- Constants & Memos ---
     const doctorTypes = useMemo(() => ['doctor', 'lab_test', undefined, null, ''] as const, []);
     const classTypes = useMemo(() => ['yoga_class', 'childbirth_class', 'fitness_class'] as const, []);
     type ClassAppointmentType = typeof classTypes[number];
 
-    // --- Combined Data Fetching ---
     const fetchData = useCallback(async (options: { forceFeedRefresh?: boolean } = {}) => {
         if (!isAuthenticated || !user?.$id) {
-            // Reset all states if not authenticated
             setIsLoading(false); setIsLoadingProfile(false); setIsLoadingAppointments(false);
             setIsLoadingHealthData(false); setIsLoadingMedReminders(false); setIsLoadingFeed(false);
             setProfile(null); setUpcomingDoctorAppointments([]); setUpcomingClassAppointments([]);
@@ -225,13 +208,10 @@ const DashboardPage: React.FC = () => {
         }
 
         const currentUserId = user.$id;
-        // Only set main loading true initially or if forcing refresh
         if (!profile || options.forceFeedRefresh) setIsLoading(true);
 
-        // Set individual loading states
         setIsLoadingProfile(true); setIsLoadingAppointments(true);
         setIsLoadingHealthData(true); setIsLoadingMedReminders(true);
-        // Reset feed state only if forcing refresh
         if (options.forceFeedRefresh) {
             setIsLoadingFeed(true);
             setDashboardFeedContent(null);
@@ -246,25 +226,21 @@ const DashboardPage: React.FC = () => {
         let fetchedReminders: MedicationReminder[] = [];
 
         try {
-            // Fetch core data concurrently
             const coreDataResults = await Promise.allSettled([
                 getUserProfile(currentUserId),
                 getUserAppointments(currentUserId),
-                getBloodPressureReadings(currentUserId, 50), // Fetch more readings for the chart
-                getBloodSugarReadings(currentUserId, 50),    // Fetch more readings for the chart
-                getWeightReadings(currentUserId, 50),       // Fetch more readings for the chart
+                getBloodPressureReadings(currentUserId, 50),
+                getBloodSugarReadings(currentUserId, 50),
+                getWeightReadings(currentUserId, 50),
                 getMedicationReminders(currentUserId),
             ]);
 
-            // --- Process Core Data Results ---
-            // Profile
             if (coreDataResults[0].status === 'fulfilled') {
                 fetchedProfile = coreDataResults[0].value as UserProfile | null;
                 setProfile(fetchedProfile);
             } else { console.error('Error fetching profile:', coreDataResults[0].reason); setProfile(null); toast({ title: "Profile Load Failed", variant: "destructive" }); }
             setIsLoadingProfile(false);
 
-            // Appointments
             if (coreDataResults[1].status === 'fulfilled') {
                 fetchedAppointments = coreDataResults[1].value as Appointment[] ?? [];
                 const now = new Date();
@@ -277,39 +253,29 @@ const DashboardPage: React.FC = () => {
             } else { console.error('Error fetching appointments:', coreDataResults[1].reason); setUpcomingDoctorAppointments([]); setUpcomingClassAppointments([]); toast({ title: "Appointments Load Failed", variant: "destructive" }); }
             setIsLoadingAppointments(false);
 
-            // Health Readings (Only set state with latest for feed context, full data for charts if needed elsewhere)
-            // Note: We fetched only the latest reading (limit 1)
             if (coreDataResults[2].status === 'fulfilled') fetchedBp = coreDataResults[2].value as BloodPressureReading[] ?? []; else console.error('Error fetching BP:', coreDataResults[2].reason);
             if (coreDataResults[3].status === 'fulfilled') fetchedSugar = coreDataResults[3].value as BloodSugarReading[] ?? []; else console.error('Error fetching Sugar:', coreDataResults[3].reason);
             if (coreDataResults[4].status === 'fulfilled') fetchedWeight = coreDataResults[4].value as WeightReading[] ?? []; else console.error('Error fetching Weight:', coreDataResults[4].reason);
-            // Set state for charts (fetch full data separately if needed, or adjust limit above)
-            // For now, we'll just use the potentially single reading for the charts too
             setBpReadings(fetchedBp);
             setSugarReadings(fetchedSugar);
-            setWeightReadings(fetchedWeight); // This will now contain up to 50 readings
+            setWeightReadings(fetchedWeight);
             setIsLoadingHealthData(false);
 
-            // Medication Reminders
             if (coreDataResults[5].status === 'fulfilled') {
                 fetchedReminders = coreDataResults[5].value as MedicationReminder[] ?? [];
                 setMedReminders(fetchedReminders);
             } else { console.error('Error fetching Reminders:', coreDataResults[5].reason); setMedReminders([]); toast({ title: "Reminders Load Failed", variant: "destructive" }); }
             setIsLoadingMedReminders(false);
 
-            // --- Fetch Dashboard Feed Data (if profile loaded or forcing refresh) ---
-            // Trigger feed generation only if profile is available OR if forcing a refresh
             if (fetchedProfile || options.forceFeedRefresh) {
-                // Ensure isLoadingFeed is true before starting the fetch
-                if(!isLoadingFeed) setIsLoadingFeed(true); // Set loading true if not already
-                setFeedError(null); // Clear previous errors
+                if(!isLoadingFeed) setIsLoadingFeed(true);
+                setFeedError(null);
                 try {
-                    // Pass the relevant LATEST data to the feed generator
                     const feedContent = await generateDashboardFeed(
                         fetchedProfile,
-                        fetchedBp[0] || null,    // Pass latest BP or null
-                        fetchedSugar[0] || null, // Pass latest Sugar or null
-                        fetchedWeight[0] || null, // Pass latest Weight or null
-                        // Pass the calculated upcoming appointments
+                        fetchedBp[0] || null,
+                        fetchedSugar[0] || null,
+                        fetchedWeight[0] || null,
                         [...upcomingDoctorAppointments, ...upcomingClassAppointments]
                             .filter((app): app is Appointment & { dateTime: Date } => app.dateTime != null)
                             .sort((a, b) => compareAsc(a.dateTime, b.dateTime))
@@ -318,70 +284,58 @@ const DashboardPage: React.FC = () => {
                 } catch (feedGenError) {
                     console.error('Error generating dashboard feed:', feedGenError);
                     setFeedError(feedGenError instanceof Error ? feedGenError.message : "Could not load personalized insights.");
-                    setDashboardFeedContent(null); // Clear content on error
+                    setDashboardFeedContent(null);
                 } finally {
-                    setIsLoadingFeed(false); // Set loading false after feed attempt
+                    setIsLoadingFeed(false);
                 }
             } else if (!options.forceFeedRefresh) {
-                 // If profile didn't load and not forcing refresh, skip feed generation
                  setIsLoadingFeed(false);
                  setFeedError("Profile data needed for personalized insights.");
             }
 
         } catch (error: unknown) {
-            // Catch errors from Promise.allSettled itself (less likely)
             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
             console.error('Critical error during dashboard data fetch:', error);
             toast({ title: "Dashboard Load Failed", description: `${errorMessage}. Please refresh.`, variant: "destructive" });
-            // Reset all states on critical failure
             setProfile(null); setUpcomingDoctorAppointments([]); setUpcomingClassAppointments([]);
             setBpReadings([]); setSugarReadings([]); setWeightReadings([]); setMedReminders([]);
             setDashboardFeedContent(null); setFeedError(null);
             setIsLoadingProfile(false); setIsLoadingAppointments(false); setIsLoadingHealthData(false);
             setIsLoadingMedReminders(false); setIsLoadingFeed(false);
         } finally {
-            setIsLoading(false); // Final loading state update
+            setIsLoading(false);
         }
-    }, [user, isAuthenticated, toast, doctorTypes, classTypes, profile, isLoadingFeed]); // Added profile and isLoadingFeed dependencies for refresh logic
+    }, [user, isAuthenticated, toast, doctorTypes, classTypes, profile, isLoadingFeed, upcomingDoctorAppointments, upcomingClassAppointments]);
 
-    // Effect to fetch data on mount and auth changes
     useEffect(() => {
-        fetchData(); // Initial fetch
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, isAuthenticated]); // Run only when user/auth changes
+        fetchData();
+    }, [user, isAuthenticated, fetchData]);
 
-    // --- Appointment Handlers (Keep existing) ---
-    const handleEditAppointment = useCallback((appointment: Appointment) => { /* ... */ setEditingAppointment(appointment); setIsEditModalOpen(true); }, []);
-    const handleDeleteAppointmentClick = useCallback((appointmentId: string) => { /* ... */ setAppointmentToDelete(appointmentId); setIsDeleteDialogOpen(true); }, []);
-    const confirmDeleteAppointment = useCallback(async () => { /* ... */ if (!appointmentToDelete) return; setDeletingAppointmentId(appointmentToDelete); try { await deleteAppointment(appointmentToDelete); toast({ title: "Appointment Deleted" }); await fetchData(); } catch (error) { const msg = error instanceof Error ? error.message : "Could not delete."; toast({ title: "Deletion Failed", description: msg, variant: "destructive" }); } finally { setDeletingAppointmentId(null); setAppointmentToDelete(null); setIsDeleteDialogOpen(false); } }, [appointmentToDelete, fetchData, toast]);
+    const handleEditAppointment = useCallback((appointment: Appointment) => { setEditingAppointment(appointment); setIsEditModalOpen(true); }, []);
+    const handleDeleteAppointmentClick = useCallback((appointmentId: string) => { setAppointmentToDelete(appointmentId); setIsDeleteDialogOpen(true); }, []);
+    const confirmDeleteAppointment = useCallback(async () => { if (!appointmentToDelete) return; setDeletingAppointmentId(appointmentToDelete); try { await deleteAppointment(appointmentToDelete); toast({ title: "Appointment Deleted" }); await fetchData(); } catch (error) { const msg = error instanceof Error ? error.message : "Could not delete."; toast({ title: "Deletion Failed", description: msg, variant: "destructive" }); } finally { setDeletingAppointmentId(null); setAppointmentToDelete(null); setIsDeleteDialogOpen(false); } }, [appointmentToDelete, fetchData, toast]);
 
-    // --- Medication Reminder Handlers (Keep existing) ---
-    const handleAddReminderClick = useCallback(() => { /* ... */ setIsMedModalOpen(true); }, []);
-    const handleSaveReminder = useCallback(async (data: CreateMedicationReminderData) => { /* ... */ if (!user?.$id) { toast({ title: "Error", description: "User not found.", variant: "destructive" }); return; } try { await createMedicationReminder(user.$id, data); toast({ title: "Reminder Added" }); await fetchData(); } catch (error) { const msg = error instanceof Error ? error.message : "Could not save."; toast({ title: "Save Failed", description: msg, variant: "destructive" }); throw error; } }, [user?.$id, fetchData, toast]);
-    const handleDeleteReminderClick = useCallback((reminderId: string) => { /* ... */ setMedReminderToDelete(reminderId); setIsDeleteMedReminderDialogOpen(true); }, []);
-    const confirmDeleteReminder = useCallback(async () => { /* ... */ if (!medReminderToDelete) return; setDeletingMedReminderId(medReminderToDelete); try { await deleteMedicationReminder(medReminderToDelete); toast({ title: "Reminder Deleted" }); await fetchData(); } catch (error) { const msg = error instanceof Error ? error.message : "Could not delete."; toast({ title: "Deletion Failed", description: msg, variant: "destructive" }); } finally { setDeletingMedReminderId(null); setMedReminderToDelete(null); setIsDeleteMedReminderDialogOpen(false); } }, [medReminderToDelete, fetchData, toast]);
+    const handleAddReminderClick = useCallback(() => { setIsMedModalOpen(true); }, []);
+    const handleSaveReminder = useCallback(async (data: CreateMedicationReminderData) => { if (!user?.$id) { toast({ title: "Error", description: "User not found.", variant: "destructive" }); return; } try { await createMedicationReminder(user.$id, data); toast({ title: "Reminder Added" }); await fetchData(); } catch (error) { const msg = error instanceof Error ? error.message : "Could not save."; toast({ title: "Save Failed", description: msg, variant: "destructive" }); throw error; } }, [user?.$id, fetchData, toast]);
+    const handleDeleteReminderClick = useCallback((reminderId: string) => { setMedReminderToDelete(reminderId); setIsDeleteMedReminderDialogOpen(true); }, []);
+    const confirmDeleteReminder = useCallback(async () => { if (!medReminderToDelete) return; setDeletingMedReminderId(medReminderToDelete); try { await deleteMedicationReminder(medReminderToDelete); toast({ title: "Reminder Deleted" }); await fetchData(); } catch (error) { const msg = error instanceof Error ? error.message : "Could not delete."; toast({ title: "Deletion Failed", description: msg, variant: "destructive" }); } finally { setDeletingMedReminderId(null); setMedReminderToDelete(null); setIsDeleteMedReminderDialogOpen(false); } }, [medReminderToDelete, fetchData, toast]);
 
-    // --- Milestone Getter (Keep existing) ---
-    const getMilestone = useCallback((week: number): string => { /* ... keep existing logic ... */ const milestones: { [key: number]: string } = { 1: "Pregnancy begins...", 4: "Implantation occurs...", /* ... all other milestones ... */ 42: "Considered 'post term'..."}; if (week <= 0) return "Planning..."; if (week > 42) return "Anticipating arrival..."; const relevantWeeks = Object.keys(milestones).map(Number).filter(w => w <= week); const currentMilestoneWeek = relevantWeeks.length > 0 ? Math.max(...relevantWeeks) : 0; return currentMilestoneWeek > 0 ? `${milestones[currentMilestoneWeek]}` : "Early development stages."; }, []);
+    const getMilestone = useCallback((week: number): string => { const milestones: { [key: number]: string } = { 1: "Pregnancy begins...", 4: "Implantation occurs...", 6: "Baby's heart begins to beat.", 8: "Fingers and toes are forming.", 12: "End of the first trimester.", 16: "You might feel baby's first flutters.", 20: "Halfway there! Anatomy scan time.", 24: "Baby is viable outside the womb.", 28: "Third trimester begins.", 32: "Baby practices breathing.", 36: "Baby 'drops' into the pelvis.", 39: "Baby is considered full term.", 40: "Your estimated due date!", 41: "Baby is 'late term'.", 42: "Considered 'post term'..."}; if (week <= 0) return "Planning..."; if (week > 42) return "Anticipating arrival..."; const relevantWeeks = Object.keys(milestones).map(Number).filter(w => w <= week); const currentMilestoneWeek = relevantWeeks.length > 0 ? Math.max(...relevantWeeks) : 0; return currentMilestoneWeek > 0 ? `${milestones[currentMilestoneWeek]}` : "Early development stages."; }, []);
 
-    // --- Formatting Helper (Keep existing) ---
-    const formatAppointmentDate = useCallback((dateString: string | undefined, time: string | undefined): string => { /* ... keep existing logic ... */ if (!dateString || !time) return "Date/Time not set"; const appStub = { date: dateString, time: time } as Appointment; try { const dt = parseAppointmentDateTime(appStub); if (!dt) throw new Error("Invalid date/time"); return format(dt, "EEE, MMM d, yyyy 'at' h:mm a"); } catch { const dp = dateString.split('T')[0] || dateString; return `${dp} at ${time}`; } }, []);
+    const formatAppointmentDate = useCallback((dateString: string | undefined, time: string | undefined): string => { if (!dateString || !time) return "Date/Time not set"; const appStub = { date: dateString, time: time } as Appointment; try { const dt = parseAppointmentDateTime(appStub); if (!dt) throw new Error("Invalid date/time"); return format(dt, "EEE, MMM d, yyyy 'at' h:mm a"); } catch { const dp = dateString.split('T')[0] || dateString; return `${dp} at ${time}`; } }, []);
 
-    // --- Derived Values (Keep existing) ---
     const currentWeek = useMemo(() => profile?.weeksPregnant ?? 0, [profile?.weeksPregnant]);
-    const pregnancyTrimester: Trimester = useMemo(() => { /* ... keep existing logic ... */ const week = currentWeek; if (week >= 1 && week <= 13) return "First"; if (week >= 14 && week <= 27) return "Second"; if (week >= 28 && week <= 40) return "Third"; if (week > 40) return "Post-term"; if (week === 0 && profile?.weeksPregnant !== undefined) return "Pre-conception"; return "N/A"; }, [currentWeek, profile?.weeksPregnant]);
-    const pregnancyProgress = useMemo(() => { /* ... keep existing logic ... */ const effectiveWeek = Math.max(0, Math.min(currentWeek, 40)); return effectiveWeek > 0 ? Math.round((effectiveWeek / 40) * 100) : 0; }, [currentWeek]);
+    const pregnancyTrimester: Trimester = useMemo(() => { const week = currentWeek; if (week >= 1 && week <= 13) return "First"; if (week >= 14 && week <= 27) return "Second"; if (week >= 28 && week <= 40) return "Third"; if (week > 40) return "Post-term"; if (week === 0 && profile?.weeksPregnant !== undefined) return "Pre-conception"; return "N/A"; }, [currentWeek, profile?.weeksPregnant]);
+    const pregnancyProgress = useMemo(() => { const effectiveWeek = Math.max(0, Math.min(currentWeek, 40)); return effectiveWeek > 0 ? Math.round((effectiveWeek / 40) * 100) : 0; }, [currentWeek]);
     const nextDoctorAppointment = useMemo(() => upcomingDoctorAppointments[0] || null, [upcomingDoctorAppointments]);
     const nextClassAppointment = useMemo(() => upcomingClassAppointments[0] || null, [upcomingClassAppointments]);
     const totalUpcomingAppointments = useMemo(() => upcomingDoctorAppointments.length + upcomingClassAppointments.length, [upcomingDoctorAppointments, upcomingClassAppointments]);
-    const allSortedUpcomingAppointments = useMemo(() => { /* ... keep existing logic ... */ return [...upcomingDoctorAppointments, ...upcomingClassAppointments].filter((app): app is Appointment & { dateTime: Date } => app.dateTime != null).sort((a, b) => compareAsc(a.dateTime, b.dateTime)); }, [upcomingDoctorAppointments, upcomingClassAppointments]);
+    const allSortedUpcomingAppointments = useMemo(() => { return [...upcomingDoctorAppointments, ...upcomingClassAppointments].filter((app): app is Appointment & { dateTime: Date } => app.dateTime != null).sort((a, b) => compareAsc(a.dateTime, b.dateTime)); }, [upcomingDoctorAppointments, upcomingClassAppointments]);
 
-    // --- Render Logic ---
     return (
         <MainLayout requireAuth={true}>
             <div className="bg-gradient-to-b from-mamasaheli-light via-white to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-800 min-h-screen py-8 md:py-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
                     <div className="mb-8 md:mb-10">
                         <h1 className="text-3xl md:text-4xl font-bold text-mamasaheli-dark dark:text-mamasaheli-light mb-1 tracking-tight">
                             {isLoadingProfile ? 'Loading...' : `Hello, ${profile?.name || user?.name || 'User'}!`}
@@ -391,19 +345,16 @@ const DashboardPage: React.FC = () => {
                         </p>
                     </div>
 
-                    {/* Main Loading State */}
-                    {isLoading && !profile && ( // Show main loader only if everything is loading initially
+                    {isLoading && !profile && (
                         <div className="flex justify-center items-center h-64">
                             <Loader2 className="h-12 w-12 animate-spin text-mamasaheli-primary" />
                             <span className="ml-4 text-lg text-gray-600 dark:text-gray-400">Loading Dashboard...</span>
                         </div>
                     )}
 
-                    {/* Content Area - Render even if feed is loading, show skeletons inside */}
-                    {!isLoading || profile ? ( // Render content if initial load done OR profile exists
+                    {!isLoading || profile ? (
                         <div className="space-y-8 md:space-y-10">
 
-                             {/* --- NEW: Personalized Feed Section --- */}
                              <Card className="border border-mamasaheli-secondary/30 shadow-sm bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-800 dark:via-gray-800/80 dark:to-gray-900/70 dark:border-gray-700">
                                 <CardHeader className="pb-3">
                                     <div className="flex justify-between items-center">
@@ -413,7 +364,7 @@ const DashboardPage: React.FC = () => {
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => fetchData({ forceFeedRefresh: true })} // Force refresh feed
+                                            onClick={() => fetchData({ forceFeedRefresh: true })}
                                             disabled={isLoadingFeed}
                                             className="text-mamasaheli-secondary dark:text-mamasaheli-accent/80 hover:bg-mamasaheli-secondary/10 dark:hover:bg-mamasaheli-accent/10 hover:text-mamasaheli-primary h-7 px-2"
                                             aria-label="Refresh personalized insights"
@@ -456,12 +407,8 @@ const DashboardPage: React.FC = () => {
                                     )}
                                 </CardContent>
                             </Card>
-                             {/* --- End Personalized Feed Section --- */}
 
-
-                            {/* Top Row Info Cards (Pregnancy, Appointments, Health Summary) */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {/* Pregnancy Journey Card (Keep existing) */}
                                 <Card className="border border-mamasaheli-primary/30 shadow-sm h-full bg-white dark:bg-gray-800 dark:border-gray-700">
                                      <CardHeader className="bg-mamasaheli-primary/5 border-b border-mamasaheli-primary/10 dark:bg-gray-700/30 dark:border-gray-600">
                                         <CardTitle className="flex items-center text-mamasaheli-primary dark:text-mamasaheli-light text-lg font-semibold">
@@ -472,7 +419,6 @@ const DashboardPage: React.FC = () => {
                                         {isLoadingProfile ? ( <div className="flex justify-center items-center py-6"><Loader2 className="h-6 w-6 animate-spin text-mamasaheli-primary" /></div> )
                                         : profile?.weeksPregnant !== undefined && profile.weeksPregnant >= 0 ? (
                                             <>
-                                                {/* Progress Bar & Milestone */}
                                                 <div>
                                                     <div className="flex justify-between items-baseline mb-2 text-sm">
                                                         <span className="font-semibold text-gray-800 dark:text-gray-200">Week {currentWeek}</span>
@@ -500,16 +446,14 @@ const DashboardPage: React.FC = () => {
                                     </CardContent>
                                 </Card>
 
-                                {/* Upcoming Appointments Column (Keep existing) */}
                                 <div className="space-y-6">
-                                    {/* Next Doctor Visit Card */}
                                     <Card className="border border-mamasaheli-primary/30 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700">
                                         <CardHeader className="bg-mamasaheli-primary/5 border-b border-mamasaheli-primary/10 dark:bg-gray-700/30 dark:border-gray-600">
                                             <CardTitle className="flex items-center text-mamasaheli-primary dark:text-mamasaheli-light text-lg font-semibold"><Stethoscope className="mr-2 h-5 w-5" />Next Doctor Visit</CardTitle>
                                         </CardHeader>
                                         <CardContent className="pt-5 px-5">
                                              {isLoadingAppointments ? ( <div className="flex justify-center items-center py-4"><Loader2 className="h-6 w-6 animate-spin text-mamasaheli-primary" /></div> )
-                                             : nextDoctorAppointment ? ( /* ... existing render logic ... */
+                                             : nextDoctorAppointment ? (
                                                 <div className="space-y-3">
                                                     <div className="flex items-start space-x-3">
                                                         <div className="mt-1 h-10 w-10 bg-mamasaheli-primary/10 text-mamasaheli-primary rounded-full flex items-center justify-center flex-shrink-0 dark:bg-mamasaheli-light/10 dark:text-mamasaheli-light"><Calendar className="h-5 w-5" /></div>
@@ -523,7 +467,7 @@ const DashboardPage: React.FC = () => {
                                                         <Button asChild size="sm" variant="outline" className="text-mamasaheli-primary border-mamasaheli-primary/50 hover:bg-mamasaheli-primary/10 hover:text-mamasaheli-primary dark:text-mamasaheli-light dark:border-mamasaheli-light/50 dark:hover:bg-mamasaheli-light/10 dark:hover:text-mamasaheli-light text-xs px-3 py-1 h-auto"><a href="/appointment">Manage All</a></Button>
                                                     </div>
                                                 </div>
-                                             ) : ( /* ... existing placeholder ... */
+                                             ) : (
                                                 <div className="text-center py-4 flex flex-col items-center">
                                                     <Stethoscope className="h-10 w-10 text-gray-400 dark:text-gray-500 mb-3" />
                                                     <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">No upcoming doctor visits.</p>
@@ -532,14 +476,13 @@ const DashboardPage: React.FC = () => {
                                              )}
                                         </CardContent>
                                     </Card>
-                                    {/* Next Class/Activity Card */}
                                     <Card className="border border-mamasaheli-secondary/30 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700">
                                         <CardHeader className="bg-mamasaheli-secondary/5 border-b border-mamasaheli-secondary/10 dark:bg-gray-700/30 dark:border-gray-600">
                                             <CardTitle className="flex items-center text-mamasaheli-secondary dark:text-blue-400 text-lg font-semibold"><GraduationCap className="mr-2 h-5 w-5" />Next Class/Activity</CardTitle>
                                         </CardHeader>
                                          <CardContent className="pt-5 px-5">
                                             {isLoadingAppointments ? ( <div className="flex justify-center items-center py-4"><Loader2 className="h-6 w-6 animate-spin text-mamasaheli-secondary" /></div> )
-                                             : nextClassAppointment ? ( /* ... existing render logic ... */
+                                             : nextClassAppointment ? (
                                                 <div className="space-y-3">
                                                     <div className="flex items-start space-x-3">
                                                         <div className="mt-1 h-10 w-10 bg-mamasaheli-secondary/10 text-mamasaheli-secondary rounded-full flex items-center justify-center flex-shrink-0 dark:bg-blue-500/10 dark:text-blue-400"><Bike className="h-5 w-5" /></div>
@@ -553,7 +496,7 @@ const DashboardPage: React.FC = () => {
                                                         <Button asChild size="sm" variant="outline" className="text-mamasaheli-secondary border-mamasaheli-secondary/50 hover:bg-mamasaheli-secondary/10 hover:text-mamasaheli-secondary dark:text-blue-400 dark:border-blue-400/50 dark:hover:bg-blue-400/10 dark:hover:text-blue-300 text-xs px-3 py-1 h-auto"><a href="/appointment">Manage All</a></Button>
                                                     </div>
                                                 </div>
-                                             ) : ( /* ... existing placeholder ... */
+                                             ) : (
                                                 <div className="text-center py-4 flex flex-col items-center">
                                                     <GraduationCap className="h-10 w-10 text-gray-400 dark:text-gray-500 mb-3" />
                                                     <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">No upcoming classes scheduled.</p>
@@ -564,7 +507,6 @@ const DashboardPage: React.FC = () => {
                                     </Card>
                                 </div>
 
-                                {/* Health Summary Column (Keep existing, includes UserStatsCards) */}
                                 <Card className="border border-gray-200 shadow-sm h-full bg-white dark:bg-gray-800 dark:border-gray-700">
                                      <CardHeader className="bg-gray-50 border-b border-gray-200 dark:bg-gray-700/50 dark:border-gray-600">
                                         <CardTitle className="flex items-center text-gray-700 dark:text-gray-300 text-lg font-semibold">
@@ -572,8 +514,6 @@ const DashboardPage: React.FC = () => {
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="pt-6 px-5 space-y-4">
-                                        {/* You might place the static health tip here OR let the AI feed handle tips */}
-                                        {/* Noted Conditions */}
                                         {isLoadingProfile ? ( <div className="flex justify-center items-center py-4"><Loader2 className="h-6 w-6 animate-spin text-amber-500" /></div> )
                                         : profile?.preExistingConditions && profile.preExistingConditions.toLowerCase() !== 'none' && (
                                             <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-4 border border-amber-200 dark:border-amber-700">
@@ -584,16 +524,12 @@ const DashboardPage: React.FC = () => {
                                                 </div>
                                             </div>
                                         )}
-                                        {/* User Stats Card */}
                                          {isLoadingProfile || isLoadingAppointments ? ( <div className="flex justify-center items-center py-4"><Loader2 className="h-6 w-6 animate-spin text-mamasaheli-primary" /></div> )
                                          : ( <UserStatsCards profile={profile} appointmentsCount={totalUpcomingAppointments} /> )}
                                     </CardContent>
                                 </Card>
                             </div>
 
-                            {/* --- Other Sections Remain Below --- */}
-
-                            {/* Medication Reminders Section */}
                              <MedReminder
                                 reminders={medReminders}
                                 isLoading={isLoadingMedReminders}
@@ -602,7 +538,6 @@ const DashboardPage: React.FC = () => {
                                 deletingReminderId={deletingMedReminderId}
                             />
 
-                            {/* Health Readings Section */}
                             <div className="space-y-3">
                                 <div className="flex justify-between items-center">
                                     <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 flex items-center">
@@ -617,11 +552,10 @@ const DashboardPage: React.FC = () => {
                                     sugarReadings={sugarReadings}
                                     weightReadings={weightReadings}
                                     isLoading={isLoadingHealthData}
-                                    onDataRefreshNeeded={() => fetchData()} // Allow chart refresh if needed
+                                    onDataRefreshNeeded={() => fetchData()}
                                 />
                             </div>
 
-                            {/* All Upcoming Appointments List */}
                             <Card className="border border-gray-200 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
                                 <CardHeader className="bg-gray-50 border-b border-gray-200 dark:bg-gray-700/50 dark:border-gray-600">
                                     <CardTitle className="flex items-center text-gray-700 dark:text-gray-300 text-lg font-semibold">
@@ -643,7 +577,7 @@ const DashboardPage: React.FC = () => {
                                                 ))}
                                             </ul>
                                         </div>
-                                    ) : ( /* ... existing placeholder ... */
+                                    ) : (
                                         <div className="text-center py-10 px-6">
                                             <Inbox className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-3" />
                                             <p className="text-gray-500 dark:text-gray-400 font-medium">No upcoming appointments found.</p>
@@ -654,13 +588,10 @@ const DashboardPage: React.FC = () => {
                                 </CardContent>
                             </Card>
 
-                            {/* Resources & Emergency Access */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Helpful Resources */}
                                 <Card className="border border-gray-200 shadow-sm lg:col-span-2 bg-white dark:bg-gray-800 dark:border-gray-700">
                                     <CardHeader className="bg-gray-50 border-b border-gray-200 dark:bg-gray-700/50 dark:border-gray-600"><CardTitle className="text-gray-700 dark:text-gray-300 text-lg font-semibold">Helpful Resources</CardTitle><CardDescription className="text-sm text-gray-500 dark:text-gray-400 mt-1">Information to support your journey.</CardDescription></CardHeader>
                                     <CardContent className="pt-6 px-5">
-                                        {/* ... existing resource links ... */}
                                          <div className="space-y-4">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <a href="/resources?category=Health Checks" className="block bg-white dark:bg-gray-700/30 border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow hover:border-mamasaheli-primary/30 dark:hover:border-mamasaheli-light/30"><div className="flex items-center"><div className="flex-shrink-0 w-10 h-10 bg-mamasaheli-primary/10 dark:bg-mamasaheli-light/10 rounded-full flex items-center justify-center mr-3"><Stethoscope className="h-5 w-5 text-mamasaheli-primary dark:text-mamasaheli-light" /></div><div><h3 className="font-semibold text-gray-800 dark:text-gray-200 text-sm">Health Checks</h3><p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Key tests during pregnancy</p></div></div></a>
@@ -674,7 +605,6 @@ const DashboardPage: React.FC = () => {
                                         </div>
                                     </CardContent>
                                 </Card>
-                                {/* Emergency Access Card */}
                                 <Card className="border-2 border-red-400 dark:border-red-600/80 shadow-md lg:col-span-1 bg-red-50/50 dark:bg-red-900/30">
                                     <CardHeader className="bg-red-100/70 dark:bg-red-800/40 border-b border-red-300 dark:border-red-700"><CardTitle className="flex items-center text-red-700 dark:text-red-300 text-lg font-semibold"><AlertTriangle className="mr-2 h-5 w-5" />Emergency Info</CardTitle></CardHeader>
                                     <CardContent className="pt-5 px-5 space-y-4">
@@ -683,7 +613,6 @@ const DashboardPage: React.FC = () => {
                                         <div className="bg-white dark:bg-gray-700/40 p-3 rounded-md border border-red-200 dark:border-red-600/50 shadow-inner">
                                             <p className="text-sm font-semibold text-red-600 dark:text-red-300 mb-1.5">Key Warning Signs:</p>
                                             <ul className="text-xs text-red-800 dark:text-red-200/90 space-y-1.5">
-                                                {/* ... warning signs list ... */}
                                                 <li className="flex items-start"><AlertTriangle className="h-3.5 w-3.5 text-red-500 dark:text-red-400 mr-1.5 flex-shrink-0 mt-0.5" />Severe abdominal pain or cramping</li>
                                                 <li className="flex items-start"><AlertTriangle className="h-3.5 w-3.5 text-red-500 dark:text-red-400 mr-1.5 flex-shrink-0 mt-0.5" />Heavy vaginal bleeding</li>
                                                 <li className="flex items-start"><AlertTriangle className="h-3.5 w-3.5 text-red-500 dark:text-red-400 mr-1.5 flex-shrink-0 mt-0.5" />Significant decrease in fetal movement</li>
@@ -697,12 +626,10 @@ const DashboardPage: React.FC = () => {
                                 </Card>
                             </div>
 
-                            {/* Quick Actions */}
                             <Card className="border border-gray-200 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700">
                                 <CardHeader><CardTitle className="text-xl font-semibold text-mamasaheli-dark dark:text-mamasaheli-light">Quick Actions</CardTitle></CardHeader>
                                 <CardContent>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                        {/* ... existing quick action buttons ... */}
                                         <Button asChild variant="outline" className="h-24 flex flex-col justify-center items-center text-center p-2 border-gray-300 dark:border-gray-600 hover:bg-mamasaheli-light/50 dark:hover:bg-gray-700/50 hover:border-mamasaheli-primary/50 dark:hover:border-mamasaheli-light/50 group transition-all duration-150 ease-in-out hover:scale-105"><a href="/chat"><MessageSquare className="h-6 w-6 mb-1.5 text-mamasaheli-primary dark:text-mamasaheli-light transition-transform group-hover:scale-110" /><span className="text-sm font-medium text-gray-700 dark:text-gray-300">Chat with AI</span></a></Button>
                                         <Button asChild variant="outline" className="h-24 flex flex-col justify-center items-center text-center p-2 border-gray-300 dark:border-gray-600 hover:bg-mamasaheli-light/50 dark:hover:bg-gray-700/50 hover:border-mamasaheli-primary/50 dark:hover:border-mamasaheli-light/50 group transition-all duration-150 ease-in-out hover:scale-105"><a href="/appointment"><Calendar className="h-6 w-6 mb-1.5 text-mamasaheli-primary dark:text-mamasaheli-light transition-transform group-hover:scale-110" /><span className="text-sm font-medium text-gray-700 dark:text-gray-300">Appointments</span></a></Button>
                                         <Button asChild variant="outline" className="h-24 flex flex-col justify-center items-center text-center p-2 border-gray-300 dark:border-gray-600 hover:bg-mamasaheli-light/50 dark:hover:bg-gray-700/50 hover:border-mamasaheli-primary/50 dark:hover:border-mamasaheli-light/50 group transition-all duration-150 ease-in-out hover:scale-105"><a href="/medicaldocs"><FilePlus className="h-6 w-6 mb-1.5 text-mamasaheli-primary dark:text-mamasaheli-light transition-transform group-hover:scale-110" /><span className="text-sm font-medium text-gray-700 dark:text-gray-300">Medical Docs</span></a></Button>
@@ -711,17 +638,16 @@ const DashboardPage: React.FC = () => {
                                 </CardContent>
                             </Card>
                         </div>
-                    ) : null} {/* End: Content Area */}
-                </div> {/* End: max-w-7xl */}
-            </div> {/* End: background gradient */}
+                    ) : null}
+                </div>
+            </div>
 
-            {/* --- Modals & Dialogs (Keep existing) --- */}
             {editingAppointment && ( <EditAppointmentModal appointment={editingAppointment} isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setEditingAppointment(null); }} onAppointmentUpdated={async () => { setIsEditModalOpen(false); setEditingAppointment(null); await fetchData(); }} /> )}
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}> {/* ... existing delete dialog ... */}
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                  <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Appointment Deletion</AlertDialogTitle> <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel onClick={() => setAppointmentToDelete(null)}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={confirmDeleteAppointment} className="bg-red-600 hover:bg-red-700" disabled={!!deletingAppointmentId} > {deletingAppointmentId === appointmentToDelete ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> : "Delete Appointment"} </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>
             </AlertDialog>
             <AddMedReminderModal isOpen={isMedModalOpen} onClose={() => setIsMedModalOpen(false)} onSubmit={handleSaveReminder} />
-            <AlertDialog open={isDeleteMedReminderDialogOpen} onOpenChange={setIsDeleteMedReminderDialogOpen}> {/* ... existing reminder delete dialog ... */}
+            <AlertDialog open={isDeleteMedReminderDialogOpen} onOpenChange={setIsDeleteMedReminderDialogOpen}>
                  <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Reminder Deletion</AlertDialogTitle> <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel onClick={() => setMedReminderToDelete(null)}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={confirmDeleteReminder} className="bg-red-600 hover:bg-red-700" disabled={!!deletingMedReminderId} > {deletingMedReminderId === medReminderToDelete ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> : "Delete Reminder"} </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>
             </AlertDialog>
 

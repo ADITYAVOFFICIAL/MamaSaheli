@@ -336,7 +336,7 @@ const ProductPage: React.FC = () => {
             isMounted.current = false;
         };
         // Run only on mount and when auth state/user ID changes fundamentally
-    }, [isAuthenticated, user?.$id]); // Removed fetchProfile, fetchBookmarks, clearProfileCache from deps - called internally
+    }, [isAuthenticated, user?.$id, fetchProfile, fetchBookmarks, clearProfileCache]);
 
     // Re-fetch profile or clear cache based on external user changes (e.g., profile update in another tab)
     useEffect(() => {
@@ -682,7 +682,7 @@ const ProductPage: React.FC = () => {
                                             <Tooltip delayDuration={150}>
                                                 <TooltipTrigger asChild>
                                                     {/* Use BookmarkCheck icon, always removing from this view */}
-                                                    <Button variant="outline" size="icon" className={`border-gray-300 dark:border-gray-600 w-9 h-9 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-200 border-purple-300 dark:border-purple-600/50 hover:bg-purple-200 dark:hover:bg-purple-800/50`} onClick={() => handleBookmarkToggle({ id: item.id, name: item.name })} disabled={isToggling || loadingBookmarks} aria-label={'Remove bookmark'} >
+                                                    <Button variant="outline" size="icon" className={`dark:border-gray-600 w-9 h-9 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-200 border-purple-300 dark:border-purple-600/50 hover:bg-purple-200 dark:hover:bg-purple-800/50`} onClick={() => handleBookmarkToggle({ id: item.id, name: item.name })} disabled={isToggling || loadingBookmarks} aria-label={'Remove bookmark'} >
                                                         {isToggling ? ( <Loader2 className="h-4 w-4 animate-spin" /> ) : ( <BookmarkCheck className="h-4 w-4" /> )}
                                                     </Button>
                                                 </TooltipTrigger>

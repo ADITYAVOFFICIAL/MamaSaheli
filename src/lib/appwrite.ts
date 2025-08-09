@@ -479,7 +479,21 @@ export const deleteBlogPost = async (documentId: string, imageFileId?: string): 
 // --- User Profile Functions ---
 export const createUserProfile = async (userId: string, profileData: Partial<Omit<UserProfile, keyof AppwriteDocument | 'userId' | 'profilePhotoUrl'>>): Promise<UserProfile> => {
     if (!profilesCollectionId) throw new Error("Profile Collection ID not configured."); if (!userId) throw new Error("User ID required for profile.");
-    try { const existingProfile = await getUserProfile(userId); if (existingProfile) { /*console.warn(`Profile exists for ${userId}. Updating.`);*/ const dataToUpdate = { ...profileData }; delete (dataToUpdate as any).userId; return updateUserProfile(existingProfile.$id, dataToUpdate); } else { const dataToSend: Record<string, any> = { userId: userId, ...profileData }; if (!Array.isArray(dataToSend.dietaryPreferences)) dataToSend.dietaryPreferences = []; const userRole = Role.user(userId); const permissions = [ Permission.read(userRole), Permission.update(userRole), Permission.delete(userRole) ]; return await databases.createDocument<UserProfile>( databaseId, profilesCollectionId, ID.unique(), dataToSend, permissions ); } }
+    try { 
+        const existingProfile = await getUserProfile(userId); 
+        if (existingProfile) { 
+            /*console.warn(`Profile exists for ${userId}. Updating.`);*/
+            const dataToUpdate: Record<string, unknown> = { ...profileData }; 
+            delete dataToUpdate.userId; 
+            return updateUserProfile(existingProfile.$id, dataToUpdate); 
+        } else { 
+            const dataToSend: Record<string, unknown> = { userId: userId, ...profileData }; 
+            if (!Array.isArray(dataToSend.dietaryPreferences)) dataToSend.dietaryPreferences = []; 
+            const userRole = Role.user(userId); 
+            const permissions = [ Permission.read(userRole), Permission.update(userRole), Permission.delete(userRole) ]; 
+            return await databases.createDocument<UserProfile>( databaseId, profilesCollectionId, ID.unique(), dataToSend, permissions ); 
+        } 
+    }
     catch (error) { handleAppwriteError(error, `creating/updating profile for user ${userId}`); throw error; }
 };
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
@@ -489,7 +503,19 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 };
 export const updateUserProfile = async (profileDocumentId: string, profileData: Partial<Omit<UserProfile, keyof AppwriteDocument | 'userId' | 'profilePhotoUrl'>>): Promise<UserProfile> => {
      if (!profilesCollectionId) throw new Error("Profile Collection ID not configured."); if (!profileDocumentId) throw new Error("Profile document ID required for update.");
-    try { const dataToUpdate = { ...profileData }; delete (dataToUpdate as any).userId; delete (dataToUpdate as any).email; delete (dataToUpdate as any).profilePhotoUrl; const filteredUpdateData = Object.fromEntries(Object.entries(dataToUpdate).filter(([_, v]) => v !== undefined)); if (filteredUpdateData.hasOwnProperty('dietaryPreferences')) { if (filteredUpdateData.dietaryPreferences === null) filteredUpdateData.dietaryPreferences = []; else if (!Array.isArray(filteredUpdateData.dietaryPreferences)) { /*console.warn("updateUserProfile: dietaryPreferences invalid.");*/ delete filteredUpdateData.dietaryPreferences; } } if (Object.keys(filteredUpdateData).length === 0) { /*console.warn("updateUserProfile called with no data to update:", profileDocumentId);*/ return await databases.getDocument<UserProfile>(databaseId, profilesCollectionId, profileDocumentId); } return await databases.updateDocument<UserProfile>( databaseId, profilesCollectionId, profileDocumentId, filteredUpdateData ); }
+    try { 
+        const dataToUpdate: Record<string, unknown> = { ...profileData }; 
+        delete dataToUpdate.userId; 
+        delete dataToUpdate.email; 
+        delete dataToUpdate.profilePhotoUrl; 
+        const filteredUpdateData = Object.fromEntries(Object.entries(dataToUpdate).filter(([_, v]) => v !== undefined)); 
+        if (Object.prototype.hasOwnProperty.call(filteredUpdateData, 'dietaryPreferences')) { 
+            if (filteredUpdateData.dietaryPreferences === null) filteredUpdateData.dietaryPreferences = []; 
+            else if (!Array.isArray(filteredUpdateData.dietaryPreferences)) { /*console.warn("updateUserProfile: dietaryPreferences invalid.");*/ delete filteredUpdateData.dietaryPreferences; } 
+        } 
+        if (Object.keys(filteredUpdateData).length === 0) { /*console.warn("updateUserProfile called with no data to update:", profileDocumentId);*/ return await databases.getDocument<UserProfile>(databaseId, profilesCollectionId, profileDocumentId); } 
+        return await databases.updateDocument<UserProfile>( databaseId, profilesCollectionId, profileDocumentId, filteredUpdateData ); 
+    }
     catch (error) { handleAppwriteError(error, `updating profile document ${profileDocumentId}`); throw error; }
 };
 export const uploadProfilePhoto = async (file: File, userId: string): Promise<Models.File> => {
@@ -539,7 +565,16 @@ export const getUserAppointments = async (userId: string): Promise<Appointment[]
 };
 export const updateAppointment = async (appointmentDocumentId: string, appointmentData: Partial<Omit<Appointment, keyof AppwriteDocument | 'userId'>>): Promise<Appointment> => {
      if (!appointmentsCollectionId || !appointmentDocumentId) throw new Error("Collection ID and document ID required for update.");
-    try { const dataToUpdate = { ...appointmentData }; delete (dataToUpdate as any).userId; const filteredUpdateData = Object.fromEntries(Object.entries(dataToUpdate).filter(([_, v]) => v !== undefined)); if (Object.keys(filteredUpdateData).length === 0) { /*console.warn(`updateAppointment called with no data for doc ${appointmentDocumentId}.`);*/ return await databases.getDocument<Appointment>(databaseId, appointmentsCollectionId, appointmentDocumentId); } return await databases.updateDocument<Appointment>( databaseId, appointmentsCollectionId, appointmentDocumentId, filteredUpdateData ); }
+    try { 
+        const dataToUpdate: Partial<Omit<Appointment, keyof AppwriteDocument | 'userId'>> = { ...appointmentData }; 
+        delete (dataToUpdate as Record<string, unknown>).userId; 
+        const filteredUpdateData = Object.fromEntries(Object.entries(dataToUpdate).filter(([_, v]) => v !== undefined)); 
+        if (Object.keys(filteredUpdateData).length === 0) { 
+            /*console.warn(`updateAppointment called with no data for doc ${appointmentDocumentId}.`);*/ 
+            return await databases.getDocument<Appointment>(databaseId, appointmentsCollectionId, appointmentDocumentId); 
+        } 
+        return await databases.updateDocument<Appointment>( databaseId, appointmentsCollectionId, appointmentDocumentId, filteredUpdateData ); 
+    }
     catch (error) { handleAppwriteError(error, `updating appointment ${appointmentDocumentId}`); throw error; }
 };
 export const deleteAppointment = async (appointmentDocumentId: string): Promise<void> => {
@@ -552,7 +587,15 @@ export const deleteAppointment = async (appointmentDocumentId: string): Promise<
 // --- Health Reading Functions ---
 const createHealthReading = async <T extends HealthReadingBase, D extends object>( userId: string, collectionId: string, collectionName: string, data: D, requiredFields: (keyof D)[] ): Promise<T> => {
     if (!userId || !collectionId || !data) throw new Error(`User ID, Collection ID, and data required for ${collectionName}.`);
-    for (const field of requiredFields) { const value = (data as any)[field]; if (value === null || value === undefined || String(value).trim() === '') throw new Error(`Field '${String(field)}' required for ${collectionName}.`); if (typeof value === 'number' && isNaN(value)) throw new Error(`Field '${String(field)}' must be valid number.`); if (typeof value === 'number' && value < 0 && !(collectionName === 'Blood Sugar' && field === 'level' && value === 0)) throw new Error(`Field '${String(field)}' must be non-negative.`); }
+    for (const field of requiredFields) { 
+        const value = (data as Record<string, unknown>)[field as string]; 
+        if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) 
+            throw new Error(`Field '${String(field)}' required for ${collectionName}.`); 
+        if (typeof value === 'number' && isNaN(value)) 
+            throw new Error(`Field '${String(field)}' must be valid number.`); 
+        if (typeof value === 'number' && value < 0 && !(collectionName === 'Blood Sugar' && field === 'level' && value === 0)) 
+            throw new Error(`Field '${String(field)}' must be non-negative.`); 
+    }
     try { const payload = { userId, ...data, recordedAt: new Date().toISOString() } as Omit<T, keyof AppwriteDocument>; const userRole = Role.user(userId); const permissions = [ Permission.read(userRole), Permission.delete(userRole) ]; return await databases.createDocument<T>(databaseId, collectionId, ID.unique(), payload, permissions); }
     catch (error) { handleAppwriteError(error, `creating ${collectionName} reading for user ${userId}`); throw error; }
 };
@@ -593,10 +636,55 @@ export const deleteMedicationReminder = async (documentId: string): Promise<void
     try { await databases.deleteDocument(databaseId, medicationRemindersCollectionId, documentId); }
     catch (error) { handleAppwriteError(error, `deleting medication reminder ${documentId}`); throw error; }
 };
-export const updateMedicationReminder = async (documentId: string, data: Partial<Omit<MedicationReminder, keyof AppwriteDocument | 'userId'>>): Promise<MedicationReminder> => {
-    if (!medicationRemindersCollectionId || !documentId) throw new Error("Collection ID and Document ID required for update.");
-    try { const dataToUpdate = { ...data }; delete (dataToUpdate as any).userId; const filteredUpdateData = Object.fromEntries(Object.entries(dataToUpdate).filter(([_, v]) => v !== undefined)); if (filteredUpdateData.hasOwnProperty('times')) { if (filteredUpdateData.times === null) filteredUpdateData.times = []; else if (!Array.isArray(filteredUpdateData.times)) { /*console.warn("updateMedicationReminder: 'times' invalid.");*/ filteredUpdateData.times = []; } else { filteredUpdateData.times = filteredUpdateData.times.map(t => String(t ?? '').trim()).filter(Boolean); } } if (Object.keys(filteredUpdateData).length === 0) { /*console.warn(`updateMedicationReminder called with no data for doc ${documentId}.`);*/ return await databases.getDocument<MedicationReminder>(databaseId, medicationRemindersCollectionId, documentId); } return await databases.updateDocument<MedicationReminder>( databaseId, medicationRemindersCollectionId, documentId, filteredUpdateData ); }
-    catch (error) { handleAppwriteError(error, `updating medication reminder ${documentId}`); throw error; }
+export const updateMedicationReminder = async (
+    documentId: string,
+    data: Partial<Omit<MedicationReminder, keyof AppwriteDocument | 'userId'>>
+): Promise<MedicationReminder> => {
+    if (!medicationRemindersCollectionId || !documentId) {
+        throw new Error("Collection ID and Document ID required for update.");
+    }
+    try {
+        // Use Record<string, unknown> instead of any
+        const dataToUpdate: Record<string, unknown> = { ...data };
+        delete dataToUpdate.userId;
+
+        const filteredUpdateData = Object.fromEntries(
+            Object.entries(dataToUpdate).filter(([_, v]) => v !== undefined)
+        );
+
+        // Use Object.prototype.hasOwnProperty.call to avoid prototype pollution
+        if (Object.prototype.hasOwnProperty.call(filteredUpdateData, 'times')) {
+            if (filteredUpdateData.times === null) {
+                filteredUpdateData.times = [];
+            } else if (!Array.isArray(filteredUpdateData.times)) {
+                // console.warn("updateMedicationReminder: 'times' invalid.");
+                filteredUpdateData.times = [];
+            } else {
+                filteredUpdateData.times = (filteredUpdateData.times as unknown[])
+                    .map(t => String(t ?? '').trim())
+                    .filter(Boolean);
+            }
+        }
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+            // console.warn(`updateMedicationReminder called with no data for doc ${documentId}.`);
+            return await databases.getDocument<MedicationReminder>(
+                databaseId,
+                medicationRemindersCollectionId,
+                documentId
+            );
+        }
+
+        return await databases.updateDocument<MedicationReminder>(
+            databaseId,
+            medicationRemindersCollectionId,
+            documentId,
+            filteredUpdateData
+        );
+    } catch (error) {
+        handleAppwriteError(error, `updating medication reminder ${documentId}`);
+        throw error;
+    }
 };
 
 
@@ -1756,7 +1844,7 @@ export const getUserProfilesByIds = async (userIds: string[]): Promise<Map<strin
         response.documents.forEach(profile => {
             // Ensure profilePhotoUrl is generated if needed (optional here)
              if (profile.profilePhotoId && profileBucketId) {
-                  try { profile.profilePhotoUrl = getFilePreview(profile.profilePhotoId, profileBucketId)?.href; } catch {}
+                  try { profile.profilePhotoUrl = getFilePreview(profile.profilePhotoId, profileBucketId)?.href; } catch { /* ignore error */ }
              }
              profilesMap.set(profile.userId, profile); // Map by userId for easy lookup
         });
@@ -1787,7 +1875,7 @@ export const getTotalUserCount = async (): Promise<{ totalUsers: number }> => {
             '',    // Body (empty for GET)
             false, // Synchronous execution
             '/',   // Path
-            // @ts-ignore - SDK type definition issue for ExecutionMethod in this version
+            // @ts-expect-error - SDK type definition issue for ExecutionMethod in this version
             'GET'
         );
 

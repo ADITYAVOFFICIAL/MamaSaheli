@@ -52,7 +52,7 @@ type GeminiImagePart = Part;
 
 // --- Configuration ---
 const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GEMINI_API_KEY;
-const MODEL_NAME = "gemini-1.5-flash-latest"; // A powerful and efficient multimodal model
+const MODEL_NAME = "gemini-2.0-flash"; // A powerful and efficient multimodal model
 
 if (!API_KEY) {
     console.error("CRITICAL: VITE_PUBLIC_GEMINI_API_KEY environment variable is not set. Gemini service will be unavailable.");
@@ -212,14 +212,14 @@ const convertHistoryToGeminiFormat = (messages: AppChatMessage[]): GeminiChatMes
             if (Array.isArray(msg.content)) {
                 parts = msg.content.map(part => {
                     if (typeof part === 'string') {
-                        return { text: part };
+                        return { text: part } as Part;
                     }
                     const match = part.image_url.url.match(/data:(.*);base64,(.*)/);
                     if (!match) {
                         console.warn("Invalid data URI format for image, skipping.");
-                        return { text: "[Unsupported Image Format]" };
+                        return { text: "[Unsupported Image Format]" } as Part;
                     }
-                    return { inlineData: { mimeType: match[1], data: match[2] } };
+                    return { inlineData: { mimeType: match[1], data: match[2] } } as Part;
                 });
             } else {
                 parts = [{ text: msg.content }];
@@ -308,8 +308,8 @@ export const sendMessage = async (messages: AppChatMessage[]): Promise<string> =
         const response: EnhancedGenerateContentResponse = result.response;
         const responseText = response.text();
 
-        if (!responseText && response.finishReason !== 'STOP') {
-             throw new Error(`AI provided no valid response content. Finish Reason: ${response.finishReason}`);
+        if (!responseText) {
+             throw new Error(`AI provided no valid response content.`);
         }
         return responseText || "";
 
