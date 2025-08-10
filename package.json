@@ -52,7 +52,7 @@
     "@web3modal/ethers": "^5.1.11",
     "@web3modal/react": "^2.7.1",
     "add": "^2.0.6",
-    "appwrite": "^17.0.2",
+    "appwrite": "^18.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
