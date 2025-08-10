@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import PWAInstallPrompt from "@/components/ui/PWAInstallPrompt";
 
 // Auth and Store (Keep these static imports)
 import { useAuthStore } from "@/store/authStore";
@@ -72,6 +73,7 @@ const App = () => {
         {/* Keep Toasters outside Suspense if they need to be always available */}
         <Toaster />
         <Sonner />
+        <PWAInstallPrompt />
         <BrowserRouter>
           {/* Suspense Wrapper: Displays fallback while lazy components load */}
           <Suspense fallback={<LoadingFallback />}>
