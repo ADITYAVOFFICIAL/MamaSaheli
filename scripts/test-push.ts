@@ -10,3 +10,6 @@ import { sendTestPushToAll } from '../src/lib/sendTestPush';
     process.exit(1);
   }
 })();
+
+// service-account.json
+// mama.json
