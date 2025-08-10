@@ -18,15 +18,19 @@ const messaging = getMessaging(app);
 export const requestFirebaseNotificationPermission = async () => {
   try {
     const permission = await Notification.requestPermission();
+    console.log('[FCM] Notification permission:', permission);
     if (permission === 'granted') {
       const token = await getToken(messaging, {
         vapidKey: 'BOlJIRBbSyAcQimWHzZcywOGOYixk4VTC1cFSJIg7wvEk5IE81u3DFmvD3a4yQKtK4JHOYm7s_iH-a_sY5gtLoI'
       });
+      console.log('[FCM] FCM token:', token);
       return token;
+    } else {
+      console.warn('[FCM] Notification permission not granted:', permission);
     }
     return null;
   } catch (err) {
-    console.error('FCM permission error:', err);
+    console.error('[FCM] FCM permission error:', err);
     return null;
   }
 };

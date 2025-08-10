@@ -1,276 +1,284 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Watch, HeartPulse, Moon, Footprints, RefreshCw, CheckCircle, XCircle, BatteryFull, Wifi, Smartphone, ChevronDown, HardDrive, Info
+  Heart,
+  Footprints,
+  Moon,
+  Wind,
+  Brain,
+  Zap,
+  Watch,
+  ChevronRight,
+  ChevronUp,
+  Target,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import {
+  BarChart, Bar, LineChart, Line, RadialBarChart, RadialBar,
+  ResponsiveContainer, Tooltip, XAxis, Cell
+} from 'recharts';
 
-// --- Mock Data ---
-const mockHeartRate = [
-  { time: '6 AM', value: 62 },
-  { time: '9 AM', value: 70 },
-  { time: '12 PM', value: 76 },
-  { time: '3 PM', value: 72 },
-  { time: '6 PM', value: 68 },
-  { time: '9 PM', value: 65 },
-];
-const mockSleep = [
-  { stage: 'Deep', hours: 2.1 },
-  { stage: 'Light', hours: 4.5 },
-  { stage: 'REM', hours: 1.4 },
-];
-const mockSteps = [
-  { hour: '8 AM', steps: 500 },
-  { hour: '10 AM', steps: 1200 },
-  { hour: '12 PM', steps: 2100 },
-  { hour: '2 PM', steps: 3200 },
-  { hour: '4 PM', steps: 4500 },
-  { hour: '6 PM', steps: 6000 },
-];
+// --- TYPE DEFINITIONS for Strict TypeScript ---
+interface HealthMetric {
+  time: string;
+  value: number;
+}
+interface SleepData {
+  totalHours: number;
+  deepHours: number;
+  remHours: number;
+  score: number;
+}
+interface ActivityData {
+  steps: number;
+  goal: number;
+  activeEnergy: number;
+  hourlySteps: { hour: string; steps: number }[];
+}
+interface BodyCompositionData {
+    weight: number;
+    skeletalMuscle: number;
+    bodyFatMass: number;
+}
+interface FullHealthData {
+  activity: ActivityData;
+  heartRate: HealthMetric[];
+  sleep: SleepData;
+  stress: HealthMetric[];
+  spo2: number;
+  bodyComposition: BodyCompositionData;
+}
 
-const deviceInfo = {
-  name: 'Galaxy Watch 8 Classic',
-  model: 'SM-R960',
-  softwareVersion: 'R960XXU1AWL1',
-  battery: 87,
-  storage: '12.1GB / 16GB used',
-  connected: true,
-  lastSync: 'Just now',
-  wifi: true,
-  phone: 'Galaxy S24 Ultra',
+// --- REALISTIC MOCK DATA GENERATION ---
+const generateHealthData = (): FullHealthData => {
+  const hourlySteps = Array.from({ length: 24 }, (_, i) => {
+    let steps = 0;
+    if (i > 6 && i < 22) {
+      const randomFactor = Math.random();
+      if (i === 8 || i === 18) steps = 300 + randomFactor * 1000;
+      else if (i > 12 && i < 14) steps = 200 + randomFactor * 400;
+      else steps = 50 + randomFactor * 150;
+    }
+    return { hour: `${i}:00`, steps: Math.floor(steps) };
+  });
+  const totalSteps = hourlySteps.reduce((sum, item) => sum + item.steps, 0);
+
+  return {
+    activity: {
+      steps: totalSteps,
+      goal: 10000,
+      activeEnergy: Math.floor(totalSteps * 0.045),
+      hourlySteps,
+    },
+    heartRate: Array.from({ length: 12 }, (_, i) => ({
+      time: `${i * 2}:00`,
+      value: Math.floor(60 + Math.sin(i) * 10 + Math.random() * 15),
+    })),
+    sleep: {
+      totalHours: 7 + Math.random() * 1.5,
+      deepHours: (7 + Math.random() * 1.5) * (0.18 + Math.random() * 0.1),
+      remHours: (7 + Math.random() * 1.5) * (0.20 + Math.random() * 0.08),
+      score: Math.floor(65 + Math.random() * 25),
+    },
+    stress: Array.from({ length: 12 }, (_, i) => ({
+      time: `${i * 2}:00`,
+      value: Math.floor(30 + Math.cos(i) * 15 + Math.random() * 20),
+    })),
+    spo2: 96 + Math.floor(Math.random() * 4),
+    bodyComposition: {
+        weight: 75.4,
+        skeletalMuscle: 34.2,
+        bodyFatMass: 15.1,
+    }
+  };
 };
 
+// --- Reusable UI Components ---
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/80 dark:bg-black/80 backdrop-blur-sm p-2 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg">
+        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+        <p className="font-bold text-sm text-gray-900 dark:text-white">{`${payload[0].value} ${payload[0].name}`}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const MetricWidget = ({ icon: Icon, title, value, unit, children, iconBgColor }: any) => (
+  <motion.div
+    layout
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    exit={{ opacity: 0, scale: 0.9 }}
+    transition={{ duration: 0.3, type: 'spring' }}
+    className="bg-gray-100/50 dark:bg-gray-800/40 p-4 rounded-2xl flex flex-col h-full"
+  >
+    <div className="flex items-center gap-3 mb-2">
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${iconBgColor}`}>
+        <Icon size={18} />
+      </div>
+      <h3 className="font-semibold text-gray-700 dark:text-gray-200">{title}</h3>
+    </div>
+    {value && (
+      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+        {value} <span className="text-base font-medium text-gray-500">{unit}</span>
+      </div>
+    )}
+    <div className="flex-grow">{children}</div>
+  </motion.div>
+);
+
+// --- Child Components for Views ---
+const HealthDashboardView = ({ healthData }: { healthData: FullHealthData }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const { activity, heartRate, sleep, stress, spo2, bodyComposition } = healthData;
+    const activityProgress = (activity.steps / activity.goal) * 100;
+    const [activeBar, setActiveBar] = useState<number | null>(null);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="space-y-4"
+        >
+            <div className="flex justify-end -mb-2 px-2">
+                <button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="flex items-center text-sm font-semibold text-blue-500 hover:text-blue-600 transition-colors"
+                >
+                    {isExpanded ? 'Collapse' : 'More'}
+                    <motion.div animate={{ rotate: isExpanded ? 180 : 0 }}>
+                        <ChevronUp size={16} className="transform transition-transform"/>
+                    </motion.div>
+                </button>
+            </div>
+             <motion.div layout className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <motion.div layout className="lg:col-span-2">
+                    <div className="bg-gray-100/50 dark:bg-gray-800/40 p-4 rounded-2xl h-full flex flex-col">
+                        <h3 className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Daily Activity</h3>
+                        <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                            <div className="relative w-48 h-48 mx-auto">
+                                <ResponsiveContainer width="100%" height="100%">
+                                <RadialBarChart innerRadius="60%" outerRadius="100%" data={[{ value: activityProgress }]} startAngle={90} endAngle={450}>
+                                    <RadialBar dataKey="value" cornerRadius={10} background fill="#2563eb" />
+                                </RadialBarChart>
+                                </ResponsiveContainer>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                    <Footprints size={24} className="text-blue-500"/>
+                                    <p className="text-2xl font-bold mt-1 text-gray-900 dark:text-white">{activity.steps.toLocaleString()}</p>
+                                    <p className="text-xs text-gray-500">/ {activity.goal.toLocaleString()} steps</p>
+                                </div>
+                            </div>
+                            <div className="w-full h-40">
+                                <ResponsiveContainer>
+                                    <BarChart data={activity.hourlySteps.filter(d => d.steps > 0)} onMouseMove={(state) => { if (state.isTooltipActive) setActiveBar(state.activeTooltipIndex);}} onMouseLeave={() => setActiveBar(null)}>
+                                        <XAxis dataKey="hour" tickLine={false} axisLine={false} fontSize={10}/>
+                                        <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(37, 99, 235, 0.1)'}}/>
+                                        <Bar dataKey="steps" radius={[4, 4, 0, 0]}>
+                                        {activity.hourlySteps.filter(d => d.steps > 0).map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={index === activeBar ? '#1d4ed8' : '#60a5fa'}/>
+                                        ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+                <div className="grid grid-cols-2 gap-4">
+                    <MetricWidget icon={Zap} title="Active" value={activity.activeEnergy} unit="kcal" iconBgColor="bg-orange-500"><p className="text-xs text-gray-500 dark:text-gray-400">Energy burned</p></MetricWidget>
+                    <MetricWidget icon={Heart} title="Heart Rate" value={heartRate[heartRate.length - 1].value} unit="bpm" iconBgColor="bg-red-500"><div className="h-10 w-full -ml-4"><ResponsiveContainer><LineChart data={heartRate}><Line type="monotone" dataKey="value" stroke="#ef4444" strokeWidth={2} dot={false}/><Tooltip content={<CustomTooltip />}/></LineChart></ResponsiveContainer></div></MetricWidget>
+                </div>
+                <AnimatePresence>
+                    {isExpanded && (
+                        <>
+                        <MetricWidget icon={Moon} title="Sleep" value={sleep.totalHours.toFixed(1)} unit="hrs" iconBgColor="bg-indigo-500"><p className="text-xs text-gray-500 dark:text-gray-400">Score: <span className="font-bold">{sleep.score}</span> | Deep: <span className="font-bold">{sleep.deepHours.toFixed(1)}h</span></p></MetricWidget>
+                        <MetricWidget icon={Brain} title="Stress" value="Low" unit="" iconBgColor="bg-green-500"><p className="text-xs text-gray-500 dark:text-gray-400">Well balanced day</p></MetricWidget>
+                        <MetricWidget icon={Wind} title="Blood Oxygen" value={spo2} unit="%" iconBgColor="bg-sky-500"><p className="text-xs text-gray-500 dark:text-gray-400">During sleep</p></MetricWidget>
+                        <MetricWidget icon={Target} title="Body Composition" iconBgColor="bg-teal-500"><div className="text-xs space-y-1 text-gray-600 dark:text-gray-300"><p>Weight: <span className="font-bold">{bodyComposition.weight.toFixed(1)} kg</span></p><p>Skeletal Muscle: <span className="font-bold">{bodyComposition.skeletalMuscle.toFixed(1)} kg</span></p><p>Body Fat: <span className="font-bold">{bodyComposition.bodyFatMass.toFixed(1)} kg</span></p></div></MetricWidget>
+                        <MetricWidget icon={TrendingUp} title="Workouts" iconBgColor="bg-purple-500"><div className="text-xs space-y-1 text-gray-600 dark:text-gray-300"><p className="font-bold">3 sessions this week</p><p>Last: <span className="font-medium">Running, 3.2 km</span></p></div></MetricWidget>
+                        </>
+                    )}
+                </AnimatePresence>
+            </motion.div>
+        </motion.div>
+    );
+};
+
+const DisconnectedView = ({ onConnect }: { onConnect: () => void }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="text-center py-10"
+    >
+      <Watch className="h-16 w-16 mx-auto text-gray-400 dark:text-gray-500 mb-4" />
+      <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">No Watch Connected</h3>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-6 max-w-xs mx-auto">
+        Connect your Samsung Galaxy Watch to see your daily activity and health insights.
+      </p>
+      <button
+        onClick={onConnect}
+        className="bg-blue-600 text-white font-semibold px-6 py-2 rounded-full hover:bg-blue-700 transition-colors shadow-lg"
+      >
+        Connect
+      </button>
+    </motion.div>
+  );
+
+// --- MAIN COMPONENT ---
 export const SamsungHealthMock: React.FC = () => {
-  const [connected, setConnected] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState<Date>(new Date());
-  const [showDetails, setShowDetails] = useState(false);
-
-  const handleToggle = () => setConnected((c) => !c);
-
-  const handleSync = () => {
-    if (!connected) return;
-    setSyncing(true);
-    setTimeout(() => {
-      setSyncing(false);
-      setLastSync(new Date());
-    }, 1800);
-  };
+  const [isConnected, setIsConnected] = useState(true);
+  const healthData = useMemo(() => generateHealthData(), []);
 
   return (
-    <Card className="rounded-2xl border-0 shadow-lg bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 mb-8 overflow-hidden">
-      <CardHeader className="flex flex-row items-start justify-between pb-2 bg-gradient-to-r from-blue-500/90 to-blue-400/80 dark:from-blue-900 dark:to-blue-700 rounded-t-2xl px-6 py-4">
+    <motion.div
+      layout
+      transition={{ duration: 0.5, ease: [0.04, 0.62, 0.23, 0.98] }}
+      className="bg-white/50 dark:bg-gray-900/50 backdrop-blur-lg border border-gray-200 dark:border-gray-700/50 rounded-3xl p-4 sm:p-6 shadow-xl"
+    >
+      <header className="flex justify-between items-center mb-4 px-2">
         <div className="flex items-center gap-3">
-          <Watch className="h-8 w-8 text-white drop-shadow" />
+          <Watch className="text-blue-500" size={28} />
           <div>
-            <CardTitle className="text-lg font-bold text-white tracking-tight">Samsung Health</CardTitle>
-            <div className="text-xs text-blue-100 font-medium flex items-center gap-1 mt-1">
-              <Smartphone className="h-3 w-3" /> {deviceInfo.phone}
-            </div>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Samsung Health</h2>
+            <AnimatePresence mode="wait">
+            <motion.p
+                key={isConnected ? 'connected' : 'disconnected'}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.2 }}
+                className={`text-xs font-medium flex items-center gap-1 ${isConnected ? 'text-green-500' : 'text-gray-500'}`}
+            >
+                {isConnected ? <CheckCircle size={12}/> : <XCircle size={12}/>}
+                {isConnected ? 'Watch8 Classic' : 'Disconnected'}
+            </motion.p>
+            </AnimatePresence>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
-           <motion.span
-            className={`text-xs font-semibold flex items-center gap-1 ${connected ? 'text-green-200' : 'text-gray-200/70'}`}
-            animate={{ opacity: connected ? 1 : 0.6 }}
-          >
-            {connected ? (
-              <>
-                <CheckCircle className="inline h-4 w-4" /> Connected
-              </>
-            ) : (
-              <>
-                <XCircle className="inline h-4 w-4" /> Disconnected
-              </>
-            )}
-          </motion.span>
-          <Button
-            size="sm"
-            variant={connected ? 'outline' : 'default'}
-            className="text-xs px-3 py-1 h-7 bg-white/80 hover:bg-white/90 border-0 shadow-sm text-blue-900"
-            onClick={handleToggle}
-          >
-            {connected ? 'Disconnect' : 'Connect'}
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-6 pb-4 px-6">
-        <AnimatePresence>
-          {connected ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+        {isConnected && (
+            <button
+                onClick={() => setIsConnected(false)}
+                className="text-xs font-semibold text-red-500 bg-red-100 dark:bg-red-900/50 px-3 py-1.5 rounded-full hover:bg-red-200 dark:hover:bg-red-800/50"
             >
-              {/* Device Details Toggle */}
-              <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setShowDetails((v) => !v)}>
-                <div className="flex items-center gap-2 text-sm text-blue-900 dark:text-blue-200 font-semibold">
-                  <Watch className="h-5 w-5" /> {deviceInfo.name}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full h-8 w-8"
-                  aria-label="Show device details"
-                >
-                  <motion.div animate={{ rotate: showDetails ? 180 : 0 }}>
-                    <ChevronDown className="h-5 w-5" />
-                  </motion.div>
-                </Button>
-              </div>
-              <AnimatePresence>
-                {showDetails && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="overflow-hidden mb-4"
-                  >
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-gray-700 dark:text-gray-200 bg-blue-50 dark:bg-blue-900/30 rounded-xl p-4">
-                      <span className="flex items-center gap-2"><Info className="h-4 w-4 text-blue-500" /> Model: {deviceInfo.model}</span>
-                      <span className="flex items-center gap-2"><Info className="h-4 w-4 text-blue-500" /> Software: {deviceInfo.softwareVersion}</span>
-                      <span className="flex items-center gap-2"><BatteryFull className="h-4 w-4 text-green-500" /> Battery: {deviceInfo.battery}%</span>
-                      <span className="flex items-center gap-2"><HardDrive className="h-4 w-4 text-gray-500" /> Storage: {deviceInfo.storage}</span>
-                      <span className="flex items-center gap-2"><Wifi className="h-4 w-4 text-blue-500" /> Wi-Fi: {deviceInfo.wifi ? 'Connected' : 'Off'}</span>
-                      <span className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> Last Sync: {deviceInfo.lastSync}</span>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              
-              {/* Charts Section */}
-              <div className="grid sm:grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Heart Rate Chart */}
-                <div className="flex-1 min-w-[180px]">
-                  <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    <HeartPulse className="h-5 w-5 text-red-500" /> Heart Rate
-                  </div>
-                  <div className="flex items-end justify-between h-28 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg">
-                    {mockHeartRate.map((d, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ scaleY: 0.1 }}
-                        animate={{ scaleY: 1 }}
-                        transition={{ delay: i * 0.1, type: 'spring', stiffness: 150, damping: 10 }}
-                        className="flex flex-col items-center w-full"
-                      >
-                        <div
-                          className="w-6 rounded-t-md bg-gradient-to-t from-red-400 to-red-500 shadow-sm"
-                          style={{ height: `${d.value * 1.1}px` }}
-                        />
-                        <span className="text-[10px] text-gray-500 mt-1">{d.time}</span>
-                      </motion.div>
-                    ))}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-2 text-center">Avg: 69 bpm</div>
-                </div>
-                {/* Sleep & Steps */}
-                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    {/* Sleep Chart */}
-                    <div className="flex-1 min-w-[160px]">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
-                        <Moon className="h-5 w-5 text-indigo-500" /> Sleep
-                        </div>
-                        <div className="flex flex-col gap-2.5 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg h-28 justify-center">
-                        {mockSleep.map((s, i) => (
-                            <motion.div
-                            key={i}
-                            initial={{ opacity: 0, x: -15 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.15 }}
-                            className="flex items-center gap-2"
-                            >
-                            <span className="w-12 text-xs text-gray-500">{s.stage}</span>
-                            <Progress value={s.hours * 12.5} className="flex-1 h-3 rounded-full bg-blue-100 dark:bg-blue-900/30" />
-                            <span className="text-xs font-medium w-8 text-right">{s.hours}h</span>
-                            </motion.div>
-                        ))}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-2 text-center">Total: 8h</div>
-                    </div>
-                    {/* Steps Chart */}
-                    <div className="flex-1 min-w-[160px]">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
-                        <Footprints className="h-5 w-5 text-green-500" /> Steps
-                        </div>
-                        <div className="flex items-end justify-between h-28 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg">
-                            {mockSteps.map((d, i) => (
-                                <motion.div
-                                key={i}
-                                initial={{ scaleY: 0.1 }}
-                                animate={{ scaleY: 1 }}
-                                transition={{ delay: i * 0.1, type: 'spring', stiffness: 150, damping: 10 }}
-                                className="flex flex-col items-center w-full"
-                                >
-                                <div
-                                    className="w-6 rounded-t-md bg-gradient-to-t from-green-400 to-green-500 shadow-sm"
-                                    style={{ height: `${d.steps / 80}px` }}
-                                />
-                                <span className="text-[10px] text-gray-500 mt-1">{d.hour.split(' ')[0]}</span>
-                                </motion.div>
-                            ))}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-2 text-center">Today: 6,000 steps</div>
-                    </div>
-                </div>
-              </div>
-              {/* Sync Status */}
-              <div className="flex items-center gap-3 mt-6">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300 font-semibold"
-                  onClick={handleSync}
-                  disabled={syncing}
-                >
-                  <motion.span
-                    animate={syncing ? { rotate: 360 } : { rotate: 0 }}
-                    transition={{ repeat: syncing ? Infinity : 0, duration: 1, ease: 'linear' }}
-                    className="inline-block"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${syncing ? 'text-blue-500' : ''}`} />
-                  </motion.span>
-                  {syncing ? 'Syncing...' : 'Sync Now'}
-                </Button>
-                <span className="text-xs text-gray-500">
-                  Last synced: {lastSync.toLocaleTimeString()}
-                </span>
-                <motion.span
-                  className="ml-auto text-xs px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 font-medium"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  Real-time sync enabled
-                </motion.span>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="text-center py-12"
-            >
-              <Watch className="h-16 w-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">Connect your Galaxy Watch</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-6">
-                Sync with Samsung Health to see your daily activity, sleep patterns, and heart rate.
-              </p>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={handleToggle}
-              >
-                Connect Device
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </CardContent>
-    </Card>
+                Disconnect
+            </button>
+        )}
+      </header>
+      <AnimatePresence mode="wait">
+        {isConnected ? (
+          <HealthDashboardView key="dash" healthData={healthData} />
+        ) : (
+          <DisconnectedView key="disco" onConnect={() => setIsConnected(true)} />
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
 

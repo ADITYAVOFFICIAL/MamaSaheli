@@ -195,6 +195,49 @@ const DashboardPage: React.FC = () => {
     const [feedError, setFeedError] = useState<string | null>(null);
 
     const { user, isAuthenticated } = useAuthStore();
+    // Save FCM token for push notifications directly to Appwrite
+    useEffect(() => {
+        async function saveFcmTokenDirect() {
+            if (isAuthenticated && user && user.$id) {
+                const token = await requestFirebaseNotificationPermission();
+                if (token) {
+                    try {
+                        const APPWRITE_ENDPOINT = import.meta.env.VITE_PUBLIC_APPWRITE_ENDPOINT;
+                        const APPWRITE_PROJECT_ID = import.meta.env.VITE_PUBLIC_APPWRITE_PROJECT_ID;
+                        const APPWRITE_API_KEY = import.meta.env.VITE_PUBLIC_APPWRITE_API_KEY || import.meta.env.APPWRITE_API_KEY;
+                        const FCM_COLLECTION_ID = import.meta.env.VITE_PUBLIC_APPWRITE_FCM_COLLECTION_ID;
+                        const FCM_DATABASE_ID = import.meta.env.VITE_PUBLIC_APPWRITE_BLOG_DATABASE_ID;
+                        const headers = {
+                            'X-Appwrite-Project': APPWRITE_PROJECT_ID,
+                            'X-Appwrite-Key': APPWRITE_API_KEY,
+                            'Content-Type': 'application/json',
+                        };
+                        const res = await fetch(
+                            `${APPWRITE_ENDPOINT}/databases/${FCM_DATABASE_ID}/collections/${FCM_COLLECTION_ID}/documents`,
+                            {
+                                method: 'POST',
+                                headers,
+                                body: JSON.stringify({
+                                    documentId: 'unique()',
+                                    data: { userId: user.$id, token },
+                                }),
+                            }
+                        );
+                        if (!res.ok) {
+                            const errText = await res.text();
+                            throw new Error(errText);
+                        }
+                        console.log('[FCM] Token sent directly to Appwrite and should be saved.');
+                    } catch (err) {
+                        console.error('[FCM] Failed to save FCM token to Appwrite:', err);
+                    }
+                } else {
+                    console.warn('[FCM] No FCM token to save.');
+                }
+            }
+        }
+        saveFcmTokenDirect();
+    }, [isAuthenticated, user]);
     const { toast } = useToast();
 
     const doctorTypes = useMemo(() => ['doctor', 'lab_test', undefined, null, ''] as const, []);
