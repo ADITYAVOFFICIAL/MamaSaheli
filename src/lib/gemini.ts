@@ -52,7 +52,7 @@ type GeminiImagePart = Part;
 
 // --- Configuration ---
 const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GEMINI_API_KEY;
-const MODEL_NAME = "gemini-2.0-flash"; // A powerful and efficient multimodal model
+const MODEL_NAME = "gemini-2.5-flash"; // A powerful and efficient multimodal model
 
 if (!API_KEY) {
     console.error("CRITICAL: VITE_PUBLIC_GEMINI_API_KEY environment variable is not set. Gemini service will be unavailable.");

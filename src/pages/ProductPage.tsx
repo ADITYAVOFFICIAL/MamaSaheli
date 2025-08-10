@@ -67,6 +67,17 @@ const PROFILE_CACHE_KEY_PREFIX = 'userProfile_';
 const PROFILE_TIMESTAMP_KEY_PREFIX = 'userProfileTimestamp_';
 const PROFILE_USER_UPDATED_AT_KEY_PREFIX = 'userProfileUserUpdatedAt_';
 
+// --- Caching Keys for Recommendations ---
+const RECS_CACHE_KEY_PREFIX = 'productRecs_';
+const RECS_TIMESTAMP_KEY_PREFIX = 'productRecsTimestamp_';
+const RECS_USER_UPDATED_AT_KEY_PREFIX = 'productRecsUserUpdatedAt_';
+const RECS_CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+// --- Helper: Generate a unique cache key for recs based on user, prompt, category, and user updatedAt ---
+function getRecsCacheKey(userId: string, userUpdatedAt: string, prompt: string, category: string, type: string) {
+    return `${RECS_CACHE_KEY_PREFIX}${userId}_${userUpdatedAt}_${type}_${prompt || 'default'}_${category || 'all'}`;
+}
+
 // --- Main Component ---
 const ProductPage: React.FC = () => {
     // --- Hooks ---
@@ -143,43 +154,81 @@ const ProductPage: React.FC = () => {
 
     // Fetch Recommendations
     const fetchRecommendations = useCallback(async (): Promise<void> => {
-        if (!isAuthenticated) {
+        if (!isAuthenticated || !user?.$id || !user?.$updatedAt) {
             setError("Authentication required.");
             setLoadingRecommendations(false);
             return;
         }
         let fetchFn: () => Promise<ProductRecommendation[]>;
         let fetchLabel: 'personalized' | 'general' | 'prompt-based';
-        const categoryArg = selectedCategory || undefined;
+        const categoryArg = selectedCategory || '';
+        const promptArg = activeSearchPrompt || '';
+        const userId = user.$id;
+        const userUpdatedAt = user.$updatedAt;
 
         if (activeSearchPrompt) {
             fetchLabel = 'prompt-based';
-            // console.log(`Fetching ${fetchLabel} recommendations for prompt: "${activeSearchPrompt}", category: ${categoryArg || 'All'}`);
-            fetchFn = () => getPromptBasedRecommendations(activeSearchPrompt, categoryArg);
+            fetchFn = () => getPromptBasedRecommendations(activeSearchPrompt, categoryArg || undefined);
         } else if (profile) {
             fetchLabel = 'personalized';
-            // console.log(`Fetching ${fetchLabel} recommendations for profile, category: ${categoryArg || 'All'}`);
-            fetchFn = () => getPersonalizedRecommendations(profile, categoryArg);
+            fetchFn = () => getPersonalizedRecommendations(profile, categoryArg || undefined);
             setPersonalizedFetchAttempted(true);
         } else {
             fetchLabel = 'general';
-            // console.log(`Fetching ${fetchLabel} recommendations, category: ${categoryArg || 'All'}`);
-            fetchFn = () => getGeneralRecommendations(categoryArg);
+            fetchFn = () => getGeneralRecommendations(categoryArg || undefined);
         }
 
         setLoadingRecommendations(true);
         setError(null);
+
+        // --- Caching logic ---
+        const recsCacheKey = getRecsCacheKey(userId, userUpdatedAt, promptArg, categoryArg, fetchLabel);
+        const recsTimestampKey = `${RECS_TIMESTAMP_KEY_PREFIX}${userId}`;
+        const recsUserUpdatedAtKey = `${RECS_USER_UPDATED_AT_KEY_PREFIX}${userId}`;
+
+        if (!activeSearchPrompt) { // Only cache personalized/general, not prompt-based searches
+            try {
+                const cachedRecsJSON = sessionStorage.getItem(recsCacheKey);
+                const cachedTimestampStr = sessionStorage.getItem(recsTimestampKey);
+                const cachedUserUpdatedAt = sessionStorage.getItem(recsUserUpdatedAtKey);
+                const now = Date.now();
+
+                if (
+                    cachedRecsJSON &&
+                    cachedTimestampStr &&
+                    cachedUserUpdatedAt === userUpdatedAt &&
+                    now - parseInt(cachedTimestampStr, 10) < RECS_CACHE_DURATION_MS
+                ) {
+                    const cachedRecs = JSON.parse(cachedRecsJSON) as ProductRecommendation[];
+                    if (isMounted.current) {
+                        setRecommendations(cachedRecs);
+                        setRecommendationType(fetchLabel);
+                        setLoadingRecommendations(false);
+                    }
+                    return;
+                }
+            } catch (e) {
+                // Ignore cache errors, fallback to fetch
+            }
+        }
+
         try {
             const results = await fetchFn();
             if (isMounted.current) {
                 setRecommendations(results);
                 setRecommendationType(fetchLabel);
-                if (results.length === 0) {
-                    // console.log(`AI returned 0 ${fetchLabel} recommendations.`);
+                // --- Store in cache ---
+                if (!activeSearchPrompt) {
+                    try {
+                        sessionStorage.setItem(recsCacheKey, JSON.stringify(results));
+                        sessionStorage.setItem(recsTimestampKey, Date.now().toString());
+                        sessionStorage.setItem(recsUserUpdatedAtKey, userUpdatedAt);
+                    } catch (cacheError) {
+                        // Ignore cache write errors
+                    }
                 }
             }
         } catch (err: unknown) {
-            // console.error(`Error fetching ${fetchLabel} recommendations:`, err);
             const message = err instanceof Error ? err.message : `Could not fetch ${fetchLabel} recommendations.`;
             if (isMounted.current) {
                 setError(`Failed to get ${fetchLabel} recommendations: ${message}`);
@@ -194,7 +243,7 @@ const ProductPage: React.FC = () => {
                 setLoadingRecommendations(false);
             }
         }
-    }, [isAuthenticated, profile, activeSearchPrompt, selectedCategory, toast]);
+    }, [isAuthenticated, user?.$id, user?.$updatedAt, profile, activeSearchPrompt, selectedCategory, toast]);
 
     // Fetch User Profile with Caching
     const fetchProfile = useCallback(async (forceRefresh: boolean = false): Promise<UserProfile | null> => {
@@ -441,9 +490,9 @@ const ProductPage: React.FC = () => {
     };
 
     const handleToggleShowBookmarked = (): void => {
-        if (loadingRecommendations || loadingBookmarks || loadingProfile) return;
-        setShowOnlyBookmarked(prev => !prev);
-    };
+    if (loadingBookmarks || loadingProfile) return;
+    setShowOnlyBookmarked(prev => !prev);
+};
 
     // Handler to explicitly fetch general recommendations
     const handleFetchGeneral = useCallback((): void => {
@@ -558,25 +607,25 @@ const ProductPage: React.FC = () => {
 
         // State 3: Loading Recommendations OR Loading Bookmarks (Subsequent loads)
         // Show skeleton only if not loading profile and recommendations/bookmarks are loading
-        const isLoadingSubsequentData = (loadingRecommendations || (loadingBookmarks && showOnlyBookmarked)) && !loadingProfile;
-        if (isLoadingSubsequentData) {
-            let loadingText = loadingBookmarks && showOnlyBookmarked ? 'Loading saved items...' : 'Fetching recommendations...';
-            if (loadingRecommendations) {
-                if (activeSearchPrompt) loadingText = `Searching for "${activeSearchPrompt}"...`;
-                else if (recommendationType === 'general' || (personalizedFetchAttempted && !profile)) loadingText = 'Fetching general recommendations...';
-                else if (recommendationType === 'personalized' || profile) loadingText = 'Fetching personalized recommendations...';
-            }
-            return (
-                <>
-                    <div className="text-center mt-6 mb-4 text-gray-600 dark:text-gray-400 flex items-center justify-center">
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" /> {loadingText}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {[...Array(8)].map((_, i) => <ProductCardSkeleton key={i} />)}
-                    </div>
-                </>
-            );
-        }
+        const isLoadingSubsequentData = (!showOnlyBookmarked && loadingRecommendations) || (loadingBookmarks && showOnlyBookmarked);
+if (isLoadingSubsequentData && !loadingProfile) {
+    let loadingText = loadingBookmarks && showOnlyBookmarked ? 'Loading saved items...' : 'Fetching recommendations...';
+    if (loadingRecommendations) {
+        if (activeSearchPrompt) loadingText = `Searching for "${activeSearchPrompt}"...`;
+        else if (recommendationType === 'general' || (personalizedFetchAttempted && !profile)) loadingText = 'Fetching general recommendations...';
+        else if (recommendationType === 'personalized' || profile) loadingText = 'Fetching personalized recommendations...';
+    }
+    return (
+        <>
+            <div className="text-center mt-6 mb-4 text-gray-600 dark:text-gray-400 flex items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" /> {loadingText}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {[...Array(8)].map((_, i) => <ProductCardSkeleton key={i} />)}
+            </div>
+        </>
+    );
+}
 
         // State 4: Error Display
         // Prioritize profile error if profile is null
@@ -888,12 +937,12 @@ const ProductPage: React.FC = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={handleToggleShowBookmarked}
-                                // Disable toggle if loading OR if there are no bookmarks to show/toggle to
-                                disabled={loadingRecommendations || loadingBookmarks || loadingProfile || bookmarkMap.size === 0}
+                                // Disable toggle if loading bookmarks/profile or if there are no bookmarks
+                                disabled={loadingBookmarks || loadingProfile || bookmarkMap.size === 0}
                                 className={`border-gray-300 dark:border-gray-600 ${showOnlyBookmarked
                                     ? 'text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-600 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30'
                                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                                } ${bookmarkMap.size === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:text-mamasaheli-primary'}`} // Add hover effect only if enabled
+                                } ${bookmarkMap.size === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:text-mamasaheli-primary'}`}
                                 title={bookmarkMap.size === 0 ? "Save some suggestions first" : showOnlyBookmarked ? "Show All Suggestions" : `Show Saved (${bookmarkMap.size})`}
                             >
                                 {showOnlyBookmarked ? <ListFilter className="mr-2 h-4 w-4" /> : <Bookmark className="mr-2 h-4 w-4" />}

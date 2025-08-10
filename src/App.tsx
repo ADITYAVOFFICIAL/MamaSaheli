@@ -42,7 +42,7 @@ const SymPage = lazy(() => import("./pages/SymptomCheckerPage"));
 const MonadPage = lazy(() => import("./pages/MonadPage"));
 const PatientDetailPage = lazy(() => import("./pages/doctor/PatientDetailPage"));
 
-// You might want a more sophisticated loading component
+// A loading component to show while lazy chunks are fetched
 const LoadingFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
     Loading...
@@ -70,12 +70,12 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        {/* Keep Toasters outside Suspense if they need to be always available */}
+        {/* Keep Toasters outside Suspense as they should be always available */}
         <Toaster />
         <Sonner />
         <PWAInstallPrompt />
         <BrowserRouter>
-          {/* Suspense Wrapper: Displays fallback while lazy components load */}
+          {/* Suspense Wrapper: Displays the fallback while lazy components are loading */}
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               {/* Public Routes */}
