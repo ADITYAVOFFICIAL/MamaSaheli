@@ -1,5 +1,6 @@
 // src/components/Hero.tsx
 import React from 'react';
+import { useAuthStore } from '@/store/authStore';
 import { Link } from 'react-router-dom'; // Assuming you use react-router
 import { Button } from '@/components/ui/button'; // Adjust path if needed
 import { MessageSquare, Heart, ArrowRight } from 'lucide-react';
@@ -56,6 +57,7 @@ const Hero: React.FC = () => {
      { top: '5%', left: '40%', size: 'text-5xl', opacity: 'opacity-15 dark:opacity-10', duration: '21s', delay: '6s' },
   ];
 
+  const { isAuthenticated } = useAuthStore();
   return (
     // Main section container with Framer Motion animation
     <motion.section
@@ -130,17 +132,31 @@ const Hero: React.FC = () => {
                   <ArrowRight className="ml-2 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 </Link>
               </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-mamasaheli-primary text-mamasaheli-primary hover:bg-mamasaheli-light dark:border-mamasaheli-light dark:text-mamasaheli-light dark:hover:bg-purple-900/50 hover:text-mamasaheli-dark dark:hover:text-white font-semibold text-base transition-all duration-300 px-8 py-3 rounded-full shadow-sm hover:shadow-md"
-                asChild
-              >
-                <Link to="/signup">
-                  <Heart className="mr-2 h-5 w-5" />
-                  Join MamaSaheli
-                </Link>
-              </Button>
+              {isAuthenticated ? (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-mamasaheli-primary text-mamasaheli-primary hover:bg-mamasaheli-light dark:border-mamasaheli-light dark:text-mamasaheli-light dark:hover:bg-purple-900/50 hover:text-mamasaheli-dark dark:hover:text-white font-semibold text-base transition-all duration-300 px-8 py-3 rounded-full shadow-sm hover:shadow-md"
+                  asChild
+                >
+                  <Link to="/dashboard">
+                    <Heart className="mr-2 h-5 w-5" />
+                    Go to Dashboard
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-mamasaheli-primary text-mamasaheli-primary hover:bg-mamasaheli-light dark:border-mamasaheli-light dark:text-mamasaheli-light dark:hover:bg-purple-900/50 hover:text-mamasaheli-dark dark:hover:text-white font-semibold text-base transition-all duration-300 px-8 py-3 rounded-full shadow-sm hover:shadow-md"
+                  asChild
+                >
+                  <Link to="/signup">
+                    <Heart className="mr-2 h-5 w-5" />
+                    Join MamaSaheli
+                  </Link>
+                </Button>
+              )}
             </motion.div>
           </motion.div>
 
