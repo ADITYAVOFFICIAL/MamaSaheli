@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { requestFirebaseNotificationPermission, onFirebaseMessageListener } from '@/lib/firebase';
 import { format, compareAsc, parseISO } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -42,6 +43,7 @@ import { Trimester, HealthTip, selectHealthTip, defaultHealthTip } from '@/lib/h
 
 import { generateDashboardFeed } from '@/lib/geminiDash';
 
+
 const UserStatsCards: React.FC<{ profile: UserProfile | null; appointmentsCount: number }> = ({ profile, appointmentsCount }) => {
     const profileCompleteness = useMemo(() => {
         if (!profile) return 0;
@@ -69,6 +71,8 @@ const UserStatsCards: React.FC<{ profile: UserProfile | null; appointmentsCount:
         const extendedPercentage = extendedFields.length > 0 ? (completedExtended / extendedFields.length) * extendedWeight * 100 : 0;
         return Math.round(essentialPercentage + extendedPercentage);
     }, [profile]);
+
+
 
     const missingFields = useMemo(() => {
         if (!profile) return { essential: [], extended: [] };

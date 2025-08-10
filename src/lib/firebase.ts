@@ -1,0 +1,39 @@
+// src/lib/firebase.ts
+import { initializeApp } from "firebase/app";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAjdxCVHgX_FmhLpB8nKfDMu3LMMDq2JkE",
+  authDomain: "mamasaheli-b0d52.firebaseapp.com",
+  projectId: "mamasaheli-b0d52",
+  storageBucket: "mamasaheli-b0d52.firebasestorage.app",
+  messagingSenderId: "483594741503",
+  appId: "1:483594741503:web:8e6becd2ad64417205ceca",
+  measurementId: "G-GKKMCC3H95"
+};
+
+const app = initializeApp(firebaseConfig);
+const messaging = getMessaging(app);
+
+export const requestFirebaseNotificationPermission = async () => {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const token = await getToken(messaging, {
+        vapidKey: '<YOUR_PUBLIC_VAPID_KEY_HERE>' // Optional: set in Firebase Console
+      });
+      return token;
+    }
+    return null;
+  } catch (err) {
+    console.error('FCM permission error:', err);
+    return null;
+  }
+};
+
+export const onFirebaseMessageListener = () =>
+  new Promise((resolve) => {
+    onMessage(messaging, (payload) => {
+      resolve(payload);
+    });
+  });
