@@ -9,7 +9,8 @@ lerna-debug.log*
 vendor
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-
+service-account.json
+mama.json
 # Runtime data
 pids
 *.pid
