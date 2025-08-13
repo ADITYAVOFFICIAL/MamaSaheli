@@ -43,7 +43,7 @@ interface AuthState {
    * @param name - The new user's name.
    * @throws Re-throws the error if signup or subsequent login fails.
    */
-  signup: (email: string, password: string, name: string) => Promise<void>;
+  signup: (email: string, password: string, name: string, hospitalId?: string, hospitalName?: string) => Promise<void>;
 
   /**
    * Logs out the current user by deleting the session.
@@ -105,27 +105,25 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      signup: async (email: string, password: string, name: string) => {
+      signup: async (email: string, password: string, name: string, hospitalId?: string, hospitalName?: string) => {
         try {
           set({ isLoading: true, error: null });
-          // createAccount function in appwrite.ts handles account creation AND login
-          await createAccount(email, password, name);
+          // Pass hospitalId and hospitalName to createAccount
+          await createAccount(email, password, name, hospitalId, hospitalName);
           // Fetch the newly created and automatically logged-in user
           const currentUser = await getCurrentUser();
-          // console.log("User signed up and logged in:", currentUser); // Debug log
           set({
-            user: currentUser, // Store the complete user object
+            user: currentUser,
             isAuthenticated: !!currentUser,
             isLoading: false
           });
         } catch (error: any) {
-          // console.error("Signup error in store:", error);
           const errorMessage = error.message || 'Signup failed. Please try again.';
           set({
             isLoading: false,
             error: errorMessage
           });
-          throw error; // Re-throw the error
+          throw error;
         }
       },
 

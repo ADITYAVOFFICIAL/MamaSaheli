@@ -1,0 +1,74 @@
+[
+  {
+    "id": "INHSA-MUMBAI-001",
+    "name": "INHS Asvini Mumbai",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "AIIMS-DELHI-001",
+    "name": "All India Institute of Medical Sciences (AIIMS) Delhi",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "FORTIS-BANGALORE-001",
+    "name": "Fortis Hospital, Bannerghatta Road",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "APOLLO-CHENNAI-001",
+    "name": "Apollo Hospitals, Greams Road",
+    "city": "Chennai",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "MAX-GURGAON-001",
+    "name": "Max Healthcare, Gurugram",
+    "city": "Gurugram",
+    "state": "Haryana"
+  },
+  {
+    "id": "GANGARAM-DELHI-001",
+    "name": "Sir Ganga Ram Hospital",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "JASLOK-MUMBAI-001",
+    "name": "Jaslok Hospital and Research Centre",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "MANIPAL-BANGALORE-001",
+    "name": "Manipal Hospital, Old Airport Road",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "KEM-MUMBAI-001",
+    "name": "King Edward Memorial Hospital",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "Narayana-Health-Bangalore-001",
+    "name": "Narayana Health City",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "Medanta-Gurgaon-001",
+    "name": "Medanta - The Medicity",
+    "city": "Gurugram",
+    "state": "Haryana"
+  },
+  {
+    "id": "Ruby-Hall-Pune-001",
+    "name": "Ruby Hall Clinic",
+    "city": "Pune",
+    "state": "Maharashtra"
+  }
+]

@@ -398,7 +398,7 @@ const GamesPage: React.FC = () => {
       // console.log("Account found/selected:", userAddr);
 
       // Use 'any' network to allow connection regardless of the initial network
-      browserProvider = new ethers.BrowserProvider(window.ethereum, 'any');
+      browserProvider = new ethers.BrowserProvider(window.ethereum as any, 'any');
       setProvider(browserProvider);
       setUserAddress(userAddr);
       setIsConnected(true);

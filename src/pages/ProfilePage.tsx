@@ -31,9 +31,17 @@ import {
     WeightReading,
     AppwriteDocument // Ensure AppwriteDocument is imported
 } from '@/lib/appwrite';
-import { User as AuthUserIcon, UploadCloud, Save, Loader2, HeartPulse, Info, Settings, HeartHandshake, Briefcase, Utensils, Activity, MessageCircle } from 'lucide-react'; // Added more icons
+import { Hospital, User as AuthUserIcon, UploadCloud, Save, Loader2, HeartPulse, Info, Settings, HeartHandshake, Briefcase, Utensils, Activity, MessageCircle } from 'lucide-react'; // Added Hospital icon
 
-const ProfilePage = () => {
+// Define the interface for a hospital entry from hospitals.json
+interface HospitalOption {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+}
+
+function ProfilePage() {
     // --- Existing State ---
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +71,13 @@ const ProfilePage = () => {
     const [dietaryPreferences, setDietaryPreferences] = useState(''); // Input as comma-separated string
     const [activityLevel, setActivityLevel] = useState('');
     const [chatTonePreference, setChatTonePreference] = useState('');
+    // --- Primary Hospital State ---
+    const [selectedHospitalId, setSelectedHospitalId] = useState('');
+    const [selectedHospitalName, setSelectedHospitalName] = useState('');
+    const [hospitals, setHospitals] = useState<HospitalOption[]>([]);
+    const [isLoadingHospitals, setIsLoadingHospitals] = useState(true);
+    const [hospitalFetchError, setHospitalFetchError] = useState<string | null>(null);
+
 
     // --- Health Input State (remains unchanged) ---
     const [isSavingHealthData, setIsSavingHealthData] = useState<'bp' | 'sugar' | 'weight' | null>(null);
@@ -73,6 +88,32 @@ const ProfilePage = () => {
     const [weight, setWeight] = useState('');
     const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
 
+    // --- Fetch Hospitals Data ---
+    useEffect(() => {
+        const fetchHospitalsData = async () => {
+            try {
+                const response = await fetch('/hospitals.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data: HospitalOption[] = await response.json();
+                setHospitals(data);
+            } catch (error) {
+                console.error("Failed to load hospitals data:", error);
+                setHospitalFetchError("Could not load hospital list. Please try again later.");
+                toast({
+                    title: "Error Loading Hospitals",
+                    description: "Failed to load the list of hospitals. Please refresh the page.",
+                    variant: "destructive",
+                });
+            } finally {
+                setIsLoadingHospitals(false);
+            }
+        };
+
+        fetchHospitalsData();
+    }, []); // Empty dependency array means this runs once on mount
+
     // --- Combined Fetch Function (Updated) ---
     const fetchData = useCallback(async () => {
         if (!user?.$id) {
@@ -82,6 +123,7 @@ const ProfilePage = () => {
 
         setIsLoading(true);
         setFetchedPhotoUrl(null);
+        setHospitalFetchError(null); // Clear hospital fetch error on new data fetch
 
         try {
             // Fetch profile (health data fetches remain unchanged)
@@ -113,18 +155,17 @@ const ProfilePage = () => {
                 setActivityLevel(profileData.activityLevel || '');
                 setChatTonePreference(profileData.chatTonePreference || '');
                 setLanguagePreference(profileData.languagePreference || 'en');
+                // Set new hospital fields from profileData
+                setSelectedHospitalId(profileData.hospitalId || '');
+                setSelectedHospitalName(profileData.hospitalName || '');
 
                 // Photo
                 if (profileData.profilePhotoId) {
                     try {
-                        // console.log(`Attempting to get preview for photo ID: ${profileData.profilePhotoId}`);
                         const previewUrl = getFilePreview(profileData.profilePhotoId, profileBucketId);
-                        // console.log("Preview URL object:", previewUrl);
                         const url = previewUrl?.toString();
-                        // console.log("Final URL string:", url);
                         setFetchedPhotoUrl(url || null);
-                    } catch (e) { 
-                        /*console.error("Error getting profile photo preview:", e);*/}
+                    } catch (e) { console.error("Error getting profile photo preview:", e); }
                 }
             } else {
                 // Reset form fields if no profile exists
@@ -136,12 +177,15 @@ const ProfilePage = () => {
                 setWorkSituation(''); setDietaryPreferences(''); setActivityLevel('');
                 setChatTonePreference('');
                 setLanguagePreference('en');
+                // Reset new hospital fields
+                setSelectedHospitalId('');
+                setSelectedHospitalName('');
             }
 
             // Note: Health data state setting removed as it's not displayed directly
 
         } catch (error) {
-            // console.error('Error fetching data:', error);
+            console.error('Error fetching data:', error);
             toast({ title: "Failed to load data", description: "Could not retrieve profile data.", variant: "destructive" });
         } finally {
             setIsLoading(false);
@@ -157,18 +201,18 @@ const ProfilePage = () => {
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            
+
             // Check if file type is allowed
             const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
             if (!allowedTypes.includes(file.type)) {
-                toast({ 
-                    title: "Invalid file type", 
-                    description: "Please select JPG, PNG, GIF or WebP images only.", 
-                    variant: "destructive" 
+                toast({
+                    title: "Invalid file type",
+                    description: "Please select JPG, PNG, GIF or WebP images only.",
+                    variant: "destructive"
                 });
                 return;
             }
-            
+
             setProfilePhotoFile(file);
             const reader = new FileReader();
             reader.onload = (event) => setLocalPhotoPreview(event.target?.result as string);
@@ -188,46 +232,39 @@ const ProfilePage = () => {
             // Pass user.$id to uploadProfilePhoto
             const uploadedFile = await uploadProfilePhoto(profilePhotoFile, user.$id);
             // console.log('Uploaded file details:', uploadedFile); // Debug log
-    
+
             const profileUpdateData = { profilePhotoId: uploadedFile.$id };
             let currentProfile = profile;
-    
+
             // Ensure profile exists before updating
             if (!currentProfile?.$id) {
-                // console.log("Profile not found locally, attempting to fetch/create before update...");
-                // Attempt to fetch again just in case state was stale, or create if truly missing
-                currentProfile = await getUserProfile(user.$id);
-                if (!currentProfile) {
-                    // console.log("Profile not found on server, creating new one...");
-                    currentProfile = await createUserProfile(user.$id, { name: name || user.name, email: user.email });
-                    setProfile(currentProfile); // Update local state with the new profile
-                    // console.log("New profile created:", currentProfile);
-                } else {
-                     setProfile(currentProfile); // Update local state if fetched
-                    //  console.log("Fetched existing profile:", currentProfile);
-                }
+                // If profile doesn't exist, create it first with essential data
+                currentProfile = await createUserProfile(user.$id, {
+                    name: name || user.name,
+                    email: user.email,
+                    hospitalId: selectedHospitalId || '', // Mandatory for creation
+                    hospitalName: selectedHospitalName || '', // Mandatory for creation
+                });
+                setProfile(currentProfile); // Update local state with the new profile
             }
-    
+
             // Now update the profile with the photo ID
             if (currentProfile?.$id) {
-                // console.log(`Updating profile ${currentProfile.$id} with photo ID ${uploadedFile.$id}`);
                 await updateUserProfile(currentProfile.$id, profileUpdateData);
             } else {
-                // console.error("Profile ID still missing after fetch/create attempt.");
                 throw new Error("Could not associate photo with profile.");
             }
-    
+
             toast({ title: "Photo uploaded successfully" });
             setProfilePhotoFile(null);
             setLocalPhotoPreview(null);
             const fileInput = document.getElementById('photo-upload') as HTMLInputElement;
             if (fileInput) fileInput.value = '';
-    
-            // console.log("Refreshing data after photo upload...");
+
             await fetchData(); // Refresh all data to get the new photo URL
-    
+
         } catch (error: any) {
-            // console.error('Error uploading photo:', error);
+            console.error('Error uploading photo:', error);
             toast({ title: "Upload failed", description: error.message || "Could not upload photo.", variant: "destructive" });
         } finally {
             setIsUploading(false);
@@ -242,18 +279,23 @@ const ProfilePage = () => {
             // --- Validation ---
             const weeksNum = weeksPregnant ? parseInt(weeksPregnant, 10) : undefined;
             if (weeksPregnant && (isNaN(weeksNum) || weeksNum < 0 || weeksNum > 45)) {
-                 toast({ title: "Invalid Input", description: "Please enter a valid number of weeks (0-45).", variant: "destructive" });
-                 setIsSaving(false); return;
+                toast({ title: "Invalid Input", description: "Please enter a valid number of weeks (0-45).", variant: "destructive" });
+                setIsSaving(false); return;
             }
             const ageNum = age ? parseInt(age, 10) : undefined;
-             if (age && (isNaN(ageNum) || ageNum < 15 || ageNum > 99)) {
-                 toast({ title: "Invalid Input", description: "Please enter a valid age (15-99).", variant: "destructive" });
-                 setIsSaving(false); return;
-             }
+            if (age && (isNaN(ageNum) || ageNum < 15 || ageNum > 99)) {
+                toast({ title: "Invalid Input", description: "Please enter a valid age (15-99).", variant: "destructive" });
+                setIsSaving(false); return;
+            }
             const prevPregNum = previousPregnancies ? parseInt(previousPregnancies, 10) : undefined;
             if (previousPregnancies && (isNaN(prevPregNum) || prevPregNum < 0 || prevPregNum > 20)) { // Example validation
-                 toast({ title: "Invalid Input", description: "Please enter a valid number of previous pregnancies (0-20).", variant: "destructive" });
-                 setIsSaving(false); return;
+                toast({ title: "Invalid Input", description: "Please enter a valid number of previous pregnancies (0-20).", variant: "destructive" });
+                setIsSaving(false); return;
+            }
+            // Validate hospital selection for saving
+            if (!selectedHospitalId) {
+                toast({ title: "Hospital Required", description: "Please select your primary hospital.", variant: "destructive" });
+                setIsSaving(false); return;
             }
 
             // --- Prepare Data ---
@@ -263,57 +305,74 @@ const ProfilePage = () => {
                 .map(pref => pref.trim()) // Trim whitespace
                 .filter(pref => pref.length > 0); // Remove empty strings
 
-                const profileDataToSave: Partial<Omit<UserProfile, keyof AppwriteDocument | 'userId' | 'profilePhotoUrl' | 'email'>> = {
-                    // Existing fields
-                    name: name || user.name,
-                    age: ageNum,
-                    gender: gender, // Allow empty string
-                    address: address, // Allow empty string
-                    weeksPregnant: weeksNum,
-                    preExistingConditions: preExistingConditions, // Allow empty string
-                    phoneNumber: phoneNumber, // Allow empty string
-                
-                    // NEW fields
-                    previousPregnancies: prevPregNum,
-                    deliveryPreference: deliveryPreference, // Allow empty string
-                    partnerSupport: partnerSupport, // Allow empty string
-                    workSituation: workSituation, // Allow empty string
-                    dietaryPreferences: dietaryPrefsArray, // Keep as is or empty array
-                    activityLevel: activityLevel, // Allow empty string
-                    chatTonePreference: chatTonePreference, // Allow empty string
-                    languagePreference: languagePreference || 'en',
-                };
+            const profileDataToSave: Partial<Omit<UserProfile, keyof AppwriteDocument | 'userId' | 'profilePhotoUrl' | 'email'>> = {
+                // Existing fields
+                name: name || user.name,
+                age: ageNum,
+                gender: gender, // Allow empty string
+                address: address, // Allow empty string
+                weeksPregnant: weeksNum,
+                preExistingConditions: preExistingConditions, // Allow empty string
+                phoneNumber: phoneNumber, // Allow empty string
+
+                // NEW fields
+                previousPregnancies: prevPregNum,
+                deliveryPreference: deliveryPreference, // Allow empty string
+                partnerSupport: partnerSupport, // Allow empty string
+                workSituation: workSituation, // Allow empty string
+                dietaryPreferences: dietaryPrefsArray, // Keep as is or empty array
+                activityLevel: activityLevel, // Allow empty string
+                chatTonePreference: chatTonePreference, // Allow empty string
+                languagePreference: languagePreference || 'en',
+                hospitalId: selectedHospitalId, // Include hospital ID
+                hospitalName: selectedHospitalName, // Include hospital Name
+            };
 
             // --- Save Logic ---
             let updatedProfile: UserProfile | null = null;
             if (profile?.$id) {
                 updatedProfile = await updateUserProfile(profile.$id, profileDataToSave);
             } else {
-                // Include email when creating a new profile
-                updatedProfile = await createUserProfile(user.$id, { ...profileDataToSave, email: user.email });
+                // Include email and mandatory hospital info when creating a new profile
+                updatedProfile = await createUserProfile(user.$id, {
+                    ...profileDataToSave,
+                    email: user.email,
+                    hospitalId: selectedHospitalId, // Ensure it's not empty for initial creation
+                    hospitalName: selectedHospitalName, // Ensure it's not empty for initial creation
+                });
             }
             setProfile(updatedProfile); // Update local state
 
             // Refresh photo URL if it exists
-             if (updatedProfile?.profilePhotoId) {
-                 try {
+            if (updatedProfile?.profilePhotoId) {
+                try {
                     const url = getFilePreview(updatedProfile.profilePhotoId, profileBucketId)?.toString();
                     setFetchedPhotoUrl(url || null);
-                 } catch(e) { /*console.error("Error getting preview after save:", e);*/ }
-             } else {
-                 setFetchedPhotoUrl(null);
-             }
+                } catch (e) { console.error("Error getting preview after save:", e); }
+            } else {
+                setFetchedPhotoUrl(null);
+            }
 
             // Update form state to reflect saved data (e.g., formatted dietary prefs)
             setDietaryPreferences(updatedProfile?.dietaryPreferences?.join(', ') || '');
+            setSelectedHospitalId(updatedProfile?.hospitalId || '');
+            setSelectedHospitalName(updatedProfile?.hospitalName || '');
+
 
             toast({ title: "Profile saved successfully" });
         } catch (error: any) {
-            // console.error('Error saving profile:', error);
+            console.error('Error saving profile:', error);
             toast({ title: "Save failed", description: error.message || "Could not save profile.", variant: "destructive" });
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Handler for hospital selection change
+    const handleHospitalChange = (value: string) => {
+        setSelectedHospitalId(value);
+        const selected = hospitals.find(h => h.id === value);
+        setSelectedHospitalName(selected ? selected.name : '');
     };
 
     // --- Health Data Save Handlers (Keep existing) ---
@@ -325,29 +384,29 @@ const ProfilePage = () => {
         try {
             await createBloodPressureReading(user.$id, { systolic: sysNum, diastolic: diaNum });
             toast({ title: "BP Reading Saved" }); setSystolic(''); setDiastolic('');
-        } catch (error) { /*console.error("Error saving BP:", error);*/ toast({ title: "Save Failed", description: "Could not save BP reading.", variant: "destructive" }); }
+        } catch (error) { console.error("Error saving BP:", error); toast({ title: "Save Failed", description: "Could not save BP reading.", variant: "destructive" }); }
         finally { setIsSavingHealthData(null); }
     };
     const handleSaveSugar = async () => {
         if (!user?.$id || !sugarLevel) { toast({ title: "Missing Information", description: "Please enter the Blood Sugar level.", variant: "destructive" }); return; }
         const levelNum = parseFloat(sugarLevel);
-         if (isNaN(levelNum) || levelNum <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid positive number for blood sugar.", variant: "destructive" }); return; }
+        if (isNaN(levelNum) || levelNum <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid positive number for blood sugar.", variant: "destructive" }); return; }
         setIsSavingHealthData('sugar');
         try {
             await createBloodSugarReading(user.$id, { level: levelNum, measurementType: sugarType });
             toast({ title: "Blood Sugar Reading Saved" }); setSugarLevel('');
-        } catch (error) { /*console.error("Error saving Sugar:", error);*/ toast({ title: "Save Failed", description: "Could not save Blood Sugar reading.", variant: "destructive" }); }
+        } catch (error) { console.error("Error saving Sugar:", error); toast({ title: "Save Failed", description: "Could not save Blood Sugar reading.", variant: "destructive" }); }
         finally { setIsSavingHealthData(null); }
     };
     const handleSaveWeight = async () => {
         if (!user?.$id || !weight) { toast({ title: "Missing Information", description: "Please enter your weight.", variant: "destructive" }); return; }
-         const weightNum = parseFloat(weight);
-         if (isNaN(weightNum) || weightNum <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid positive number for weight.", variant: "destructive" }); return; }
+        const weightNum = parseFloat(weight);
+        if (isNaN(weightNum) || weightNum <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid positive number for weight.", variant: "destructive" }); return; }
         setIsSavingHealthData('weight');
         try {
             await createWeightReading(user.$id, { weight: weightNum, unit: weightUnit });
             toast({ title: "Weight Reading Saved" }); setWeight('');
-        } catch (error) { /*console.error("Error saving Weight:", error);*/ toast({ title: "Save Failed", description: "Could not save Weight reading.", variant: "destructive" }); }
+        } catch (error) { console.error("Error saving Weight:", error); toast({ title: "Save Failed", description: "Could not save Weight reading.", variant: "destructive" }); }
         finally { setIsSavingHealthData(null); }
     };
 
@@ -374,7 +433,7 @@ const ProfilePage = () => {
                         <p className="text-gray-600">Loading your profile...</p>
                     </div>
                 ) : !user ? (
-                     <div className="text-center py-12"><p className="text-red-600">You need to be logged in.</p></div>
+                    <div className="text-center py-12"><p className="text-red-600">You need to be logged in.</p></div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -388,14 +447,14 @@ const ProfilePage = () => {
                                         <AvatarFallback className="bg-mamasaheli-primary text-white text-3xl">{getInitials(name || user?.name)}</AvatarFallback>
                                     </Avatar>
                                     <div className="space-y-4 w-full">
-                                    <div className="space-y-2">
-    <Label htmlFor="photo-upload">Upload New Photo</Label>
-    <Input id="photo-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp" className='file:rounded-full file:border-0
+                                        <div className="space-y-2">
+                                            <Label htmlFor="photo-upload">Upload New Photo</Label>
+                                            <Input id="photo-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp" className='file:rounded-full file:border-0
                              file:text-sm file:font-semibold
                              file:bg-mamasaheli-light file:text-mamasaheli-primary
                              hover:file:bg-mamasaheli-primary/10' onChange={handlePhotoChange} disabled={isUploading} />
-    <p className="text-xs text-gray-500">Accepted formats: JPG, PNG, GIF, WebP (max 5MB)</p>
-</div>
+                                            <p className="text-xs text-gray-500">Accepted formats: JPG, PNG, GIF, WebP (max 5MB)</p>
+                                        </div>
                                         {profilePhotoFile && (
                                             <Button onClick={handleUploadPhoto} className="w-full bg-mamasaheli-primary hover:bg-mamasaheli-dark" disabled={isUploading}>
                                                 {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : <><UploadCloud className="mr-2 h-4 w-4" /> Upload Photo</>}
@@ -434,15 +493,41 @@ const ProfilePage = () => {
                                             <div className="mt-4 space-y-1.5"><Label htmlFor="address">Address</Label><Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Optional address" className="min-h-[80px]" /></div>
                                         </div>
 
+                                        {/* --- Primary Hospital Section --- */}
+                                        <div className="pt-6 border-t">
+                                            <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center"><Hospital className="mr-2 h-5 w-5 text-mamasaheli-secondary" />Primary Hospital</h3>
+                                            {isLoadingHospitals ? (
+                                                <div className="flex items-center justify-center h-10 border rounded-md text-gray-500">
+                                                    <Loader2 className="animate-spin mr-2" size={16} /> Loading Hospitals...
+                                                </div>
+                                            ) : hospitalFetchError ? (
+                                                <div className="text-red-500 text-sm">{hospitalFetchError}</div>
+                                            ) : (
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="primaryHospital">Select Primary Hospital</Label>
+                                                    <Select value={selectedHospitalId} onValueChange={handleHospitalChange} disabled={isSaving}>
+                                                        <SelectTrigger id="primaryHospital"><SelectValue placeholder="Choose hospital" /></SelectTrigger>
+                                                        <SelectContent>
+                                                            {hospitals.map(hospital => (
+                                                                <SelectItem key={hospital.id} value={hospital.id}>{hospital.name} ({hospital.city}, {hospital.state})</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {selectedHospitalName && <p className="text-xs text-gray-500">Current: <span className="font-semibold">{selectedHospitalName}</span></p>}
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-gray-500 mt-2">You can change your primary hospital anytime.</p>
+                                        </div>
+
                                         {/* --- Pregnancy Information Section (Updated) --- */}
                                         <div className="pt-6 border-t">
                                             <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center"><HeartPulse className="mr-2 h-5 w-5 text-mamasaheli-secondary" /> Pregnancy Details</h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {/* Weeks Pregnant */}
                                                 <div className="space-y-1.5">
-                                                  <Label htmlFor="weeksPregnant">Current Weeks Pregnant</Label>
-                                                  <Input id="weeksPregnant" type="number" value={weeksPregnant} onChange={(e) => setWeeksPregnant(e.target.value)} placeholder="e.g., 16" min="0" max="45" />
-                                                  <p className="text-xs text-gray-500">Estimated week (0-45).</p>
+                                                    <Label htmlFor="weeksPregnant">Current Weeks Pregnant</Label>
+                                                    <Input id="weeksPregnant" type="number" value={weeksPregnant} onChange={(e) => setWeeksPregnant(e.target.value)} placeholder="e.g., 16" min="0" max="45" />
+                                                    <p className="text-xs text-gray-500">Estimated week (0-45).</p>
                                                 </div>
                                                 {/* Previous Pregnancies */}
                                                 <div className="space-y-1.5">
@@ -536,37 +621,37 @@ const ProfilePage = () => {
                                                     </Select>
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                <Label htmlFor="languagePreference">Preferred Language</Label>
-                                                <Select value={languagePreference} onValueChange={setLanguagePreference}>
-                                                    <SelectTrigger id="languagePreference"><SelectValue placeholder="Select language" /></SelectTrigger>
-                                                    <SelectContent>
-                                                        {/* International */}
-                                                        <SelectItem value="en">English</SelectItem>
-                                                        <SelectItem value="es">Español (Spanish)</SelectItem>
-                                                        <SelectItem value="fr">Français (French)</SelectItem>
-                                                        <SelectItem value="de">Deutsch (German)</SelectItem>
-                                                        <SelectItem value="zh">中文 (Mandarin)</SelectItem>
-                                                        <SelectItem value="ja">日本語 (Japanese)</SelectItem>
-                                                        <SelectItem value="pt">Português (Portuguese)</SelectItem>
-                                                        <SelectItem value="ru">Русский (Russian)</SelectItem>
-                                                        <SelectItem value="ar">العربية (Arabic)</SelectItem>
-                                                        {/* Indian */}
-                                                        <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
-                                                        <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
-                                                        <SelectItem value="te">తెలుగు (Telugu)</SelectItem>
-                                                        <SelectItem value="mr">मराठी (Marathi)</SelectItem>
-                                                        <SelectItem value="ta">தமிழ் (Tamil)</SelectItem>
-                                                        <SelectItem value="ur">اردو (Urdu)</SelectItem>
-                                                        <SelectItem value="gu">ગુજરાતી (Gujarati)</SelectItem>
-                                                        <SelectItem value="kn">ಕನ್ನಡ (Kannada)</SelectItem>
-                                                        <SelectItem value="or">ଓଡ଼ିଆ (Odia)</SelectItem>
-                                                        <SelectItem value="ml">മലയാളം (Malayalam)</SelectItem>
-                                                        <SelectItem value="pa">ਪੰਜਾਬੀ (Punjabi)</SelectItem>
-                                                        <SelectItem value="as">অসমীয়া (Assamese)</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <p className="text-xs text-gray-500">Select your preferred language for the interface.</p>
-                                            </div>
+                                                    <Label htmlFor="languagePreference">Preferred Language</Label>
+                                                    <Select value={languagePreference} onValueChange={setLanguagePreference}>
+                                                        <SelectTrigger id="languagePreference"><SelectValue placeholder="Select language" /></SelectTrigger>
+                                                        <SelectContent>
+                                                            {/* International */}
+                                                            <SelectItem value="en">English</SelectItem>
+                                                            <SelectItem value="es">Español (Spanish)</SelectItem>
+                                                            <SelectItem value="fr">Français (French)</SelectItem>
+                                                            <SelectItem value="de">Deutsch (German)</SelectItem>
+                                                            <SelectItem value="zh">中文 (Mandarin)</SelectItem>
+                                                            <SelectItem value="ja">日本語 (Japanese)</SelectItem>
+                                                            <SelectItem value="pt">Português (Portuguese)</SelectItem>
+                                                            <SelectItem value="ru">Русский (Russian)</SelectItem>
+                                                            <SelectItem value="ar">العربية (Arabic)</SelectItem>
+                                                            {/* Indian */}
+                                                            <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
+                                                            <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
+                                                            <SelectItem value="te">తెలుగు (Telugu)</SelectItem>
+                                                            <SelectItem value="mr">मराठी (Marathi)</SelectItem>
+                                                            <SelectItem value="ta">தமிழ் (Tamil)</SelectItem>
+                                                            <SelectItem value="ur">اردو (Urdu)</SelectItem>
+                                                            <SelectItem value="gu">ગુજરાતી (Gujarati)</SelectItem>
+                                                            <SelectItem value="kn">ಕನ್ನಡ (Kannada)</SelectItem>
+                                                            <SelectItem value="or">ଓଡ଼ିଆ (Odia)</SelectItem>
+                                                            <SelectItem value="ml">മലയാളം (Malayalam)</SelectItem>
+                                                            <SelectItem value="pa">ਪੰਜਾਬੀ (Punjabi)</SelectItem>
+                                                            <SelectItem value="as">অসমীয়া (Assamese)</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <p className="text-xs text-gray-500">Select your preferred language for the interface.</p>
+                                                </div>
                                             </div>
                                             {/* Dietary Preferences */}
                                             <div className="mt-4 space-y-1.5">
@@ -658,6 +743,6 @@ const ProfilePage = () => {
             </div>
         </MainLayout>
     );
-};
+}
 
 export default ProfilePage;

@@ -64,6 +64,9 @@ export const appwriteSchemaConfig = {
         { key: 'activityLevel', type: 'string', required: false, size: 50, array: false, description: 'e.g., sedentary, light, moderate, active' },
         { key: 'chatTonePreference', type: 'string', required: false, size: 50, array: false, description: 'Preferred AI chat tone (e.g., empathetic, direct)' },
         { key: 'languagePreference', type: 'string', required: false, size: 10, array: false, default: 'en', description: 'User preferred language code (e.g., en, hi, es)' },
+        // NEW: Hospital Selection Fields
+        { key: 'hospitalId', type: 'string', required: false, size: 255, array: false, description: 'ID of the selected hospital' },
+        { key: 'hospitalName', type: 'string', required: false, size: 255, array: false, description: 'Name of the selected hospital' }
       ],
       indexes: [
         { key: 'userId_unique', type: 'unique', attributes: ['userId'], orders: ['ASC'], description: 'Ensure only one profile per user' },

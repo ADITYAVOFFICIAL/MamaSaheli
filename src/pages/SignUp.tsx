@@ -1,28 +1,81 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Import Select components
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
-import { Heart } from 'lucide-react';
+import { Heart, Loader2, Hospital } from 'lucide-react'; // Import Hospital icon
+
+// Define the interface for a hospital entry from hospitals.json
+interface HospitalOption {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+}
 
 const SignUp = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  // New state for hospital selection
+  const [hospitals, setHospitals] = useState<HospitalOption[]>([]);
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>('');
+  const [selectedHospitalName, setSelectedHospitalName] = useState<string>('');
+  const [isLoadingHospitals, setIsLoadingHospitals] = useState(true);
+  const [hospitalFetchError, setHospitalFetchError] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const { signup } = useAuthStore();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Effect to fetch hospitals data on component mount
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      try {
+        const response = await fetch('/hospitals.json');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data: HospitalOption[] = await response.json();
+        setHospitals(data);
+        // Automatically select the first hospital if available and not already selected
+        if (data.length > 0 && !selectedHospitalId) {
+          setSelectedHospitalId(data[0].id);
+          setSelectedHospitalName(data[0].name);
+        }
+      } catch (error) {
+        console.error("Failed to load hospitals data:", error);
+        setHospitalFetchError("Could not load hospital list. Please try again later.");
+        toast({
+          title: "Error Loading Hospitals",
+          description: "Failed to load the list of hospitals. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingHospitals(false);
+      }
+    };
+
+    fetchHospitals();
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Handler for hospital selection change
+  const handleHospitalChange = (value: string) => {
+    setSelectedHospitalId(value);
+    const selected = hospitals.find(h => h.id === value);
+    setSelectedHospitalName(selected ? selected.name : '');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       toast({
         title: "Passwords don't match",
@@ -41,15 +94,26 @@ const SignUp = () => {
       return;
     }
 
+    // Validate hospital selection
+    if (!selectedHospitalId) {
+      toast({
+        title: "Hospital Selection Required",
+        description: "Please select your primary hospital.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await signup(email, password, name);
+      // Pass hospitalId and hospitalName to the signup function
+      await signup(email, password, name, selectedHospitalId, selectedHospitalName);
       toast({
         title: "Account created successfully",
         description: "Welcome to MamaSaheli!",
       });
-      navigate('/profile');
+      navigate('/profile'); // Redirect to profile page after signup
     } catch (error: any) {
       toast({
         title: "Signup failed",
@@ -71,7 +135,7 @@ const SignUp = () => {
               <span className="ml-2 text-2xl font-bold text-mamasaheli-primary">MamaSaheli</span>
             </div>
           </div>
-          
+
           <Card className="shadow-lg border-mamasaheli-primary/20">
             <CardHeader>
               <CardTitle className="text-center text-2xl">Create Account</CardTitle>
@@ -125,10 +189,36 @@ const SignUp = () => {
                       required
                     />
                   </div>
-                  <Button 
-                    type="submit" 
+                  {/* New Hospital Selection Field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="hospital-select" className="flex items-center">
+                      <Hospital className="mr-2 h-4 w-4" /> Primary Hospital *
+                    </Label>
+                    {isLoadingHospitals ? (
+                      <div className="flex items-center justify-center h-10 border rounded-md text-gray-500">
+                        <Loader2 className="animate-spin mr-2" size={16} /> Loading Hospitals...
+                      </div>
+                    ) : hospitalFetchError ? (
+                      <div className="text-red-500 text-sm">{hospitalFetchError}</div>
+                    ) : (
+                      <Select value={selectedHospitalId} onValueChange={handleHospitalChange} required disabled={isLoading}>
+                        <SelectTrigger id="hospital-select">
+                          <SelectValue placeholder="Select your primary hospital" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hospitals.map((hospital) => (
+                            <SelectItem key={hospital.id} value={hospital.id}>
+                              {hospital.name} ({hospital.city}, {hospital.state})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  <Button
+                    type="submit"
                     className="w-full bg-mamasaheli-primary hover:bg-mamasaheli-dark"
-                    disabled={isLoading}
+                    disabled={isLoading || isLoadingHospitals || hospitalFetchError !== null || !selectedHospitalId}
                   >
                     {isLoading ? "Creating Account..." : "Create Account"}
                   </Button>
@@ -138,8 +228,8 @@ const SignUp = () => {
             <CardFooter className="flex flex-col space-y-4">
               <div className="text-center text-sm">
                 Already have an account?{' '}
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className="text-mamasaheli-primary font-semibold hover:underline"
                 >
                   Log in

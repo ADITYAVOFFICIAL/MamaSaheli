@@ -213,6 +213,8 @@ export interface UserProfile extends AppwriteDocument {
     activityLevel?: string;
     /** Preferred AI chat tone (e.g., 'empathetic', 'direct') */
     chatTonePreference?: string;
+    hospitalId?: string; // <-- Add this line
+    hospitalName?: string;
 }
 
 /**
@@ -361,13 +363,25 @@ export const handleAppwriteError = (error: unknown, context: string, throwGeneri
 
 
 // --- Authentication Functions ---
-export const createAccount = async (email: string, password: string, name: string): Promise<Models.User<Models.Preferences>> => {
+export const createAccount = async (
+    email: string,
+    password: string,
+    name: string,
+    hospitalId?: string,
+    hospitalName?: string
+): Promise<Models.User<Models.Preferences>> => {
     try {
         if (!email || !password || !name) throw new Error("Email, password, and name are required.");
         const newUserAccount = await account.create(ID.unique(), email, password, name);
         await login(email, password);
-        try { await createUserProfile(newUserAccount.$id, { name: name, email: email }); }
-        catch (profileError) { /*console.warn(`Failed to auto-create profile for ${newUserAccount.$id}:`, profileError);*/ }
+        try {
+            await createUserProfile(newUserAccount.$id, {
+                name: name,
+                email: email,
+                hospitalId: hospitalId ?? '',
+                hospitalName: hospitalName ?? ''
+            });
+        } catch (profileError) { /*console.warn(`Failed to auto-create profile for ${newUserAccount.$id}:`, profileError);*/ }
         return newUserAccount;
     } catch (error) { handleAppwriteError(error, 'creating account'); throw error; }
 };
@@ -395,7 +409,42 @@ export const createBlogPost = async (postData: CreateBlogPostData): Promise<Blog
   if (!blogCollectionId) throw new Error("Blog Collection ID not configured.");
   if (!postData.title?.trim() || !postData.slug?.trim() || !postData.content?.trim() || !postData.author?.trim()) throw new Error("Title, slug, content, and author required.");
   const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/; if (!slugRegex.test(postData.slug)) throw new Error("Invalid slug format.");
-  try { const dataToSend: Partial<Omit<BlogPost, keyof AppwriteDocument>> = { title: postData.title.trim(), slug: postData.slug.trim(), content: postData.content, author: postData.author.trim(), category: postData.category?.trim() || undefined, imageUrl: postData.imageUrl?.trim() || undefined, imageFileId: postData.imageFileId?.trim() || undefined, tags: postData.tags?.map(tag => tag.trim()).filter(Boolean) || [], publishedAt: postData.publishedAt || undefined, }; const filteredDataToSend = Object.fromEntries(Object.entries(dataToSend).filter(([_, v]) => v !== undefined)); const permissions = [ Permission.read(Role.any()), Permission.update(Role.label('admin')), Permission.delete(Role.label('admin')) ]; return await databases.createDocument<BlogPost>( databaseId, blogCollectionId, ID.unique(), filteredDataToSend, permissions ); }
+  try {
+    const dataToSend: Partial<Omit<BlogPost, keyof AppwriteDocument>> = {
+      title: postData.title.trim(),
+      slug: postData.slug.trim(),
+      content: postData.content,
+      author: postData.author.trim(),
+      category: postData.category?.trim() || undefined,
+      imageUrl: postData.imageUrl?.trim() || undefined,
+      imageFileId: postData.imageFileId?.trim() || undefined,
+      tags: postData.tags?.map(tag => tag.trim()).filter(Boolean) || [],
+      publishedAt: postData.publishedAt || undefined,
+    };
+    const filteredDataToSend: Omit<BlogPost, keyof AppwriteDocument> = {
+      title: dataToSend.title!,
+      slug: dataToSend.slug!,
+      content: dataToSend.content!,
+      author: dataToSend.author!,
+      category: dataToSend.category,
+      imageUrl: dataToSend.imageUrl,
+      imageFileId: dataToSend.imageFileId,
+      tags: dataToSend.tags,
+      publishedAt: dataToSend.publishedAt,
+    };
+    const permissions = [
+      Permission.read(Role.any()),
+      Permission.update(Role.label('admin')),
+      Permission.delete(Role.label('admin'))
+    ];
+    return await databases.createDocument<BlogPost>(
+      databaseId,
+      blogCollectionId,
+      ID.unique(),
+      filteredDataToSend,
+      permissions
+    );
+  }
   catch (error) { if (error instanceof AppwriteException && error.code === 409 && error.message.toLowerCase().includes('slug')) { const slugErr = new Error(`Slug "${postData.slug}" already taken.`); handleAppwriteError(slugErr, 'creating blog post (slug conflict)', false); throw slugErr; } handleAppwriteError(error, 'creating blog post'); throw error; }
 };
 export const getBlogPost = async (id: string): Promise<BlogPost | null> => {
@@ -478,21 +527,45 @@ export const deleteBlogPost = async (documentId: string, imageFileId?: string): 
 
 // --- User Profile Functions ---
 export const createUserProfile = async (userId: string, profileData: Partial<Omit<UserProfile, keyof AppwriteDocument | 'userId' | 'profilePhotoUrl'>>): Promise<UserProfile> => {
-    if (!profilesCollectionId) throw new Error("Profile Collection ID not configured."); if (!userId) throw new Error("User ID required for profile.");
-    try { 
-        const existingProfile = await getUserProfile(userId); 
-        if (existingProfile) { 
+    if (!profilesCollectionId) throw new Error("Profile Collection ID not configured.");
+    if (!userId) throw new Error("User ID required for profile.");
+    try {
+        const existingProfile = await getUserProfile(userId);
+        if (existingProfile) {
             /*console.warn(`Profile exists for ${userId}. Updating.`);*/
-            const dataToUpdate: Record<string, unknown> = { ...profileData }; 
-            delete dataToUpdate.userId; 
-            return updateUserProfile(existingProfile.$id, dataToUpdate); 
-        } else { 
-            const dataToSend: Record<string, unknown> = { userId: userId, ...profileData }; 
-            if (!Array.isArray(dataToSend.dietaryPreferences)) dataToSend.dietaryPreferences = []; 
-            const userRole = Role.user(userId); 
-            const permissions = [ Permission.read(userRole), Permission.update(userRole), Permission.delete(userRole) ]; 
-            return await databases.createDocument<UserProfile>( databaseId, profilesCollectionId, ID.unique(), dataToSend, permissions ); 
-        } 
+            const dataToUpdate: Record<string, unknown> = { ...profileData };
+            delete dataToUpdate.userId;
+            // Always include hospitalId and hospitalName if present
+            if (profileData.hospitalId) dataToUpdate.hospitalId = profileData.hospitalId;
+            if (profileData.hospitalName) dataToUpdate.hospitalName = profileData.hospitalName;
+            return updateUserProfile(existingProfile.$id, dataToUpdate);
+        } else {
+            // Build the profile data to match Omit<UserProfile, keyof AppwriteDocument>
+            const dataToSend: Omit<UserProfile, keyof AppwriteDocument> = {
+                userId,
+                name: profileData.name ?? '',
+                profilePhotoId: profileData.profilePhotoId ?? '',
+                age: profileData.age ?? null,
+                gender: profileData.gender ?? '',
+                address: profileData.address ?? '',
+                weeksPregnant: profileData.weeksPregnant ?? null,
+                preExistingConditions: profileData.preExistingConditions ?? '',
+                email: profileData.email ?? '',
+                phoneNumber: profileData.phoneNumber ?? '',
+                previousPregnancies: profileData.previousPregnancies ?? null,
+                deliveryPreference: profileData.deliveryPreference ?? '',
+                partnerSupport: profileData.partnerSupport ?? '',
+                workSituation: profileData.workSituation ?? '',
+                dietaryPreferences: Array.isArray(profileData.dietaryPreferences) ? profileData.dietaryPreferences : [],
+                activityLevel: profileData.activityLevel ?? '',
+                chatTonePreference: profileData.chatTonePreference ?? '',
+                hospitalId: profileData.hospitalId ?? '',
+                hospitalName: profileData.hospitalName ?? '',
+            };
+            const userRole = Role.user(userId);
+            const permissions = [ Permission.read(userRole), Permission.update(userRole), Permission.delete(userRole) ];
+            return await databases.createDocument<UserProfile>( databaseId, profilesCollectionId, ID.unique(), dataToSend, permissions );
+        }
     }
     catch (error) { handleAppwriteError(error, `creating/updating profile for user ${userId}`); throw error; }
 };
