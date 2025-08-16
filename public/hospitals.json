@@ -676,5 +676,47 @@
     "name": "SRM Global Hospital",
     "city": "Kattankulathur",
     "state": "Tamil Nadu"
+  },
+  {
+    "id": "CLOUDNINE-BANGALORE-001",
+    "name": "Cloudnine Hospitals, Old Airport Road",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "CLOUDNINE-DELHI-001",
+    "name": "Cloudnine Hospitals, Kailash Colony",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "MAX-CLOUDNINE-GURGAON-001",
+    "name": "Max Cloudnine Hospitals, Gurugram",
+    "city": "Gurugram",
+    "state": "Haryana"
+  },
+  {
+    "id": "APOLLO-CRADLE-DELHI-001",
+    "name": "Apollo Cradle & Children's Hospital, Nehru Place",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "APOLLO-CRADLE-BANGALORE-001",
+    "name": "Apollo Cradle & Children's Hospital, Koramangala",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "RAINBOW-BANGALORE-001",
+    "name": "Rainbow Children's Hospital, Marathahalli",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "RAINBOW-DELHI-001",
+    "name": "Rainbow Children's Hospital, Malviya Nagar",
+    "city": "New Delhi",
+    "state": "Delhi"
   }
 ]

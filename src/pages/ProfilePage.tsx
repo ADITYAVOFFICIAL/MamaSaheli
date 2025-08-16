@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 import {
@@ -77,6 +79,7 @@ function ProfilePage() {
     const [hospitals, setHospitals] = useState<HospitalOption[]>([]);
     const [isLoadingHospitals, setIsLoadingHospitals] = useState(true);
     const [hospitalFetchError, setHospitalFetchError] = useState<string | null>(null);
+    const [hospitalSearchTerm, setHospitalSearchTerm] = useState('');
 
 
     // --- Health Input State (remains unchanged) ---
@@ -368,11 +371,29 @@ function ProfilePage() {
         }
     };
 
-    // Handler for hospital selection change
-    const handleHospitalChange = (value: string) => {
-        setSelectedHospitalId(value);
-        const selected = hospitals.find(h => h.id === value);
-        setSelectedHospitalName(selected ? selected.name : '');
+    // Hospital search and selection logic (like SignUp)
+    const filteredHospitals = React.useMemo(() => {
+        if (hospitalSearchTerm.trim() === '') return [];
+        const lowercasedQuery = hospitalSearchTerm.toLowerCase();
+        return hospitals
+            .filter(hospital =>
+                hospital.name.toLowerCase().includes(lowercasedQuery) ||
+                hospital.city.toLowerCase().includes(lowercasedQuery) ||
+                hospital.state.toLowerCase().includes(lowercasedQuery)
+            )
+            .slice(0, 10);
+    }, [hospitalSearchTerm, hospitals]);
+
+    const handleHospitalSelect = (hospital: HospitalOption) => {
+        setSelectedHospitalId(hospital.id);
+        setSelectedHospitalName(hospital.name);
+        setHospitalSearchTerm('');
+    };
+
+    const clearHospitalSelection = () => {
+        setSelectedHospitalId('');
+        setSelectedHospitalName('');
+        setHospitalSearchTerm('');
     };
 
     // --- Health Data Save Handlers (Keep existing) ---
@@ -504,15 +525,60 @@ function ProfilePage() {
                                                 <div className="text-red-500 text-sm">{hospitalFetchError}</div>
                                             ) : (
                                                 <div className="space-y-1.5">
-                                                    <Label htmlFor="primaryHospital">Select Primary Hospital</Label>
-                                                    <Select value={selectedHospitalId} onValueChange={handleHospitalChange} disabled={isSaving}>
-                                                        <SelectTrigger id="primaryHospital"><SelectValue placeholder="Choose hospital" /></SelectTrigger>
-                                                        <SelectContent>
-                                                            {hospitals.map(hospital => (
-                                                                <SelectItem key={hospital.id} value={hospital.id}>{hospital.name} ({hospital.city}, {hospital.state})</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
+                                                    <Label htmlFor="hospital-search" className="flex items-center">
+                                                        <Hospital className="mr-2 h-4 w-4" /> Primary Hospital *
+                                                    </Label>
+                                                    {isLoadingHospitals ? (
+                                                        <div className="flex items-center justify-center h-10 border rounded-md text-gray-500">
+                                                            <Loader2 className="animate-spin mr-2" size={16} /> Loading Hospitals...
+                                                        </div>
+                                                    ) : hospitalFetchError ? (
+                                                        <div className="text-red-500 text-sm">{hospitalFetchError}</div>
+                                                    ) : selectedHospitalId ? (
+                                                        <div className="flex items-center justify-between h-10 pl-3 pr-2 border rounded-md bg-gray-50">
+                                                            <p className="text-sm font-medium text-gray-800 truncate">{selectedHospitalName}</p>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7 text-gray-500 hover:text-red-600"
+                                                                onClick={clearHospitalSelection}
+                                                            >
+                                                                <XCircle className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="relative">
+                                                            <Input
+                                                                id="hospital-search"
+                                                                placeholder="Search by hospital name or city..."
+                                                                value={hospitalSearchTerm}
+                                                                onChange={(e) => setHospitalSearchTerm(e.target.value)}
+                                                                disabled={isSaving}
+                                                                autoComplete="off"
+                                                            />
+                                                            {filteredHospitals.length > 0 && (
+                                                                <Card className="absolute z-10 w-full mt-1 shadow-lg max-h-56 overflow-y-auto">
+                                                                    <ScrollArea className="max-h-56 overflow-y-auto">
+                                                                        <ul className="p-1">
+                                                                            {filteredHospitals.map((hospital) => (
+                                                                                <li
+                                                                                    key={hospital.id}
+                                                                                    className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded-md"
+                                                                                    onClick={() => handleHospitalSelect(hospital)}
+                                                                                    onKeyDown={(e) => e.key === 'Enter' && handleHospitalSelect(hospital)}
+                                                                                    tabIndex={0}
+                                                                                >
+                                                                                    <p className="font-medium">{hospital.name}</p>
+                                                                                    <p className="text-xs text-gray-500">{hospital.city}, {hospital.state}</p>
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </ScrollArea>
+                                                                </Card>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {selectedHospitalName && <p className="text-xs text-gray-500">Current: <span className="font-semibold">{selectedHospitalName}</span></p>}
                                                 </div>
                                             )}
