@@ -26,7 +26,7 @@ interface ChatMessagesProps {
   setError: (e: string | null) => void;
 }
 
-const Anchor = (props: any) => <a target="_blank" rel="noopener noreferrer" {...props} />;
+const Anchor = (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a target="_blank" rel="noopener noreferrer" {...props} />;
 
 const ChatMessages: React.FC<ChatMessagesProps> = ({
   messages,

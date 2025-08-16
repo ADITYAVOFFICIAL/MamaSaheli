@@ -497,6 +497,27 @@ const DashboardPage: React.FC = () => {
                                                 </div>
                                             </div>
                                         )}
+                                        {/* Health Tip Section - Improved Design */}
+                                        <div className="mb-3">
+                                            {(() => {
+                                                const tip = selectHealthTip(pregnancyTrimester, currentWeek) || defaultHealthTip;
+                                                return (
+                                                    <div className="rounded-xl border border-green-200 dark:border-green-700 bg-gradient-to-r from-green-50 via-white to-green-100 dark:from-green-900 dark:via-gray-900 dark:to-green-900 p-4 flex items-start gap-3 shadow-sm">
+                                                      <div className="flex-shrink-0">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-green-500 dark:text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z" /></svg>
+                                                      </div>
+                                                      <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                          <span className="text-xs font-semibold text-green-700 dark:text-green-200 uppercase tracking-wide">Health Tip</span>
+                                                          <span className="inline-block px-2 py-0.5 rounded bg-green-100 dark:bg-green-800 text-[10px] text-green-700 dark:text-green-200 font-medium ml-2">{tip.category}</span>
+                                                        </div>
+                                                        <div className="font-semibold text-sm text-green-900 dark:text-green-100 mb-0.5">{tip.title}</div>
+                                                        <div className="text-xs text-green-800 dark:text-green-200 leading-relaxed">{tip.description}</div>
+                                                      </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
                                         {profile?.weeksPregnant !== undefined && profile.weeksPregnant >= 0 ? (
                                             <>
                                                 <div>
