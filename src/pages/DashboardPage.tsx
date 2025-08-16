@@ -473,14 +473,31 @@ const DashboardPage: React.FC = () => {
                             </Card>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <Card className="border border-mamasaheli-primary/30 shadow-sm h-full bg-white dark:bg-gray-800 dark:border-gray-700">
-                                     <CardHeader className="bg-mamasaheli-primary/5 border-b border-mamasaheli-primary/10 dark:bg-gray-700/30 dark:border-gray-600">
+                                    <CardHeader className="bg-mamasaheli-primary/5 border-b border-mamasaheli-primary/10 dark:bg-gray-700/30 dark:border-gray-600">
                                         <CardTitle className="flex items-center text-mamasaheli-primary dark:text-mamasaheli-light text-lg font-semibold">
                                             <Baby className="mr-2 h-5 w-5" />Pregnancy Journey
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="pt-6 px-5 space-y-5">
-                                        {isLoadingProfile ? ( <div className="flex justify-center items-center py-6"><Loader2 className="h-6 w-6 animate-spin text-mamasaheli-primary" /></div> )
-                                        : profile?.weeksPregnant !== undefined && profile.weeksPregnant >= 0 ? (
+                                        {/* Show hospital info if available */}
+                                        {isLoadingProfile ? (
+                                            <div className="flex justify-center items-center py-6"><Loader2 className="h-6 w-6 animate-spin text-mamasaheli-primary" /></div>
+                                        ) : profile?.hospitalName ? (
+                                            <div className="mb-3">
+                                                <div className="flex items-center bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg px-3 py-2">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 21h8M12 17v4m-6-4V7a2 2 0 012-2h8a2 2 0 012 2v10" /></svg>
+                                                    <span className="text-xs text-blue-800 dark:text-blue-300 font-medium">Current Hospital: <strong>{profile.hospitalName}</strong></span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="mb-3">
+                                                <div className="flex items-center bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg px-3 py-2">
+                                                    <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mr-2" />
+                                                    <span className="text-xs text-red-800 dark:text-red-300 font-medium">No hospital set. <a href="/profile" className="underline font-semibold">Set your hospital</a> in your profile.</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {profile?.weeksPregnant !== undefined && profile.weeksPregnant >= 0 ? (
                                             <>
                                                 <div>
                                                     <div className="flex justify-between items-baseline mb-2 text-sm">
