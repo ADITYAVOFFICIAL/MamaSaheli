@@ -1,13 +1,85 @@
 [
   {
-    "id": "INHSA-MUMBAI-001",
-    "name": "INHS Asvini Mumbai",
+    "id": "AIIMS-DELHI-001",
+    "name": "All India Institute of Medical Sciences (AIIMS)",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "PGIMER-CHANDIGARH-001",
+    "name": "Postgraduate Institute of Medical Education & Research (PGIMER)",
+    "city": "Chandigarh",
+    "state": "Chandigarh"
+  },
+  {
+    "id": "CMC-VELLORE-001",
+    "name": "Christian Medical College (CMC)",
+    "city": "Vellore",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "JIPMER-PUDUCHERRY-001",
+    "name": "Jawaharlal Institute of Postgraduate Medical Education & Research (JIPMER)",
+    "city": "Puducherry",
+    "state": "Puducherry"
+  },
+  {
+    "id": "SGPGI-LUCKNOW-001",
+    "name": "Sanjay Gandhi Postgraduate Institute of Medical Sciences (SGPGI)",
+    "city": "Lucknow",
+    "state": "Uttar Pradesh"
+  },
+  {
+    "id": "MEDANTA-GURGAON-001",
+    "name": "Medanta - The Medicity",
+    "city": "Gurugram",
+    "state": "Haryana"
+  },
+  {
+    "id": "APOLLO-CHENNAI-001",
+    "name": "Apollo Hospitals, Greams Road",
+    "city": "Chennai",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "APOLLO-DELHI-001",
+    "name": "Indraprastha Apollo Hospitals",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "APOLLO-HYDERABAD-001",
+    "name": "Apollo Hospitals, Jubilee Hills",
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  {
+    "id": "APOLLO-BANGALORE-001",
+    "name": "Apollo Hospitals, Bannerghatta Road",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "APOLLO-KOLKATA-001",
+    "name": "Apollo Gleneagles Hospitals",
+    "city": "Kolkata",
+    "state": "West Bengal"
+  },
+  {
+    "id": "APOLLO-MUMBAI-001",
+    "name": "Apollo Hospitals, Navi Mumbai",
     "city": "Mumbai",
     "state": "Maharashtra"
   },
   {
-    "id": "AIIMS-DELHI-001",
-    "name": "All India Institute of Medical Sciences (AIIMS) Delhi",
+    "id": "FORTIS-GURGAON-001",
+    "name": "Fortis Memorial Research Institute (FMRI)",
+    "city": "Gurugram",
+    "state": "Haryana"
+  },
+  {
+    "id": "FORTIS-DELHI-001",
+    "name": "Fortis Escorts Heart Institute",
     "city": "New Delhi",
     "state": "Delhi"
   },
@@ -18,10 +90,28 @@
     "state": "Karnataka"
   },
   {
-    "id": "APOLLO-CHENNAI-001",
-    "name": "Apollo Hospitals, Greams Road",
-    "city": "Chennai",
-    "state": "Tamil Nadu"
+    "id": "FORTIS-MUMBAI-001",
+    "name": "Fortis Hospital, Mulund",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "FORTIS-KOLKATA-001",
+    "name": "Fortis Hospital, Anandapur",
+    "city": "Kolkata",
+    "state": "West Bengal"
+  },
+  {
+    "id": "FORTIS-MOHALI-001",
+    "name": "Fortis Hospital, Mohali",
+    "city": "Mohali",
+    "state": "Punjab"
+  },
+  {
+    "id": "MAX-DELHI-001",
+    "name": "Max Super Speciality Hospital, Saket",
+    "city": "New Delhi",
+    "state": "Delhi"
   },
   {
     "id": "MAX-GURGAON-001",
@@ -30,14 +120,8 @@
     "state": "Haryana"
   },
   {
-    "id": "GANGARAM-DELHI-001",
-    "name": "Sir Ganga Ram Hospital",
-    "city": "New Delhi",
-    "state": "Delhi"
-  },
-  {
-    "id": "JASLOK-MUMBAI-001",
-    "name": "Jaslok Hospital and Research Centre",
+    "id": "MAX-MUMBAI-001",
+    "name": "Max Nanavati Super Speciality Hospital",
     "city": "Mumbai",
     "state": "Maharashtra"
   },
@@ -48,27 +132,549 @@
     "state": "Karnataka"
   },
   {
-    "id": "KEM-MUMBAI-001",
-    "name": "King Edward Memorial Hospital",
-    "city": "Mumbai",
-    "state": "Maharashtra"
+    "id": "MANIPAL-JAIPUR-001",
+    "name": "Manipal Hospital, Jaipur",
+    "city": "Jaipur",
+    "state": "Rajasthan"
   },
   {
-    "id": "Narayana-Health-Bangalore-001",
+    "id": "NARAYANA-BANGALORE-001",
     "name": "Narayana Health City",
     "city": "Bengaluru",
     "state": "Karnataka"
   },
   {
-    "id": "Medanta-Gurgaon-001",
-    "name": "Medanta - The Medicity",
+    "id": "NARAYANA-KOLKATA-001",
+    "name": "Narayana Superspeciality Hospital, Howrah",
+    "city": "Kolkata",
+    "state": "West Bengal"
+  },
+  {
+    "id": "KOKILABEN-MUMBAI-001",
+    "name": "Kokilaben Dhirubhai Ambani Hospital",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "LILAVATI-MUMBAI-001",
+    "name": "Lilavati Hospital and Research Centre",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "BREACHCANDY-MUMBAI-001",
+    "name": "Breach Candy Hospital",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "GANGARAM-DELHI-001",
+    "name": "Sir Ganga Ram Hospital",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "ARTEMIS-GURGAON-001",
+    "name": "Artemis Hospital",
     "city": "Gurugram",
     "state": "Haryana"
   },
   {
-    "id": "Ruby-Hall-Pune-001",
+    "id": "ASTER-KOCHI-001",
+    "name": "Aster Medcity",
+    "city": "Kochi",
+    "state": "Kerala"
+  },
+  {
+    "id": "AMRITA-KOCHI-001",
+    "name": "Amrita Institute of Medical Sciences (Amrita Hospital)",
+    "city": "Kochi",
+    "state": "Kerala"
+  },
+  {
+    "id": "CARE-HYDERABAD-001",
+    "name": "CARE Hospitals, Banjara Hills",
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  {
+    "id": "YASHODA-HYDERABAD-001",
+    "name": "Yashoda Hospitals, Somajiguda",
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  {
+    "id": "KIMS-HYDERABAD-001",
+    "name": "Krishna Institute of Medical Sciences (KIMS)",
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  {
+    "id": "RUBY-HALL-PUNE-001",
     "name": "Ruby Hall Clinic",
     "city": "Pune",
     "state": "Maharashtra"
+  },
+  {
+    "id": "JEHANGIR-PUNE-001",
+    "name": "Jehangir Hospital",
+    "city": "Pune",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "SAHYADRI-PUNE-001",
+    "name": "Sahyadri Super Speciality Hospital, Deccan Gymkhana",
+    "city": "Pune",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "STERLING-AHMEDABAD-001",
+    "name": "Sterling Hospitals",
+    "city": "Ahmedabad",
+    "state": "Gujarat"
+  },
+  {
+    "id": "ZYDUS-AHMEDABAD-001",
+    "name": "Zydus Hospitals",
+    "city": "Ahmedabad",
+    "state": "Gujarat"
+  },
+  {
+    "id": "MIOT-CHENNAI-001",
+    "name": "MIOT International",
+    "city": "Chennai",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "KAUVERY-CHENNAI-001",
+    "name": "Kauvery Hospital",
+    "city": "Chennai",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "AMRI-KOLKATA-001",
+    "name": "AMRI Hospitals, Dhakuria",
+    "city": "Kolkata",
+    "state": "West Bengal"
+  },
+  {
+    "id": "MEDICA-KOLKATA-001",
+    "name": "Medica Superspecialty Hospital",
+    "city": "Kolkata",
+    "state": "West Bengal"
+  },
+  {
+    "id": "JAYPEE-NOIDA-001",
+    "name": "Jaypee Hospital",
+    "city": "Noida",
+    "state": "Uttar Pradesh"
+  },
+  {
+    "id": "KGMU-LUCKNOW-001",
+    "name": "King George's Medical University (KGMU)",
+    "city": "Lucknow",
+    "state": "Uttar Pradesh"
+  },
+  {
+    "id": "SMS-JAIPUR-001",
+    "name": "Sawai Man Singh (SMS) Hospital",
+    "city": "Jaipur",
+    "state": "Rajasthan"
+  },
+  {
+    "id": "BOMBAY-MUMBAI-001",
+    "name": "Bombay Hospital & Medical Research Centre",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "KEM-MUMBAI-001",
+    "name": "King Edward Memorial (KEM) Hospital",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "JASLOK-MUMBAI-001",
+    "name": "Jaslok Hospital and Research Centre",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "INHSA-MUMBAI-001",
+    "name": "INHS Asvini Mumbai",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "AIIMS-BHOPAL-001",
+    "name": "AIIMS Bhopal",
+    "city": "Bhopal",
+    "state": "Madhya Pradesh"
+  },
+  {
+    "id": "AIIMS-BHUBANESWAR-001",
+    "name": "AIIMS Bhubaneswar",
+    "city": "Bhubaneswar",
+    "state": "Odisha"
+  },
+  {
+    "id": "AIIMS-JODHPUR-001",
+    "name": "AIIMS Jodhpur",
+    "city": "Jodhpur",
+    "state": "Rajasthan"
+  },
+  {
+    "id": "AIIMS-PATNA-001",
+    "name": "AIIMS Patna",
+    "city": "Patna",
+    "state": "Bihar"
+  },
+  {
+    "id": "AIIMS-RAIPUR-001",
+    "name": "AIIMS Raipur",
+    "city": "Raipur",
+    "state": "Chhattisgarh"
+  },
+  {
+    "id": "AIIMS-RISHIKESH-001",
+    "name": "AIIMS Rishikesh",
+    "city": "Rishikesh",
+    "state": "Uttarakhand"
+  },
+  {
+    "id": "BLKC-DELHI-001",
+    "name": "BLK-Max Super Speciality Hospital",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "CONTINENTAL-HYDERABAD-001",
+    "name": "Continental Hospitals",
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  {
+    "id": "SAKRA-BANGALORE-001",
+    "name": "Sakra World Hospital",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "GLENEAGLES-CHENNAI-001",
+    "name": "Gleneagles Global Health City",
+    "city": "Chennai",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "HINDUJA-MUMBAI-001",
+    "name": "P. D. Hinduja Hospital & Medical Research Centre",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "RELIANCE-MUMBAI-001",
+    "name": "Sir H. N. Reliance Foundation Hospital",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "GLOBAL-MUMBAI-001",
+    "name": "Global Hospitals, Parel",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "SAIFEE-MUMBAI-001",
+    "name": "Saifee Hospital",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "TATAMEM-MUMBAI-001",
+    "name": "Tata Memorial Hospital",
+    "city": "Mumbai",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "DEENANATH-PUNE-001",
+    "name": "Deenanath Mangeshkar Hospital",
+    "city": "Pune",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "SAFDARJUNG-DELHI-001",
+    "name": "Safdarjung Hospital",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "RML-DELHI-001",
+    "name": "Ram Manohar Lohia (RML) Hospital",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "HOLYFAMILY-DELHI-001",
+    "name": "Holy Family Hospital",
+    "city": "New Delhi",
+    "state": "Delhi"
+  },
+  {
+    "id": "STJOHNS-BANGALORE-001",
+    "name": "St. John's Medical College Hospital",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "ASTERCMI-BANGALORE-001",
+    "name": "Aster CMI Hospital, Hebbal",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "NIMHANS-BANGALORE-001",
+    "name": "National Institute of Mental Health and Neuro-Sciences (NIMHANS)",
+    "city": "Bengaluru",
+    "state": "Karnataka"
+  },
+  {
+    "id": "RAINBOW-HYDERABAD-001",
+    "name": "Rainbow Children's Hospital, Banjara Hills",
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  {
+    "id": "SUNSHINE-HYDERABAD-001",
+    "name": "Sunshine Hospitals, Secunderabad",
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  {
+    "id": "NIMS-HYDERABAD-001",
+    "name": "Nizam's Institute of Medical Sciences (NIMS)",
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  {
+    "id": "SIMS-CHENNAI-001",
+    "name": "SIMS Hospital, Vadapalani",
+    "city": "Chennai",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "SANKARA-CHENNAI-001",
+    "name": "Sankara Nethralaya",
+    "city": "Chennai",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "BILLROTH-CHENNAI-001",
+    "name": "Billroth Hospitals, Shenoy Nagar",
+    "city": "Chennai",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "PEERLESS-KOLKATA-001",
+    "name": "Peerless Hospital",
+    "city": "Kolkata",
+    "state": "West Bengal"
+  },
+  {
+    "id": "WOODLANDS-KOLKATA-001",
+    "name": "Woodlands Multispeciality Hospital",
+    "city": "Kolkata",
+    "state": "West Bengal"
+  },
+  {
+    "id": "CIMS-AHMEDABAD-001",
+    "name": "CIMS Hospital",
+    "city": "Ahmedabad",
+    "state": "Gujarat"
+  },
+  {
+    "id": "SHALBY-AHMEDABAD-001",
+    "name": "Shalby Hospitals",
+    "city": "Ahmedabad",
+    "state": "Gujarat"
+  },
+  {
+    "id": "ALEXIS-NAGPUR-001",
+    "name": "Alexis Multispeciality Hospital",
+    "city": "Nagpur",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "WOCKHARDT-NAGPUR-001",
+    "name": "Wockhardt Hospitals",
+    "city": "Nagpur",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "AIIMS-NAGPUR-001",
+    "name": "AIIMS Nagpur",
+    "city": "Nagpur",
+    "state": "Maharashtra"
+  },
+  {
+    "id": "CHL-INDORE-001",
+    "name": "CHL Hospitals",
+    "city": "Indore",
+    "state": "Madhya Pradesh"
+  },
+  {
+    "id": "APOLLO-INDORE-001",
+    "name": "Apollo Hospitals, Indore",
+    "city": "Indore",
+    "state": "Madhya Pradesh"
+  },
+  {
+    "id": "PARAS-PATNA-001",
+    "name": "Paras HMRI Hospital",
+    "city": "Patna",
+    "state": "Bihar"
+  },
+  {
+    "id": "IGIMS-PATNA-001",
+    "name": "Indira Gandhi Institute of Medical Sciences (IGIMS)",
+    "city": "Patna",
+    "state": "Bihar"
+  },
+  {
+    "id": "DMCH-LUDHIANA-001",
+    "name": "Dayanand Medical College & Hospital (DMCH)",
+    "city": "Ludhiana",
+    "state": "Punjab"
+  },
+  {
+    "id": "SKIMS-SRINAGAR-001",
+    "name": "Sher-I-Kashmir Institute of Medical Sciences (SKIMS)",
+    "city": "Srinagar",
+    "state": "Jammu and Kashmir"
+  },
+  {
+    "id": "GMCH-GUWAHATI-001",
+    "name": "Gauhati Medical College and Hospital",
+    "city": "Guwahati",
+    "state": "Assam"
+  },
+  {
+    "id": "APOLLO-GUWAHATI-001",
+    "name": "Apollo Hospitals, Guwahati",
+    "city": "Guwahati",
+    "state": "Assam"
+  },
+  {
+    "id": "NARAYANA-GUWAHATI-001",
+    "name": "Narayana Superspeciality Hospital, Guwahati",
+    "city": "Guwahati",
+    "state": "Assam"
+  },
+  {
+    "id": "RAJAGIRI-KOCHI-001",
+    "name": "Rajagiri Hospital",
+    "city": "Kochi",
+    "state": "Kerala"
+  },
+  {
+    "id": "LAKESHORE-KOCHI-001",
+    "name": "Lakeshore Hospital",
+    "city": "Kochi",
+    "state": "Kerala"
+  },
+  {
+    "id": "KIMSHEALTH-TRIVANDRUM-001",
+    "name": "KIMSHEALTH",
+    "city": "Thiruvananthapuram",
+    "state": "Kerala"
+  },
+  {
+    "id": "SCTIMST-TRIVANDRUM-001",
+    "name": "Sree Chitra Tirunal Institute for Medical Sciences and Technology",
+    "city": "Thiruvananthapuram",
+    "state": "Kerala"
+  },
+  {
+    "id": "KMCH-COIMBATORE-001",
+    "name": "Kovai Medical Center and Hospital (KMCH)",
+    "city": "Coimbatore",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "PSG-COIMBATORE-001",
+    "name": "PSG Hospitals",
+    "city": "Coimbatore",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "APOLLO-VISAKHAPATNAM-001",
+    "name": "Apollo Hospitals, Health City",
+    "city": "Visakhapatnam",
+    "state": "Andhra Pradesh"
+  },
+  {
+    "id": "CARE-VISAKHAPATNAM-001",
+    "name": "CARE Hospitals, Ramnagar",
+    "city": "Visakhapatnam",
+    "state": "Andhra Pradesh"
+  },
+  {
+    "id": "KIMS-BHUBANESWAR-001",
+    "name": "Kalinga Institute of Medical Sciences (KIMS)",
+    "city": "Bhubaneswar",
+    "state": "Odisha"
+  },
+  {
+    "id": "APOLLO-BHUBANESWAR-001",
+    "name": "Apollo Hospitals, Bhubaneswar",
+    "city": "Bhubaneswar",
+    "state": "Odisha"
+  },
+  {
+    "id": "SCBMC-CUTTACK-001",
+    "name": "SCB Medical College Hospital",
+    "city": "Cuttack",
+    "state": "Odisha"
+  },
+  {
+    "id": "RIMS-RANCHI-001",
+    "name": "Rajendra Institute of Medical Sciences (RIMS)",
+    "city": "Ranchi",
+    "state": "Jharkhand"
+  },
+  {
+    "id": "MEDICA-RANCHI-001",
+    "name": "Medica Superspecialty Hospital, Ranchi",
+    "city": "Ranchi",
+    "state": "Jharkhand"
+  },
+  {
+    "id": "RKCARE-RAIPUR-001",
+    "name": "Ramkrishna CARE Hospitals",
+    "city": "Raipur",
+    "state": "Chhattisgarh"
+  },
+  {
+    "id": "MANIPAL-GOA-001",
+    "name": "Manipal Hospital, Goa",
+    "city": "Dona Paula",
+    "state": "Goa"
+  },
+  {
+    "id": "NEOTIA-SILIGURI-001",
+    "name": "Neotia Getwel Healthcare Centre",
+    "city": "Siliguri",
+    "state": "West Bengal"
+  },
+  {
+    "id": "SRM-GENERAL-CHENNAI-001",
+    "name": "SRM General Hospital",
+    "city": "Kattankulathur",
+    "state": "Tamil Nadu"
+  },
+  {
+    "id": "SRM-GLOBAL-CHENNAI-001",
+    "name": "SRM Global Hospital",
+    "city": "Kattankulathur",
+    "state": "Tamil Nadu"
   }
 ]
