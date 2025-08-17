@@ -195,6 +195,26 @@ const DashboardPage: React.FC = () => {
     const [isLoadingFeed, setIsLoadingFeed] = useState<boolean>(false);
     const [feedError, setFeedError] = useState<string | null>(null);
 
+    // Helper to create a stable signature of data dependencies for caching the feed
+    const createFeedSignature = (
+        profile: UserProfile | null,
+        bp: BloodPressureReading | null,
+        sugar: BloodSugarReading | null,
+        weight: WeightReading | null,
+        appointments: (Appointment & { dateTime?: Date })[]
+    ): string | null => {
+        if (!profile) return null;
+        const data = {
+            profileUpdatedAt: profile?.$updatedAt,
+            bpId: bp?.$id,
+            sugarId: sugar?.$id,
+            weightId: weight?.$id,
+            appointmentIds: appointments.map(a => a.$id).sort(),
+            appointmentUpdatedAts: appointments.map(a => a.$updatedAt).sort(),
+        };
+        return JSON.stringify(data);
+    };
+
     const { user, isAuthenticated } = useAuthStore();
     // Save FCM token for push notifications directly to Appwrite
     useEffect(() => {
@@ -291,16 +311,14 @@ const DashboardPage: React.FC = () => {
             } else { console.error('Error fetching profile:', coreDataResults[0].reason); setProfile(null); toast({ title: "Profile Load Failed", variant: "destructive" }); setDashboardCriticalError("Failed to load your profile. Please try again later."); }
             setIsLoadingProfile(false);
 
+            let allUpcoming: (Appointment & { dateTime: Date; })[] = [];
             if (coreDataResults[1].status === 'fulfilled') {
                 fetchedAppointments = coreDataResults[1].value as Appointment[] ?? [];
                 const now = new Date();
-                const allUpcoming = fetchedAppointments
-                    .map(app => {
-                        const dateTime = parseAppointmentDateTime(app);
-                        return { ...app, dateTime };
-                    })
-                    .filter((app) => app.dateTime !== null && app.dateTime > now && !app.isCompleted)
-                    .sort((a, b) => (a.dateTime && b.dateTime ? compareAsc(a.dateTime, b.dateTime) : 0));
+                allUpcoming = fetchedAppointments
+                    .map(app => ({ ...app, dateTime: parseAppointmentDateTime(app) }))
+                    .filter((app): app is Appointment & { dateTime: Date } => app.dateTime !== null && app.dateTime > now && !app.isCompleted)
+                    .sort((a, b) => compareAsc(a.dateTime, b.dateTime));
                 setUpcomingDoctorAppointments(allUpcoming.filter(app => doctorTypes.includes(app.appointmentType)));
                 setUpcomingClassAppointments(allUpcoming.filter(app => app.appointmentType && classTypes.includes(app.appointmentType as ClassAppointmentType)));
             } else { console.error('Error fetching appointments:', coreDataResults[1].reason); setUpcomingDoctorAppointments([]); setUpcomingClassAppointments([]); toast({ title: "Appointments Load Failed", variant: "destructive" }); setDashboardCriticalError("Failed to load your appointments. Please try again later."); }
@@ -320,27 +338,55 @@ const DashboardPage: React.FC = () => {
             } else { console.error('Error fetching Reminders:', coreDataResults[5].reason); setMedReminders([]); toast({ title: "Reminders Load Failed", variant: "destructive" }); setDashboardCriticalError("Failed to load medication reminders."); }
             setIsLoadingMedReminders(false);
 
-            if (fetchedProfile || options.forceFeedRefresh) {
-                if(!isLoadingFeed) setIsLoadingFeed(true);
+            if (fetchedProfile) {
+                if (!isLoadingFeed) setIsLoadingFeed(true);
                 setFeedError(null);
-                try {
-                    const feedContent = await generateDashboardFeed(
-                        fetchedProfile,
-                        fetchedBp[0] || null,
-                        fetchedSugar[0] || null,
-                        fetchedWeight[0] || null,
-                        [...upcomingDoctorAppointments, ...upcomingClassAppointments]
-                            .filter((app): app is Appointment & { dateTime: Date } => app.dateTime != null)
-                            .sort((a, b) => compareAsc(a.dateTime, b.dateTime))
-                    );
-                    setDashboardFeedContent(feedContent);
-                } catch (feedGenError) {
-                    console.error('Error generating dashboard feed:', feedGenError);
-                    setFeedError(feedGenError instanceof Error ? feedGenError.message : "Could not load personalized insights.");
-                    setDashboardFeedContent(null);
-                } finally {
-                    setIsLoadingFeed(false);
+
+                const signature = createFeedSignature(
+                    fetchedProfile,
+                    fetchedBp[0] || null,
+                    fetchedSugar[0] || null,
+                    fetchedWeight[0] || null,
+                    allUpcoming
+                );
+
+                let feedLoadedFromCache = false;
+                if (signature && !options.forceFeedRefresh) {
+                    const cachedFeed = localStorage.getItem(`dashboardFeed-${currentUserId}`);
+                    if (cachedFeed) {
+                        try {
+                            const { signature: cachedSignature, content } = JSON.parse(cachedFeed);
+                            if (cachedSignature === signature) {
+                                setDashboardFeedContent(content);
+                                feedLoadedFromCache = true;
+                            }
+                        } catch (e) {
+                            console.warn("Could not parse cached feed", e);
+                            localStorage.removeItem(`dashboardFeed-${currentUserId}`);
+                        }
+                    }
                 }
+
+                if (!feedLoadedFromCache || options.forceFeedRefresh) {
+                    try {
+                        const feedContent = await generateDashboardFeed(
+                            fetchedProfile,
+                            fetchedBp[0] || null,
+                            fetchedSugar[0] || null,
+                            fetchedWeight[0] || null,
+                            allUpcoming
+                        );
+                        setDashboardFeedContent(feedContent);
+                        if (signature) {
+                            localStorage.setItem(`dashboardFeed-${currentUserId}`, JSON.stringify({ signature, content: feedContent }));
+                        }
+                    } catch (feedGenError) {
+                        console.error('Error generating dashboard feed:', feedGenError);
+                        setFeedError(feedGenError instanceof Error ? feedGenError.message : "Could not load personalized insights.");
+                        setDashboardFeedContent(null);
+                    }
+                }
+                setIsLoadingFeed(false);
             } else if (!options.forceFeedRefresh) {
                  setIsLoadingFeed(false);
                  setFeedError("Profile data needed for personalized insights.");
@@ -359,7 +405,7 @@ const DashboardPage: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [user, isAuthenticated, toast, doctorTypes, classTypes, isLoadingFeed, profile, upcomingClassAppointments, upcomingDoctorAppointments]);
+    }, [user, isAuthenticated, toast, doctorTypes, classTypes, isLoadingFeed, profile, createFeedSignature]);
 
     // Only fetch on mount or when user/auth state changes, not on isLoading
     useEffect(() => {
