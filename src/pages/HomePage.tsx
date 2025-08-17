@@ -1,14 +1,14 @@
-
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
-import { 
-  MessageSquare, 
-  Calendar, 
-  FilePlus, 
-  AlertTriangle, 
+import {
+  MessageSquare,
+  Calendar,
+  FilePlus,
+  AlertTriangle,
   BookOpen,
-  ArrowRight, 
+  ArrowRight,
   Heart,
   Baby,
   CheckCircle,
@@ -28,73 +28,95 @@ import {
 } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import Hero from '@/components/home/Hero';
-import { useQuery } from '@tanstack/react-query';   // <-- Import useQuery
+import { useQuery } from '@tanstack/react-query';
 import { getTotalUserCount } from '@/lib/appwrite';
-import HomeCta from '@/components/home/HomeCta'; 
+import HomeCta from '@/components/home/HomeCta';
 
 const HomePage = () => {
+  const { isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
+
+  // Effect to redirect authenticated users to their dashboard
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Fetch total user count using React Query
   const {
     data: userCountData,
     isLoading: isLoadingUserCount,
     isError: isErrorUserCount,
-    error: userCountError // Optional: get the actual error object
-   } = useQuery({
-    queryKey: ['totalUserCount'], // Unique key for this query cache
-    queryFn: getTotalUserCount,    // The function that fetches the data
-    refetchInterval: 60000, // Optional: Refetch every 60 seconds
-    staleTime: 30000,       // Optional: Data fresh for 30 seconds
-    retry: 1, // Optional: Retry once on failure
+    error: userCountError,
+  } = useQuery({
+    queryKey: ['totalUserCount'],
+    queryFn: getTotalUserCount,
+    refetchInterval: 60000, // Refetch every 60 seconds
+    staleTime: 30000,       // Data is considered fresh for 30 seconds
+    retry: 1,               // Retry once on failure
   });
-  // -----------------------------------------
 
-  // Helper function to render the user count display
+  // Helper function to render the user count with loading and error states
   const renderUserCount = () => {
     if (isLoadingUserCount) {
-      // Show a loading spinner
       return <Loader2 className="h-5 w-5 animate-spin text-mamasaheli-primary inline-block" aria-label="Loading user count"/>;
     }
 
     if (isErrorUserCount) {
-      // Show an error indicator
-      // console.error("Error fetching user count:", userCountError); // Log the error for debugging
+      const errorMessage = userCountError instanceof Error ? userCountError.message : 'Could not load user count';
       return (
-        <span className="font-medium flex items-center" title={userCountError instanceof Error ? userCountError.message : 'Could not load user count'}>
+        <span className="font-medium flex items-center" title={errorMessage}>
           <AlertCircle className="h-5 w-5 text-red-500 inline-block mr-1" /> --
         </span>
       );
     }
 
     if (userCountData && typeof userCountData.totalUsers === 'number') {
-      // Format and display the count
       const formattedCount = new Intl.NumberFormat().format(userCountData.totalUsers);
-      return <span className="font-medium">
-      <span className="font-bold">{formattedCount}</span> Active Users
-    </span>
+      return (
+        <span className="font-medium">
+          <span className="font-bold">{formattedCount}</span> Active Users
+        </span>
+      );
     }
 
-    // Fallback if data is somehow invalid (shouldn't normally happen with TS)
+    // Fallback for unexpected data format
     return <span className="font-medium">-- Active Users</span>;
   };
+
+  // If the user is authenticated, this component will render briefly before the useEffect redirects them.
+  // Returning null or a loader prevents the homepage from flashing.
+  if (isAuthenticated) {
+    return (
+        <MainLayout>
+            <div className="flex justify-center items-center min-h-screen">
+                <Loader2 className="h-12 w-12 animate-spin text-mamasaheli-primary" />
+            </div>
+        </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       {/* Hero Section */}
       <Hero />
 
       {/* Trusted By Section */}
-      <section className="py-10 bg-white">
+      <section className="py-10 bg-white dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <p className="text-sm uppercase tracking-wider text-gray-500 mb-4">Trusted by expectant mothers</p>
+            <p className="text-sm uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Trusted by expectant mothers</p>
             <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
-              <div className="flex items-center space-x-2 text-gray-700">
+              <div className="flex items-center space-x-2 text-gray-700 dark:text-gray-300">
                 <ShieldCheck className="h-5 w-5 text-mamasaheli-primary" />
-                <span className="font-medium">HIPAA Compliant</span>
+                <span className="font-medium">Secure & Private</span>
               </div>
-              <div className="flex items-center space-x-2 text-gray-700">
+              <div className="flex items-center space-x-2 text-gray-700 dark:text-gray-300">
                 <CheckCircle className="h-5 w-5 text-mamasaheli-primary" />
-                <span className="font-medium">{renderUserCount()}</span>
+                {renderUserCount()}
               </div>
-              <div className="flex items-center space-x-2 text-gray-700">
+              <div className="flex items-center space-x-2 text-gray-700 dark:text-gray-300">
                 <Sparkles className="h-5 w-5 text-mamasaheli-primary" />
                 <span className="font-medium">AI Powered Advice</span>
               </div>
@@ -113,8 +135,7 @@ const HomePage = () => {
             </p>
           </div>
           
-          {/* Updated Grid with more items */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8"> {/* Added xl:grid-cols-4 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
             {/* AI Chat */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md transition-all hover:shadow-lg border-t-4 border-mamasaheli-primary dark:border-mamasaheli-accent">
               <div className="flex items-center justify-center h-12 w-12 rounded-md bg-mamasaheli-primary dark:bg-mamasaheli-accent text-white mb-4">
@@ -254,6 +275,7 @@ const HomePage = () => {
                 Play the game <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
+            
             {/* Symptom Checker */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md transition-all hover:shadow-lg border-t-4 border-yellow-500 dark:border-yellow-600">
               <div className="flex items-center justify-center h-12 w-12 rounded-md bg-yellow-500 dark:bg-yellow-600 text-white mb-4">
@@ -287,139 +309,74 @@ const HomePage = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-16 md:py-24 bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 overflow-hidden"> {/* Subtle gradient change, added overflow */}
+      <section className="py-16 md:py-24 bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 dark:from-gray-900/50 dark:via-gray-800/50 dark:to-gray-900/50 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-mamasaheli-primary tracking-tight">How MamaSaheli Works</h2>
-            <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">
+            <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
               Follow these simple steps to begin your personalized pregnancy support journey.
             </p>
           </div>
 
-          {/* Using Flexbox for better alignment and potential connector elements if needed later */}
           <div className="relative">
-             {/* Optional: Add subtle connecting lines for desktop - requires more CSS */}
-            {/* <div className="hidden md:block absolute top-1/2 left-0 w-full h-px bg-mamasaheli-primary/20 -translate-y-1/2 z-0"></div> */}
-
-            <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12"> {/* Increased gap */}
-
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
               {/* Step 1 Card */}
-              <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5 flex flex-col text-center h-full border-t-4 border-mamasaheli-primary"> {/* Added hover, flex, border */}
+              <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5 flex flex-col text-center h-full border-t-4 border-mamasaheli-primary">
                 <div className="flex-shrink-0 mb-4">
-                   <div className="flex items-center justify-center h-16 w-16 rounded-full bg-mamasaheli-light text-mamasaheli-primary mx-auto mb-4 border-2 border-mamasaheli-primary font-bold text-2xl">
+                   <div className="flex items-center justify-center h-16 w-16 rounded-full bg-mamasaheli-light dark:bg-gray-700 text-mamasaheli-primary dark:text-mamasaheli-light mx-auto mb-4 border-2 border-mamasaheli-primary font-bold text-2xl">
                      1
                    </div>
-                   <UserPlus className="mx-auto h-10 w-10 text-mamasaheli-primary" /> {/* Icon Added */}
+                   <UserPlus className="mx-auto h-10 w-10 text-mamasaheli-primary" />
                 </div>
                 <div className="flex-grow">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Create Your Profile</h3>
-                  <p className="text-gray-600">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Create Your Profile</h3>
+                  <p className="text-gray-600 dark:text-gray-400">
                     Sign up easily and provide some basic details about your pregnancy and health history to personalize your experience.
                   </p>
                 </div>
               </div>
 
               {/* Step 2 Card */}
-              <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5 flex flex-col text-center h-full border-t-4 border-mamasaheli-secondary"> {/* Added hover, flex, border */}
+              <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5 flex flex-col text-center h-full border-t-4 border-mamasaheli-secondary">
                  <div className="flex-shrink-0 mb-4">
-                   <div className="flex items-center justify-center h-16 w-16 rounded-full bg-mamasaheli-light text-mamasaheli-primary mx-auto mb-4 border-2 border-mamasaheli-primary font-bold text-2xl">
+                   <div className="flex items-center justify-center h-16 w-16 rounded-full bg-mamasaheli-light dark:bg-gray-700 text-mamasaheli-primary dark:text-mamasaheli-light mx-auto mb-4 border-2 border-mamasaheli-primary font-bold text-2xl">
                      2
                    </div>
-                   <Sparkles className="mx-auto h-10 w-10 text-mamasaheli-secondary" /> {/* Icon Added */}
+                   <Sparkles className="mx-auto h-10 w-10 text-mamasaheli-secondary" />
                  </div>
                 <div className="flex-grow">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Personalized Care</h3>
-                  <p className="text-gray-600">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Access Personalized Care</h3>
+                  <p className="text-gray-600 dark:text-gray-400">
                     Interact with our AI assistant, explore tailored resources, schedule appointments, and manage your health data securely.
                   </p>
                 </div>
               </div>
 
               {/* Step 3 Card */}
-              <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5 flex flex-col text-center h-full border-t-4 border-mamasaheli-accent"> {/* Added hover, flex, border */}
+              <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5 flex flex-col text-center h-full border-t-4 border-mamasaheli-accent">
                  <div className="flex-shrink-0 mb-4">
-                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-mamasaheli-light text-mamasaheli-primary mx-auto mb-4 border-2 border-mamasaheli-primary font-bold text-2xl">
+                    <div className="flex items-center justify-center h-16 w-16 rounded-full bg-mamasaheli-light dark:bg-gray-700 text-mamasaheli-primary dark:text-mamasaheli-light mx-auto mb-4 border-2 border-mamasaheli-primary font-bold text-2xl">
                       3
                     </div>
-                   <Activity className="mx-auto h-10 w-10 text-mamasaheli-accent" /> {/* Icon Added */}
+                   <Activity className="mx-auto h-10 w-10 text-mamasaheli-accent" />
                  </div>
                 <div className="flex-grow">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Stay Informed & Prepared</h3>
-                  <p className="text-gray-600">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Stay Informed & Prepared</h3>
+                  <p className="text-gray-600 dark:text-gray-400">
                     Receive timely reminders, track milestones on your dashboard, and access helpful guides for every stage of your journey.
                   </p>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      {/* <section className="py-16 bg-mamasaheli-light">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-mamasaheli-primary">What Mothers Say</h2>
-            <p className="mt-4 text-gray-600 max-w-2xl mx-auto">
-              Hear from expectant mothers who have benefited from MamaSaheli's support.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white p-6 rounded-xl shadow-md">
-              <div className="flex items-center mb-4">
-                <div className="h-10 w-10 rounded-full bg-mamasaheli-primary flex items-center justify-center text-white">
-                  <span className="font-bold">S</span>
-                </div>
-                <div className="ml-4">
-                  <h4 className="text-lg font-semibold">Sarah J.</h4>
-                  <p className="text-sm text-gray-500">28 weeks pregnant</p>
-                </div>
-              </div>
-              <p className="text-gray-600 border-l-4 border-mamasaheli-light pl-4 italic">
-                "The AI chat has been incredibly helpful for those middle-of-the-night questions. I love how it remembers my history and gives me personalized advice."
-              </p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl shadow-md">
-              <div className="flex items-center mb-4">
-                <div className="h-10 w-10 rounded-full bg-mamasaheli-accent flex items-center justify-center text-white">
-                  <span className="font-bold">M</span>
-                </div>
-                <div className="ml-4">
-                  <h4 className="text-lg font-semibold">Maria T.</h4>
-                  <p className="text-sm text-gray-500">35 weeks pregnant</p>
-                </div>
-              </div>
-              <p className="text-gray-600 border-l-4 border-mamasaheli-light pl-4 italic">
-                "Being able to store all my medical documents in one secure place has made it so much easier to stay organized throughout my pregnancy."
-              </p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl shadow-md">
-              <div className="flex items-center mb-4">
-                <div className="h-10 w-10 rounded-full bg-mamasaheli-secondary flex items-center justify-center text-white">
-                  <span className="font-bold">R</span>
-                </div>
-                <div className="ml-4">
-                  <h4 className="text-lg font-semibold">Rebecca L.</h4>
-                  <p className="text-sm text-gray-500">First-time mom</p>
-                </div>
-              </div>
-              <p className="text-gray-600 border-l-4 border-mamasaheli-light pl-4 italic">
-                "The emergency information section gave me peace of mind, especially when traveling. Knowing nearby hospitals and warning signs is reassuring."
-              </p>
-            </div>
-          </div>
-        </div>
-      </section> */}
-
       {/* CTA Section */}
       <HomeCta />
       
       {/* Features Highlights */}
-      <section className="py-16">
+      <section className="py-16 bg-white dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="flex">
@@ -427,8 +384,8 @@ const HomePage = () => {
                 <CheckCircle className="h-6 w-6 text-mamasaheli-primary" />
               </div>
               <div className="ml-4">
-                <h3 className="text-lg font-medium text-gray-900">Expert-Guided AI</h3>
-                <p className="mt-2 text-gray-600">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Expert-Guided AI</h3>
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
                   Our AI is developed with healthcare professionals to ensure accurate advice.
                 </p>
               </div>
@@ -439,8 +396,8 @@ const HomePage = () => {
                 <BellRing className="h-6 w-6 text-mamasaheli-primary" />
               </div>
               <div className="ml-4">
-                <h3 className="text-lg font-medium text-gray-900">Timely Reminders</h3>
-                <p className="mt-2 text-gray-600">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Timely Reminders</h3>
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
                   Get personalized reminders for appointments, tests, and important milestones.
                 </p>
               </div>
@@ -451,8 +408,8 @@ const HomePage = () => {
                 <Heart className="h-6 w-6 text-mamasaheli-primary" />
               </div>
               <div className="ml-4">
-                <h3 className="text-lg font-medium text-gray-900">Compassionate Support</h3>
-                <p className="mt-2 text-gray-600">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Compassionate Support</h3>
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
                   Designed with empathy to support mothers through the emotional journey of pregnancy.
                 </p>
               </div>
@@ -460,8 +417,9 @@ const HomePage = () => {
           </div>
         </div>
       </section>
-       {/* --- NEW: Pricing Section --- */}
-       <section className="py-16 md:py-20 bg-white dark:bg-gray-900">
+      
+       {/* Pricing Section */}
+       <section className="py-16 md:py-20 bg-gray-50 dark:bg-gray-800/50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <Tag className="mx-auto h-10 w-10 text-mamasaheli-secondary mb-4" />
           <h2 className="text-3xl md:text-4xl font-bold text-mamasaheli-primary dark:text-mamasaheli-light tracking-tight mb-4">
@@ -477,7 +435,6 @@ const HomePage = () => {
           </Button>
         </div>
       </section>
-      {/* --- End Pricing Section --- */}
     </MainLayout>
   );
 };
