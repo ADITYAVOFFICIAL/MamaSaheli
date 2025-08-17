@@ -406,6 +406,17 @@ const DashboardPage: React.FC = () => {
             .sort((a, b) => (a.dateTime && b.dateTime ? compareAsc(a.dateTime, b.dateTime) : 0));
     }, [upcomingDoctorAppointments, upcomingClassAppointments]);
 
+    // Helper to format EDD as 'dd MMM yyyy'
+    function formatEDD(dateStr: string): string {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = d.toLocaleString('default', { month: 'short' });
+        const year = d.getFullYear();
+        return `${day} ${month} ${year}`;
+    }
+
     return (
         <MainLayout requireAuth={true}>
             <div className="bg-gradient-to-b from-mamasaheli-light via-white to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-800 min-h-screen py-8 md:py-12">
@@ -555,7 +566,7 @@ const DashboardPage: React.FC = () => {
                                                 <div className="bg-mamasaheli-light/40 dark:bg-gray-700/50 p-3 rounded-lg border border-mamasaheli-primary/10 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300">
                                                     <p><span className="font-medium text-mamasaheli-dark dark:text-mamasaheli-light">Milestone (Week {currentWeek}): </span>{getMilestone(currentWeek)}</p>
                                                     {estimatedDueDate && (
-                                                        <p className="mt-2 text-xs text-mamasaheli-secondary dark:text-mamasaheli-accent">Estimated Delivery Date: <span className="font-semibold">{estimatedDueDate}</span></p>
+                                                        <p className="mt-2 text-xs text-mamasaheli-secondary dark:text-mamasaheli-accent">Estimated Delivery Date: <span className="font-semibold">{formatEDD(estimatedDueDate)}</span></p>
                                                     )}
                                                 </div>
                                             </>
