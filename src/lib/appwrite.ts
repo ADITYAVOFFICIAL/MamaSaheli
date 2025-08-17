@@ -213,8 +213,10 @@ export interface UserProfile extends AppwriteDocument {
     activityLevel?: string;
     /** Preferred AI chat tone (e.g., 'empathetic', 'direct') */
     chatTonePreference?: string;
-    hospitalId?: string; // <-- Add this line
+    hospitalId?: string;
     hospitalName?: string;
+    lmpDate?: string; // ISO date string for Last Menstrual Period
+    estimatedDueDate?: string; // ISO date string for Estimated Delivery Date
 }
 
 /**

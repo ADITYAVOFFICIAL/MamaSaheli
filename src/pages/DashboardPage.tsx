@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { calculateWeeksPregnant, calculateEstimatedDueDate } from '@/lib/pregnancyUtils';
 import { requestFirebaseNotificationPermission, onFirebaseMessageListener } from '@/lib/firebase';
 import { format, compareAsc, parseISO } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -294,9 +295,12 @@ const DashboardPage: React.FC = () => {
                 fetchedAppointments = coreDataResults[1].value as Appointment[] ?? [];
                 const now = new Date();
                 const allUpcoming = fetchedAppointments
-                    .map(app => ({ ...app, dateTime: parseAppointmentDateTime(app) }))
-                    .filter((app): app is Appointment & { dateTime: Date } => app.dateTime !== null && app.dateTime > now && !app.isCompleted)
-                    .sort((a, b) => compareAsc(a.dateTime, b.dateTime));
+                    .map(app => {
+                        const dateTime = parseAppointmentDateTime(app);
+                        return { ...app, dateTime };
+                    })
+                    .filter((app) => app.dateTime !== null && app.dateTime > now && !app.isCompleted)
+                    .sort((a, b) => (a.dateTime && b.dateTime ? compareAsc(a.dateTime, b.dateTime) : 0));
                 setUpcomingDoctorAppointments(allUpcoming.filter(app => doctorTypes.includes(app.appointmentType)));
                 setUpcomingClassAppointments(allUpcoming.filter(app => app.appointmentType && classTypes.includes(app.appointmentType as ClassAppointmentType)));
             } else { console.error('Error fetching appointments:', coreDataResults[1].reason); setUpcomingDoctorAppointments([]); setUpcomingClassAppointments([]); toast({ title: "Appointments Load Failed", variant: "destructive" }); setDashboardCriticalError("Failed to load your appointments. Please try again later."); }
@@ -355,14 +359,14 @@ const DashboardPage: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [user, isAuthenticated, toast, doctorTypes, classTypes]);
+    }, [user, isAuthenticated, toast, doctorTypes, classTypes, isLoadingFeed, profile, upcomingClassAppointments, upcomingDoctorAppointments]);
 
     // Only fetch on mount or when user/auth state changes, not on isLoading
     useEffect(() => {
         if (typeof isAuthenticated === 'boolean' && isAuthenticated && user && user.$id) {
             fetchData();
         }
-    }, [user, user?.$id, isAuthenticated, fetchData]);
+    }, [user, user?.$id, isAuthenticated]);
 
     const handleEditAppointment = useCallback((appointment: Appointment) => { setEditingAppointment(appointment); setIsEditModalOpen(true); }, []);
     const handleDeleteAppointmentClick = useCallback((appointmentId: string) => { setAppointmentToDelete(appointmentId); setIsDeleteDialogOpen(true); }, []);
@@ -377,13 +381,30 @@ const DashboardPage: React.FC = () => {
 
     const formatAppointmentDate = useCallback((dateString: string | undefined, time: string | undefined): string => { if (!dateString || !time) return "Date/Time not set"; const appStub = { date: dateString, time: time } as Appointment; try { const dt = parseAppointmentDateTime(appStub); if (!dt) throw new Error("Invalid date/time"); return format(dt, "EEE, MMM d, yyyy 'at' h:mm a"); } catch { const dp = dateString.split('T')[0] || dateString; return `${dp} at ${time}`; } }, []);
 
-    const currentWeek = useMemo(() => profile?.weeksPregnant ?? 0, [profile?.weeksPregnant]);
-    const pregnancyTrimester: Trimester = useMemo(() => { const week = currentWeek; if (week >= 1 && week <= 13) return "First"; if (week >= 14 && week <= 27) return "Second"; if (week >= 28 && week <= 40) return "Third"; if (week > 40) return "Post-term"; if (week === 0 && profile?.weeksPregnant !== undefined) return "Pre-conception"; return "N/A"; }, [currentWeek, profile?.weeksPregnant]);
-    const pregnancyProgress = useMemo(() => { const effectiveWeek = Math.max(0, Math.min(currentWeek, 40)); return effectiveWeek > 0 ? Math.round((effectiveWeek / 40) * 100) : 0; }, [currentWeek]);
+    // Calculate weeks and EDD from lmpDate if available
+    const currentWeek = useMemo(() => {
+        if (profile?.lmpDate) return calculateWeeksPregnant(profile.lmpDate);
+        return profile?.weeksPregnant ?? 0;
+    }, [profile?.lmpDate, profile?.weeksPregnant]);
+    const estimatedDueDate = useMemo(() => {
+        if (profile?.lmpDate) return calculateEstimatedDueDate(profile.lmpDate);
+        return profile?.estimatedDueDate ?? '';
+    }, [profile?.lmpDate, profile?.estimatedDueDate]);
+        const pregnancyTrimester: Trimester = useMemo(() => { const week = currentWeek; if (week >= 1 && week <= 13) return "First"; if (week >= 14 && week <= 27) return "Second"; if (week >= 28 && week <= 40) return "Third"; if (week > 40) return "Post-term"; if (week === 0 && profile?.weeksPregnant !== undefined) return "Pre-conception"; return "N/A"; }, [currentWeek, profile?.weeksPregnant]);
+        const pregnancyProgress = useMemo(() => { const effectiveWeek = Math.max(0, Math.min(currentWeek, 40)); return effectiveWeek > 0 ? Math.round((effectiveWeek / 40) * 100) : 0; }, [currentWeek]);
     const nextDoctorAppointment = useMemo(() => upcomingDoctorAppointments[0] || null, [upcomingDoctorAppointments]);
     const nextClassAppointment = useMemo(() => upcomingClassAppointments[0] || null, [upcomingClassAppointments]);
     const totalUpcomingAppointments = useMemo(() => upcomingDoctorAppointments.length + upcomingClassAppointments.length, [upcomingDoctorAppointments, upcomingClassAppointments]);
-    const allSortedUpcomingAppointments = useMemo(() => { return [...upcomingDoctorAppointments, ...upcomingClassAppointments].filter((app): app is Appointment & { dateTime: Date } => app.dateTime != null).sort((a, b) => compareAsc(a.dateTime, b.dateTime)); }, [upcomingDoctorAppointments, upcomingClassAppointments]);
+    // Compose sorted upcoming appointments using local dateTime property from parseAppointmentDateTime
+    const allSortedUpcomingAppointments = useMemo(() => {
+        return [...upcomingDoctorAppointments, ...upcomingClassAppointments]
+            .map(app => {
+                const dateTime = parseAppointmentDateTime(app);
+                return { ...app, dateTime };
+            })
+            .filter(app => app.dateTime !== null)
+            .sort((a, b) => (a.dateTime && b.dateTime ? compareAsc(a.dateTime, b.dateTime) : 0));
+    }, [upcomingDoctorAppointments, upcomingClassAppointments]);
 
     return (
         <MainLayout requireAuth={true}>
@@ -518,7 +539,7 @@ const DashboardPage: React.FC = () => {
                                                 );
                                             })()}
                                         </div>
-                                        {profile?.weeksPregnant !== undefined && profile.weeksPregnant >= 0 ? (
+                                        {(currentWeek !== null && currentWeek >= 0) ? (
                                             <>
                                                 <div>
                                                     <div className="flex justify-between items-baseline mb-2 text-sm">
@@ -533,12 +554,15 @@ const DashboardPage: React.FC = () => {
                                                 </div>
                                                 <div className="bg-mamasaheli-light/40 dark:bg-gray-700/50 p-3 rounded-lg border border-mamasaheli-primary/10 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300">
                                                     <p><span className="font-medium text-mamasaheli-dark dark:text-mamasaheli-light">Milestone (Week {currentWeek}): </span>{getMilestone(currentWeek)}</p>
+                                                    {estimatedDueDate && (
+                                                        <p className="mt-2 text-xs text-mamasaheli-secondary dark:text-mamasaheli-accent">Estimated Delivery Date: <span className="font-semibold">{estimatedDueDate}</span></p>
+                                                    )}
                                                 </div>
                                             </>
                                         ) : (
                                             <div className="text-center py-6 flex flex-col items-center">
                                                 <Baby className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-3" />
-                                                <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">Update profile with current weeks pregnant to track progress.</p>
+                                                <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">Update profile with your LMP date to track progress.</p>
                                                 <Button asChild variant="outline" size="sm" className="text-mamasaheli-primary border-mamasaheli-primary/50 hover:bg-mamasaheli-primary/5 dark:text-mamasaheli-accent dark:border-mamasaheli-accent/50 dark:hover:bg-mamasaheli-accent/10">
                                                     <a href="/profile">Go to Profile</a>
                                                 </Button>

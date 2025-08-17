@@ -61,7 +61,10 @@ function ProfilePage() {
     const [age, setAge] = useState('');
     const [gender, setGender] = useState('');
     const [address, setAddress] = useState('');
-    const [weeksPregnant, setWeeksPregnant] = useState('');
+    // Pregnancy tracking states
+    const [lmpDate, setLmpDate] = useState('');
+    const [calculatedWeeksPregnant, setCalculatedWeeksPregnant] = useState<number | null>(null);
+    const [estimatedDueDate, setEstimatedDueDate] = useState<string>('');
     const [preExistingConditions, setPreExistingConditions] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
 
@@ -145,7 +148,15 @@ function ProfilePage() {
                 setAge(profileData.age?.toString() || '');
                 setGender(profileData.gender || '');
                 setAddress(profileData.address || '');
-                setWeeksPregnant(profileData.weeksPregnant?.toString() || '');
+                                setLmpDate(profileData.lmpDate || '');
+                                if (profileData.lmpDate) {
+                                    const { calculateWeeksPregnant, calculateEstimatedDueDate } = await import('@/lib/pregnancyUtils');
+                                    setCalculatedWeeksPregnant(calculateWeeksPregnant(profileData.lmpDate));
+                                    setEstimatedDueDate(calculateEstimatedDueDate(profileData.lmpDate));
+                                } else {
+                                    setCalculatedWeeksPregnant(null);
+                                    setEstimatedDueDate('');
+                                }
                 setPreExistingConditions(profileData.preExistingConditions || '');
                 setPhoneNumber(profileData.phoneNumber || '');
 
@@ -173,7 +184,7 @@ function ProfilePage() {
             } else {
                 // Reset form fields if no profile exists
                 setName(user.name || '');
-                setAge(''); setGender(''); setAddress(''); setWeeksPregnant('');
+                setAge(''); setGender(''); setAddress(''); setLmpDate(''); setCalculatedWeeksPregnant(null); setEstimatedDueDate('');
                 setPreExistingConditions(''); setPhoneNumber('');
                 // NEW fields reset
                 setPreviousPregnancies(''); setDeliveryPreference(''); setPartnerSupport('');
@@ -280,10 +291,16 @@ function ProfilePage() {
         setIsSaving(true);
         try {
             // --- Validation ---
-            const weeksNum = weeksPregnant ? parseInt(weeksPregnant, 10) : undefined;
-            if (weeksPregnant && (isNaN(weeksNum) || weeksNum < 0 || weeksNum > 45)) {
-                toast({ title: "Invalid Input", description: "Please enter a valid number of weeks (0-45).", variant: "destructive" });
-                setIsSaving(false); return;
+            let calculatedWeeks: number | undefined = undefined;
+            let dueDate: string | undefined = undefined;
+            if (lmpDate) {
+                const { calculateWeeksPregnant, calculateEstimatedDueDate } = await import('@/lib/pregnancyUtils');
+                calculatedWeeks = calculateWeeksPregnant(lmpDate);
+                dueDate = calculateEstimatedDueDate(lmpDate);
+                if (isNaN(calculatedWeeks) || calculatedWeeks < 0 || calculatedWeeks > 45) {
+                    toast({ title: "Invalid LMP Date", description: "Please enter a valid Last Menstrual Period date.", variant: "destructive" });
+                    setIsSaving(false); return;
+                }
             }
             const ageNum = age ? parseInt(age, 10) : undefined;
             if (age && (isNaN(ageNum) || ageNum < 15 || ageNum > 99)) {
@@ -314,7 +331,9 @@ function ProfilePage() {
                 age: ageNum,
                 gender: gender, // Allow empty string
                 address: address, // Allow empty string
-                weeksPregnant: weeksNum,
+                lmpDate: lmpDate || undefined,
+                weeksPregnant: calculatedWeeks,
+                estimatedDueDate: dueDate,
                 preExistingConditions: preExistingConditions, // Allow empty string
                 phoneNumber: phoneNumber, // Allow empty string
 
@@ -346,6 +365,14 @@ function ProfilePage() {
             }
             setProfile(updatedProfile); // Update local state
 
+            // Immediately update form state to reflect saved data
+            setLmpDate(updatedProfile?.lmpDate || lmpDate || '');
+            setCalculatedWeeksPregnant(updatedProfile?.weeksPregnant ?? calculatedWeeks ?? null);
+            setEstimatedDueDate(updatedProfile?.estimatedDueDate || dueDate || '');
+            setDietaryPreferences(updatedProfile?.dietaryPreferences?.join(', ') || '');
+            setSelectedHospitalId(updatedProfile?.hospitalId || '');
+            setSelectedHospitalName(updatedProfile?.hospitalName || '');
+
             // Refresh photo URL if it exists
             if (updatedProfile?.profilePhotoId) {
                 try {
@@ -355,12 +382,6 @@ function ProfilePage() {
             } else {
                 setFetchedPhotoUrl(null);
             }
-
-            // Update form state to reflect saved data (e.g., formatted dietary prefs)
-            setDietaryPreferences(updatedProfile?.dietaryPreferences?.join(', ') || '');
-            setSelectedHospitalId(updatedProfile?.hospitalId || '');
-            setSelectedHospitalName(updatedProfile?.hospitalName || '');
-
 
             toast({ title: "Profile saved successfully" });
         } catch (error: any) {
@@ -436,6 +457,17 @@ function ProfilePage() {
         if (!nameStr) return 'U';
         return nameStr.split(' ').map(n => n[0]).filter(Boolean).join('').toUpperCase().substring(0, 2);
     };
+
+    // Format ISO date string to dd/mm/yyyy
+    function formatDateDDMMYYYY(dateStr: string): string {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
 
     // --- Render Logic ---
     return (
@@ -579,7 +611,7 @@ function ProfilePage() {
                                                             )}
                                                         </div>
                                                     )}
-                                                    {selectedHospitalName && <p className="text-xs text-gray-500">Current: <span className="font-semibold">{selectedHospitalName}</span></p>}
+                                                    {selectedHospitalName && <p className="text-xs text-gray-500 mt-2">Current: <span className="font-semibold">{selectedHospitalName}</span></p>}
                                                 </div>
                                             )}
                                             <p className="text-xs text-gray-500 mt-2">You can change your primary hospital anytime.</p>
@@ -589,11 +621,35 @@ function ProfilePage() {
                                         <div className="pt-6 border-t">
                                             <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center"><HeartPulse className="mr-2 h-5 w-5 text-mamasaheli-secondary" /> Pregnancy Details</h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {/* Weeks Pregnant */}
+                                                {/* LMP Date Picker */}
                                                 <div className="space-y-1.5">
-                                                    <Label htmlFor="weeksPregnant">Current Weeks Pregnant</Label>
-                                                    <Input id="weeksPregnant" type="number" value={weeksPregnant} onChange={(e) => setWeeksPregnant(e.target.value)} placeholder="e.g., 16" min="0" max="45" />
-                                                    <p className="text-xs text-gray-500">Estimated week (0-45).</p>
+                                                    <Label htmlFor="lmpDate">Date of Last Menstrual Period (LMP)</Label>
+                                                    <Input
+                                                        id="lmpDate"
+                                                        type="date"
+                                                        value={lmpDate ? lmpDate.substring(0, 10) : ''}
+                                                        onChange={(e) => setLmpDate(e.target.value)}
+                                                        max={new Date().toISOString().split('T')[0]}
+                                                        placeholder="yyyy-mm-dd"
+                                                    />
+                                                    <p className="text-xs text-gray-500">Select the first day of your last period.</p>
+                                                </div>
+                                                {/* Calculated Weeks Pregnant */}
+                                                <div className="space-y-1.5">
+                                                    <Label>Current Weeks Pregnant</Label>
+                                                    <Input type="number" value={calculatedWeeksPregnant ?? ''} readOnly disabled />
+                                                    <p className="text-xs text-gray-500">Calculated from LMP date.</p>
+                                                </div>
+                                                {/* Estimated Due Date */}
+                                                <div className="space-y-1.5">
+                                                    <Label>Estimated Delivery Date (EDD)</Label>
+                                                    <Input
+                                                        type="text"
+                                                        value={estimatedDueDate ? formatDateDDMMYYYY(estimatedDueDate) : ''}
+                                                        readOnly
+                                                        disabled
+                                                    />
+                                                    <p className="text-xs text-gray-500">Calculated as LMP + 280 days.</p>
                                                 </div>
                                                 {/* Previous Pregnancies */}
                                                 <div className="space-y-1.5">
