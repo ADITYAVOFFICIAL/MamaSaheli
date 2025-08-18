@@ -7,12 +7,12 @@ import {
     ID,
     Query,
     Storage,
-    Models, // Use Models namespace for Document type
     Permission,
     Role,
     AppwriteException,
     Functions
 } from 'appwrite';
+import type { Models } from 'appwrite';
 import { formatDistanceToNow, parseISO } from 'date-fns'; // Import date-fns
 import { ProductRecommendation } from './geminiProduct';
 // --- Configuration ---
@@ -30,6 +30,7 @@ const appointmentsCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_AP
 const bloodPressureCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_BP_COLLECTION_ID as string;
 const bloodSugarCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_SUGAR_COLLECTION_ID as string;
 const weightCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_WEIGHT_COLLECTION_ID as string;
+const bloodworksCollectionId: string = (import.meta.env.VITE_PUBLIC_BLOODWORKS_COLLECTION_ID as string) || 'bloodworks';
 const medicationRemindersCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_MEDS_COLLECTION_ID as string;
 const chatHistoryCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_CHAT_HISTORY_COLLECTION_ID as string;
 const bookmarkedMessagesCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_BOOKMARKS_COLLECTION_ID as string;
@@ -278,10 +279,10 @@ export interface Appointment extends AppwriteDocument {
 // --- Health Reading Types ---
 /** Base interface for health readings with common fields. */
 interface HealthReadingBase extends AppwriteDocument {
-    /** Should be indexed */
-    userId: string;
-    /** ISO Datetime string when the reading was recorded (should be indexed) */
-    recordedAt: string;
+        /** Should be indexed */
+        userId: string;
+        /** ISO Datetime string when the reading was recorded (should be indexed) */
+        recordedAt: string;
 }
 /** Represents a blood pressure reading document. */
 export interface BloodPressureReading extends HealthReadingBase { systolic: number; diastolic: number; }
@@ -289,6 +290,96 @@ export interface BloodPressureReading extends HealthReadingBase { systolic: numb
 export interface BloodSugarReading extends HealthReadingBase { level: number; measurementType: 'fasting' | 'post_meal' | 'random'; }
 /** Represents a weight reading document. */
 export interface WeightReading extends HealthReadingBase { weight: number; unit: 'kg' | 'lbs'; }
+
+// --- Bloodwork Types & Functions ---
+export interface BloodworkResult extends Models.Document {
+    userId: string;
+    testName: string;
+    summary?: string;
+    recordedAt: string;
+    fileId: string;
+    fileName: string;
+}
+
+export interface CreateBloodworkData {
+    userId: string;
+    testName: string;
+    summary?: string;
+    recordedAt: string;
+    file: File;
+}
+
+export const createBloodworkResult = async (data: CreateBloodworkData): Promise<BloodworkResult> => {
+    if (!medicalBucketId) {
+        throw new Error("Medical files storage bucket ID is not configured.");
+    }
+    try {
+        const fileResponse = await storage.createFile(
+            medicalBucketId,
+            ID.unique(),
+            data.file,
+            [
+                Permission.read(Role.user(data.userId)),
+                Permission.update(Role.user(data.userId)),
+                Permission.delete(Role.user(data.userId)),
+            ]
+        );
+
+        const documentData = {
+            userId: data.userId,
+            testName: data.testName,
+            summary: data.summary,
+            recordedAt: new Date(data.recordedAt).toISOString(),
+            fileId: fileResponse.$id,
+            fileName: data.file.name,
+        };
+
+        const docResponse = await databases.createDocument<BloodworkResult>(
+            databaseId,
+            bloodworksCollectionId,
+            ID.unique(),
+            documentData,
+            [
+                Permission.read(Role.user(data.userId)),
+                Permission.update(Role.user(data.userId)),
+                Permission.delete(Role.user(data.userId)),
+            ]
+        );
+        return docResponse;
+    } catch (error) {
+        console.error("Error creating bloodwork result:", error);
+        throw new Error("Failed to upload and save bloodwork result.");
+    }
+};
+
+export const getUserBloodworkResults = async (userId: string): Promise<BloodworkResult[]> => {
+    try {
+        const response = await databases.listDocuments<BloodworkResult>(
+            databaseId,
+            bloodworksCollectionId,
+            [Query.equal('userId', userId), Query.orderDesc('recordedAt')]
+        );
+        return response.documents;
+    } catch (error) {
+        console.error("Error fetching user bloodwork results:", error);
+        throw new Error("Failed to retrieve bloodwork results.");
+    }
+};
+
+export const deleteBloodworkResult = async (result: BloodworkResult): Promise<void> => {
+    if (!medicalBucketId) {
+        throw new Error("Medical files storage bucket ID is not configured.");
+    }
+    try {
+        await Promise.all([
+            databases.deleteDocument(databaseId, bloodworksCollectionId, result.$id),
+            storage.deleteFile(medicalBucketId, result.fileId),
+        ]);
+    } catch (error) {
+        console.error("Error deleting bloodwork result:", error);
+        throw new Error("Failed to delete the bloodwork result and its file.");
+    }
+};
 
 // --- Chat History & Session Types ---
 /** Represents a single message in the chat history */

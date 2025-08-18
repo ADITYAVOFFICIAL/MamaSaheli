@@ -233,7 +233,9 @@ const MealPage: FC = () => {
         }
 
     } catch (err: unknown) {
-        const msg = err.message || "Failed to generate meal suggestions.";
+        const msg = (typeof err === "object" && err !== null && "message" in err && typeof (err as Error).message === "string")
+          ? (err as Error).message
+          : "Failed to generate meal suggestions.";
         if (isMounted.current) {
             setError(msg); // Set general error
             setMealSuggestions(null); // Clear meals on error
@@ -280,8 +282,11 @@ const MealPage: FC = () => {
             setExerciseSuggestions(content.exercises || []); // Update only exercise suggestions
         }
 
-    } catch (err: any) {
-        const msg = err.message || "Failed to generate exercise suggestions.";
+    } catch (err: unknown) {
+        const msg =
+          typeof err === "object" && err !== null && "message" in err && typeof (err as Error).message === "string"
+            ? (err as Error).message
+            : "Failed to generate exercise suggestions.";
         if (isMounted.current) {
             setError(msg); // Set general error
             setExerciseSuggestions(null); // Clear exercises on error
@@ -367,12 +372,16 @@ const MealPage: FC = () => {
                     state: { message: 'Please create/complete your profile to access recommendations.' }
                 });
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             if (!didCancel && isMounted.current) {
-                setError(`Could not load profile data: ${err.message || 'Unknown error'}`);
+                const errorMessage =
+                  typeof err === "object" && err !== null && "message" in err && typeof (err as Error).message === "string"
+                    ? (err as Error).message
+                    : "Unknown error";
+                setError(`Could not load profile data: ${errorMessage}`);
                 setUserProfile(null);
                 setIsProfileConsideredComplete(false);
-                toast({ title: "Profile Load Error", description: err.message || "Failed to load profile.", variant: "destructive" });
+                toast({ title: "Profile Load Error", description: errorMessage || "Failed to load profile.", variant: "destructive" });
             }
         } finally {
             if (!didCancel && isMounted.current) {

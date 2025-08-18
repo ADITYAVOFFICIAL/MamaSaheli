@@ -41,6 +41,7 @@ const ContactPage = lazy(() => import("./pages/ContactPage"));
 const SymPage = lazy(() => import("./pages/SymptomCheckerPage"));
 const MonadPage = lazy(() => import("./pages/MonadPage"));
 const PatientDetailPage = lazy(() => import("./pages/doctor/PatientDetailPage"));
+const BloodworkPage = lazy(() => import("./pages/BloodworkPage"));
 
 // A loading component to show while lazy chunks are fetched
 const LoadingFallback = () => (
@@ -107,6 +108,7 @@ const App = () => {
               <Route path="/edit-blog/:slug" element={<PrivateRoute><EditBlogPage /></PrivateRoute>} />
               <Route path="/doctor/patient/:userId" element={<PrivateRoute requiredRole="doctor"><PatientDetailPage /></PrivateRoute>} />
               <Route path="/forum" element={<PrivateRoute><ForumPage /></PrivateRoute>} />
+              <Route path="/bloodwork" element={<PrivateRoute><BloodworkPage /></PrivateRoute>} />
               <Route path="/forum/:topicId" element={<PrivateRoute><ForumPage /></PrivateRoute>} />
 
               {/* 404 Route */}
