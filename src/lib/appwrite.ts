@@ -12,6 +12,7 @@ import {
     AppwriteException,
     Functions
 } from 'appwrite';
+import { extractBloodworkDataFromImage } from './geminiBloodwork';
 import type { Models } from 'appwrite';
 import { formatDistanceToNow, parseISO } from 'date-fns'; // Import date-fns
 import { ProductRecommendation } from './geminiProduct';
@@ -309,49 +310,51 @@ export interface CreateBloodworkData {
     file: File;
 }
 
-export const createBloodworkResult = async (data: CreateBloodworkData): Promise<BloodworkResult> => {
-    if (!medicalBucketId) {
-        throw new Error("Medical files storage bucket ID is not configured.");
-    }
-    try {
-        const fileResponse = await storage.createFile(
-            medicalBucketId,
-            ID.unique(),
-            data.file,
-            [
-                Permission.read(Role.user(data.userId)),
-                Permission.update(Role.user(data.userId)),
-                Permission.delete(Role.user(data.userId)),
-            ]
-        );
+export const createBloodworkResult = async (data: CreateBloodworkData): Promise<Models.Document> => {
+  if (!medicalBucketId) {
+    throw new Error("Medical files storage bucket ID is not configured.");
+  }
+  try {
+    const aiData = await extractBloodworkDataFromImage(data.file);
 
-        const documentData = {
-            userId: data.userId,
-            testName: data.testName,
-            summary: data.summary,
-            recordedAt: new Date(data.recordedAt).toISOString(),
-            fileId: fileResponse.$id,
-            fileName: data.file.name,
-        };
+    const fileResponse = await storage.createFile(
+      medicalBucketId,
+      ID.unique(),
+      data.file,
+      [
+        Permission.read(Role.user(data.userId)),
+        Permission.update(Role.user(data.userId)),
+        Permission.delete(Role.user(data.userId)),
+      ]
+    );
 
-        const docResponse = await databases.createDocument<BloodworkResult>(
-            databaseId,
-            bloodworksCollectionId,
-            ID.unique(),
-            documentData,
-            [
-                Permission.read(Role.user(data.userId)),
-                Permission.update(Role.user(data.userId)),
-                Permission.delete(Role.user(data.userId)),
-            ]
-        );
-        return docResponse;
-    } catch (error) {
-        console.error("Error creating bloodwork result:", error);
-        throw new Error("Failed to upload and save bloodwork result.");
-    }
+            const documentData = {
+                userId: data.userId,
+                testName: data.testName,
+                summary: data.summary || aiData.summary,
+                recordedAt: new Date(data.recordedAt).toISOString(),
+                fileId: fileResponse.$id,
+                fileName: data.file.name,
+                results: JSON.stringify(aiData.results),
+            };
+
+    const docResponse = await databases.createDocument(
+      databaseId,
+      bloodworksCollectionId,
+      ID.unique(),
+      documentData,
+      [
+        Permission.read(Role.user(data.userId)),
+        Permission.update(Role.user(data.userId)),
+        Permission.delete(Role.user(data.userId)),
+      ]
+    );
+    return docResponse;
+  } catch (error) {
+    console.error("Error creating bloodwork result:", error);
+    throw new Error("Failed to upload and save bloodwork result.");
+  }
 };
-
 export const getUserBloodworkResults = async (userId: string): Promise<BloodworkResult[]> => {
     try {
         const response = await databases.listDocuments<BloodworkResult>(
@@ -2134,3 +2137,9 @@ export const getRecentUserProfiles = async (limit: number = 10): Promise<UserPro
 };
 
 export { ID, Permission, Role,Query };
+/**
+ * Extracts bloodwork data from an uploaded image file using AI or OCR.
+ * This is a placeholder implementation. In production, integrate with an OCR/AI API.
+ * Returns a summary and structured results.
+ */
+// Gemini AI extraction now handled in geminiBloodwork.ts

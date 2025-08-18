@@ -171,6 +171,7 @@ export const appwriteSchemaConfig = {
         { key: 'recordedAt', type: 'datetime', required: true, array: false },
         { key: 'fileId', type: 'string', required: true, size: 255, array: false },
         { key: 'fileName', type: 'string', required: true, size: 255, array: false },
+        { key: 'results', type: 'string', required: false, size: 10000, array: false, description: 'JSON string of extracted key-value pairs from the report' },
       ],
       indexes: [
         { key: 'userId_recordedAt_idx', type: 'key', attributes: ['userId', 'recordedAt'], orders: ['ASC', 'DESC'] },
