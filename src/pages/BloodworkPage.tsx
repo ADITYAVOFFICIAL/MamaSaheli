@@ -50,44 +50,64 @@ const ResultsSkeleton = () => (
 
 const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) => {
     const chartData = useMemo(() => {
-        // Accept common variants for Hemoglobin
-        const hgbKeys = [
-            "hemoglobin", "hgb", "hemoglobin (hgb)", "hemoglobin (g/dl)",
-            "haemoglobin", "haemoglobin (hb)", "hemoglobin (hb)", "haemoglobin (g/dl)", "hb"
-        ];
+        // Flexible key matching for all biomarkers
+        const keyVariants = {
+            hemoglobin: ["hemoglobin", "hgb", "hemoglobin (hgb)", "hemoglobin (g/dl)", "haemoglobin", "haemoglobin (hb)", "hemoglobin (hb)", "haemoglobin (g/dl)", "hb"],
+            mchc: ["mchc", "mean corpuscular hemoglobin concentration"],
+            "r b c count": ["r b c count", "rbc", "rbc count", "red blood cell count"],
+            "platelet count": ["platelet count", "platelets", "plt"],
+            hematocrit: ["hematocrit", "pcv", "p.c.v/haematocrit"],
+            leucocyte: ["leucocyte", "wbc", "white blood cell count", "total leucocyte count", "tlc"],
+        };
+        // Normalize dataKey for matching
+        const variants = keyVariants[dataKey] || [dataKey];
+        // Helper to normalize key: remove spaces, parentheses, and non-alphanumeric
+        const normalize = s => (s || "")
+            .replace(/\s+/g, '')
+            .replace(/\([^)]*\)/g, '')
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .toLowerCase();
         return documents
             .map(doc => {
                 try {
                     const rawResults = doc.results ? JSON.parse(doc.results) : {};
-                    // If results is an array, find the Hgb item
+                    let item = null;
                     if (Array.isArray(rawResults)) {
-                        const hgbItem = rawResults.find(item => {
-                            const lowerName = (item.name || "").toLowerCase();
-                            return hgbKeys.some(hk => lowerName.includes(hk));
-                        });
-                        const value = hgbItem ? Number(hgbItem.value) : null;
-                        if (hgbItem && value !== null && !isNaN(value)) {
-                            return {
-                                date: new Date(doc.recordedAt),
-                                value: value,
-                                name: format(new Date(doc.recordedAt), 'MMM d'),
-                            };
+                        // Debug: log all normalized names and variants
+                        if (dataKey === 'leucocyte') {
+                            console.log('WBC debug:', rawResults.map(i => normalize(i.name || "")), variants.map(normalize));
                         }
-                    } else {
-                        // Fallback: results as key-value object
-                        const key = Object.keys(rawResults).find(k => {
-                            const lowerK = k.toLowerCase();
-                            if (dataKey.toLowerCase() === "hemoglobin") {
-                                return hgbKeys.some(hk => lowerK.includes(hk));
-                            }
-                            return lowerK.includes(dataKey.toLowerCase());
+                        item = rawResults.find(i => {
+                            const n = normalize(i.name || "");
+                            return variants.some(v => n.includes(normalize(v)));
                         });
-                        const value = key ? Number(rawResults[key]) : null;
-                        if (key && value !== null && !isNaN(value)) {
+                    } else {
+                        const key = Object.keys(rawResults).find(k => {
+                            const n = normalize(k);
+                            return variants.some(v => n.includes(normalize(v)));
+                        });
+                        if (key) {
+                            item = { value: rawResults[key], name: key, unit: unit };
+                        }
+                    }
+                    if (item && item.value !== null && item.value !== undefined) {
+                        // Parse value robustly
+                        const valStr = String(item.value).replace(/,/g, '');
+                        const value = parseFloat(valStr);
+                        if (!isNaN(value)) {
+                            // Use reference range from report if present
+                            let refRange = item.referenceRange || normalRange;
+                            if (typeof refRange === 'string') {
+                                const match = refRange.match(/([\d.]+)\s*-\s*([\d.]+)/);
+                                if (match) refRange = [parseFloat(match[1]), parseFloat(match[2])];
+                            }
                             return {
                                 date: new Date(doc.recordedAt),
-                                value: value,
+                                value,
                                 name: format(new Date(doc.recordedAt), 'MMM d'),
+                                unit: item.unit || unit,
+                                referenceRange: refRange,
+                                flag: item.flag || null,
                             };
                         }
                     }
@@ -96,20 +116,22 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
             })
             .filter(item => item !== null)
             .sort((a, b) => a.date.getTime() - b.date.getTime());
-    }, [documents, dataKey]);
+    }, [documents, dataKey, unit, normalRange]);
 
     if (chartData.length < 2) {
         return (
             <div className="flex flex-col items-center justify-center h-[250px] text-center text-sm text-muted-foreground bg-secondary/30 rounded-lg gap-2">
                 <span>Not enough data to display a trend for {name}.</span>
-                <span className="text-xs text-muted-foreground">Upload at least two reports with Hemoglobin results to see your trend over time.</span>
+                <span className="text-xs text-muted-foreground">Upload at least two reports with {name} results to see your trend over time.</span>
             </div>
         );
     }
 
     const dataValues = chartData.map(d => d.value);
-    const yMin = Math.min(...dataValues, normalRange[0]);
-    const yMax = Math.max(...dataValues, normalRange[1]);
+    // Use reference range from data if available
+    const refRange = chartData.length > 0 && chartData[0].referenceRange ? chartData[0].referenceRange : normalRange;
+    const yMin = Math.min(...dataValues, refRange[0]);
+    const yMax = Math.max(...dataValues, refRange[1]);
     const yPadding = (yMax - yMin) * 0.2 || 5;
     const yDomain = [Math.max(0, Math.floor(yMin - yPadding)), Math.ceil(yMax + yPadding)];
 
@@ -383,8 +405,34 @@ const BloodworkPage = () => {
                     <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">CBC Reports</CardTitle><TestTube2 className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent>{isLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold">{dashboardStats.commonTestCount}</div>}<p className="text-xs text-muted-foreground">complete blood count tests</p></CardContent></Card>
                 </section>
                 
+                {/* Pregnancy-relevant biomarker trend charts */}
                 <section className="mb-10">
-                    <Card><CardHeader><CardTitle>Hemoglobin (Hgb) Trend</CardTitle><CardDescription>Normal range for pregnancy: 11-14 g/dL</CardDescription></CardHeader><CardContent><BloodworkTrendChart documents={documents} dataKey="hemoglobin" name="Hgb" unit=" g/dL" normalRange={[11, 14]} /></CardContent></Card>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <Card>
+                            <CardHeader><CardTitle>Hemoglobin (Hgb) Trend</CardTitle><CardDescription>Normal range for pregnancy: 11-14 g/dL</CardDescription></CardHeader>
+                            <CardContent><BloodworkTrendChart documents={documents} dataKey="hemoglobin" name="Hgb" unit=" g/dL" normalRange={[11, 14]} /></CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader><CardTitle>MCHC Trend</CardTitle><CardDescription>Normal range: 33-37 g/dL</CardDescription></CardHeader>
+                            <CardContent><BloodworkTrendChart documents={documents} dataKey="mchc" name="MCHC" unit=" g/dL" normalRange={[33, 37]} /></CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader><CardTitle>RBC Count Trend</CardTitle><CardDescription>Normal range: 3.8-4.8 Million/cmm</CardDescription></CardHeader>
+                            <CardContent><BloodworkTrendChart documents={documents} dataKey="r b c count" name="RBC Count" unit=" Million/cmm" normalRange={[3.8, 4.8]} /></CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader><CardTitle>Platelet Count Trend</CardTitle><CardDescription>Normal range: 1.50-4.50 Lakh/cmm</CardDescription></CardHeader>
+                            <CardContent><BloodworkTrendChart documents={documents} dataKey="platelet count" name="Platelet Count" unit=" Lakh/cmm" normalRange={[1.5, 4.5]} /></CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader><CardTitle>Hematocrit (PCV) Trend</CardTitle><CardDescription>Normal range: 35-45 %</CardDescription></CardHeader>
+                            <CardContent><BloodworkTrendChart documents={documents} dataKey="hematocrit" name="Hematocrit (PCV)" unit=" %" normalRange={[35, 45]} /></CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader><CardTitle>WBC (Leukocyte) Count Trend</CardTitle><CardDescription>Normal range: 4000-11000 /cumm</CardDescription></CardHeader>
+                            <CardContent><BloodworkTrendChart documents={documents} dataKey="leucocyte|wbc|total leucocyte count|tlc" name="WBC Count" unit=" /cumm" normalRange={[4000, 11000]} /></CardContent>
+                        </Card>
+                    </div>
                 </section>
 
                 <main className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">

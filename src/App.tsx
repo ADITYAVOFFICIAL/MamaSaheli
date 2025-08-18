@@ -75,7 +75,12 @@ const App = () => {
         <Toaster />
         <Sonner />
         <PWAInstallPrompt />
-        <BrowserRouter>
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true
+              }}
+            >
           {/* Suspense Wrapper: Displays the fallback while lazy components are loading */}
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
