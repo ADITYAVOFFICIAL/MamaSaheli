@@ -50,18 +50,46 @@ const ResultsSkeleton = () => (
 
 const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) => {
     const chartData = useMemo(() => {
+        // Accept common variants for Hemoglobin
+        const hgbKeys = [
+            "hemoglobin", "hgb", "hemoglobin (hgb)", "hemoglobin (g/dl)",
+            "haemoglobin", "haemoglobin (hb)", "hemoglobin (hb)", "haemoglobin (g/dl)", "hb"
+        ];
         return documents
             .map(doc => {
                 try {
-                    const resultsObj = doc.results ? JSON.parse(doc.results) : {};
-                    const key = Object.keys(resultsObj).find(k => k.toLowerCase().includes(dataKey.toLowerCase()));
-                    const value = key ? Number(resultsObj[key]) : null;
-                    if (key && value !== null && !isNaN(value)) {
-                        return {
-                            date: new Date(doc.recordedAt),
-                            value: value,
-                            name: format(new Date(doc.recordedAt), 'MMM d'),
-                        };
+                    const rawResults = doc.results ? JSON.parse(doc.results) : {};
+                    // If results is an array, find the Hgb item
+                    if (Array.isArray(rawResults)) {
+                        const hgbItem = rawResults.find(item => {
+                            const lowerName = (item.name || "").toLowerCase();
+                            return hgbKeys.some(hk => lowerName.includes(hk));
+                        });
+                        const value = hgbItem ? Number(hgbItem.value) : null;
+                        if (hgbItem && value !== null && !isNaN(value)) {
+                            return {
+                                date: new Date(doc.recordedAt),
+                                value: value,
+                                name: format(new Date(doc.recordedAt), 'MMM d'),
+                            };
+                        }
+                    } else {
+                        // Fallback: results as key-value object
+                        const key = Object.keys(rawResults).find(k => {
+                            const lowerK = k.toLowerCase();
+                            if (dataKey.toLowerCase() === "hemoglobin") {
+                                return hgbKeys.some(hk => lowerK.includes(hk));
+                            }
+                            return lowerK.includes(dataKey.toLowerCase());
+                        });
+                        const value = key ? Number(rawResults[key]) : null;
+                        if (key && value !== null && !isNaN(value)) {
+                            return {
+                                date: new Date(doc.recordedAt),
+                                value: value,
+                                name: format(new Date(doc.recordedAt), 'MMM d'),
+                            };
+                        }
                     }
                 } catch { return null; }
                 return null;
@@ -71,7 +99,12 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
     }, [documents, dataKey]);
 
     if (chartData.length < 2) {
-        return <div className="flex items-center justify-center h-[250px] text-center text-sm text-muted-foreground bg-secondary/30 rounded-lg">Not enough data to display a trend for {name}.</div>;
+        return (
+            <div className="flex flex-col items-center justify-center h-[250px] text-center text-sm text-muted-foreground bg-secondary/30 rounded-lg gap-2">
+                <span>Not enough data to display a trend for {name}.</span>
+                <span className="text-xs text-muted-foreground">Upload at least two reports with Hemoglobin results to see your trend over time.</span>
+            </div>
+        );
     }
 
     const dataValues = chartData.map(d => d.value);
