@@ -312,6 +312,11 @@ const BloodworkPage = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [docToDelete, setDocToDelete] = useState(null);
     const [selectedDoc, setSelectedDoc] = useState(null);
+    // Dynamic biomarker chart states
+    const [selectedBiomarker, setSelectedBiomarker] = useState("");
+    const [biomarkerOptions, setBiomarkerOptions] = useState([]);
+    const [biomarkerUnits, setBiomarkerUnits] = useState({});
+    const [biomarkerRanges, setBiomarkerRanges] = useState({});
 
     const fetchBloodwork = useCallback(async () => {
         if (!user?.$id) return;
@@ -347,7 +352,7 @@ const BloodworkPage = () => {
         setFile(null);
         setTestName('');
         setRecordedAt('');
-        const fileInput = document.getElementById('file-upload');
+        const fileInput = document.getElementById('file-upload') as HTMLInputElement | null;
         if (fileInput) fileInput.value = '';
     };
 
@@ -391,6 +396,60 @@ const BloodworkPage = () => {
         } catch { return ''; }
     };
 
+    // Aggregate all biomarkers with >1 data point
+    useEffect(() => {
+        if (!documents || documents.length === 0) {
+            setBiomarkerOptions([]);
+            setSelectedBiomarker("");
+            return;
+        }
+        const biomarkerMap = {};
+        const unitsMap = {};
+        const rangesMap = {};
+        documents.forEach(doc => {
+            let results;
+            try {
+                results = doc.results ? JSON.parse(doc.results) : {};
+            } catch { results = {}; }
+            if (Array.isArray(results)) {
+                results.forEach(item => {
+                    const name = item.name?.trim();
+                    if (!name) return;
+                    biomarkerMap[name] = biomarkerMap[name] || [];
+                    biomarkerMap[name].push({
+                        value: item.value,
+                        date: doc.recordedAt,
+                        unit: item.unit,
+                        referenceRange: item.referenceRange
+                    });
+                    if (item.unit) unitsMap[name] = item.unit;
+                    if (item.referenceRange) rangesMap[name] = item.referenceRange;
+                });
+            } else if (results && typeof results === "object") {
+                Object.entries(results).forEach(([key, value]) => {
+                    biomarkerMap[key] = biomarkerMap[key] || [];
+                    biomarkerMap[key].push({
+                        value,
+                        date: doc.recordedAt,
+                        unit: undefined,
+                        referenceRange: undefined
+                    });
+                });
+            }
+        });
+        // Only include biomarkers with >1 data point
+        const options = Object.keys(biomarkerMap).filter(k => biomarkerMap[k].length > 1);
+        setBiomarkerOptions(options);
+        setBiomarkerUnits(unitsMap);
+        setBiomarkerRanges(rangesMap);
+        // Default selection
+        if (options.length > 0) {
+            setSelectedBiomarker(prev => options.includes(prev) ? prev : options[0]);
+        } else {
+            setSelectedBiomarker("");
+        }
+    }, [documents]);
+
     return (
         <MainLayout requireAuth>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
@@ -406,33 +465,50 @@ const BloodworkPage = () => {
                 </section>
                 
                 {/* Pregnancy-relevant biomarker trend charts */}
+                {/* Dynamic biomarker trend chart */}
                 <section className="mb-10">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <Card>
-                            <CardHeader><CardTitle>Hemoglobin (Hgb) Trend</CardTitle><CardDescription>Normal range for pregnancy: 11-14 g/dL</CardDescription></CardHeader>
-                            <CardContent><BloodworkTrendChart documents={documents} dataKey="hemoglobin" name="Hgb" unit=" g/dL" normalRange={[11, 14]} /></CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader><CardTitle>MCHC Trend</CardTitle><CardDescription>Normal range: 33-37 g/dL</CardDescription></CardHeader>
-                            <CardContent><BloodworkTrendChart documents={documents} dataKey="mchc" name="MCHC" unit=" g/dL" normalRange={[33, 37]} /></CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader><CardTitle>RBC Count Trend</CardTitle><CardDescription>Normal range: 3.8-4.8 Million/cmm</CardDescription></CardHeader>
-                            <CardContent><BloodworkTrendChart documents={documents} dataKey="r b c count" name="RBC Count" unit=" Million/cmm" normalRange={[3.8, 4.8]} /></CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader><CardTitle>Platelet Count Trend</CardTitle><CardDescription>Normal range: 1.50-4.50 Lakh/cmm</CardDescription></CardHeader>
-                            <CardContent><BloodworkTrendChart documents={documents} dataKey="platelet count" name="Platelet Count" unit=" Lakh/cmm" normalRange={[1.5, 4.5]} /></CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader><CardTitle>Hematocrit (PCV) Trend</CardTitle><CardDescription>Normal range: 35-45 %</CardDescription></CardHeader>
-                            <CardContent><BloodworkTrendChart documents={documents} dataKey="hematocrit" name="Hematocrit (PCV)" unit=" %" normalRange={[35, 45]} /></CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader><CardTitle>WBC (Leukocyte) Count Trend</CardTitle><CardDescription>Normal range: 4000-11000 /cumm</CardDescription></CardHeader>
-                            <CardContent><BloodworkTrendChart documents={documents} dataKey="leucocyte|wbc|total leucocyte count|tlc" name="WBC Count" unit=" /cumm" normalRange={[4000, 11000]} /></CardContent>
-                        </Card>
-                    </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Biomarker Trend Chart</CardTitle>
+                            <CardDescription>
+                                Select any biomarker with multiple data points to view its trend over time.
+                            </CardDescription>
+                            <div className="mt-4">
+                                <label htmlFor="biomarker-select" className="mr-2 font-medium">Biomarker:</label>
+                                <select
+                                    id="biomarker-select"
+                                    value={selectedBiomarker}
+                                    onChange={e => setSelectedBiomarker(e.target.value)}
+                                    className="border rounded px-2 py-1"
+                                >
+                                    {biomarkerOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {selectedBiomarker ? (
+                                <BloodworkTrendChart
+                                    documents={documents}
+                                    dataKey={selectedBiomarker}
+                                    name={selectedBiomarker}
+                                    unit={biomarkerUnits[selectedBiomarker] || ""}
+                                    normalRange={(() => {
+                                        const r = biomarkerRanges[selectedBiomarker];
+                                        if (Array.isArray(r)) return r;
+                                        if (typeof r === "string") {
+                                            const m = r.match(/([\d.]+)\s*-\s*([\d.]+)/);
+                                            if (m) return [parseFloat(m[1]), parseFloat(m[2])];
+                                        }
+                                        return [0, 0];
+                                    })()}
+                                />
+                            ) : (
+                                <div className="text-center text-muted-foreground">Select a biomarker to view its trend.</div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </section>
 
                 <main className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
