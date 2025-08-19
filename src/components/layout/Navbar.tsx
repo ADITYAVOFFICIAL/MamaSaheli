@@ -30,6 +30,7 @@ import {
 import { getUserProfile, getFilePreview, profileBucketId } from '@/lib/appwrite';
 import { cn } from '@/lib/utils'; // Import cn utility for conditional classes
 import { motion, AnimatePresence } from 'framer-motion'; // For mobile menu animation
+import icon256 from '/public/icons/icon-256x256.png';
 
 // Define Navigation Item Structure
 interface NavItem {
@@ -173,7 +174,8 @@ const Navbar: React.FC = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex flex-shrink-0 items-center" aria-label="MamaSaheli Homepage">
-              <Heart className="h-8 w-8 text-mamasaheli-accent" aria-hidden="true" />
+              {/* Replace Heart icon with PNG logo */}
+              <img src={icon256} alt="MamaSaheli Logo" className="h-8 w-8" aria-hidden="true" />
               <span className="ml-2 text-xl font-bold text-mamasaheli-primary dark:text-mamasaheli-light">
                 MamaSaheli
               </span>

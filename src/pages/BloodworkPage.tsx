@@ -11,6 +11,7 @@ import {
   medicalBucketId,
   BloodworkResult,
   CreateBloodworkData,
+  updateBloodworkResult,
 } from '@/lib/appwrite';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -150,12 +151,13 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
     );
 };
 
-const ReportDetails = ({ result }) => {
+const ReportDetails = ({ result, onUpdate }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editRows, setEditRows] = useState([]);
     const parsedData = useMemo(() => {
         const raw = result?.results || '';
         let resultsArr = [];
         let summaryText = '';
-
         try {
             const parsed = raw ? JSON.parse(raw) : {};
             if (Array.isArray(parsed)) {
@@ -167,7 +169,6 @@ const ReportDetails = ({ result }) => {
         } catch (error) {
             return { error: 'Error parsing results.', raw };
         }
-
         const processFlag = (value, referenceRange) => {
             if (!value || !referenceRange) return 'N/A';
             const numValue = parseFloat(String(value).replace(/,/g, ''));
@@ -181,37 +182,46 @@ const ReportDetails = ({ result }) => {
             }
             return 'N/A';
         };
-
         resultsArr = resultsArr.map(item => ({
             ...item,
             flag: item.flag || processFlag(item.value, item.referenceRange)
         }));
-
         if (!summaryText && resultsArr.length > 0) {
             const abnormal = resultsArr.filter(r => r.flag === 'Low' || r.flag === 'High');
             if (abnormal.length > 0) {
                 summaryText = abnormal.map(r => `${r.name} is ${r.flag.toLowerCase()}`).join(', ') + '.';
             }
         }
-        
         return { resultsArr, summaryText, raw };
     }, [result]);
+
+    useEffect(() => {
+        if (isEditing) {
+            setEditRows(parsedData.resultsArr.map(r => ({ ...r })));
+        }
+    }, [isEditing, parsedData.resultsArr]);
+
+    const handleEditChange = (idx, field, value) => {
+        setEditRows(rows => rows.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+    };
+
+    const handleSave = () => {
+        if (onUpdate) onUpdate(editRows);
+        setIsEditing(false);
+    };
 
     if (parsedData.error) {
         return <div className="text-center text-red-500 italic p-4">{parsedData.error}</div>;
     }
-
     const { resultsArr, summaryText, raw } = parsedData;
-
     return (
         <div className="space-y-4 p-1">
-             {summaryText && (
+            {summaryText && (
                 <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900/50">
                     <CardHeader><CardTitle className="text-base text-blue-900 dark:text-blue-200">AI Summary</CardTitle></CardHeader>
                     <CardContent><p className="text-sm text-blue-800 dark:text-blue-300">{summaryText}</p></CardContent>
                 </Card>
             )}
-
             {resultsArr.length > 0 ? (
                 <div className="overflow-x-auto border rounded-lg">
                     <table className="min-w-full text-sm">
@@ -225,12 +235,24 @@ const ReportDetails = ({ result }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {resultsArr.map((item, idx) => (
+                            {(isEditing ? editRows : resultsArr).map((item, idx) => (
                                 <tr key={idx} className="border-t">
                                     <td className="px-3 py-2 font-semibold">{item.name}</td>
-                                    <td className="px-3 py-2">{item.value}</td>
-                                    <td className="px-3 py-2">{item.unit}</td>
-                                    <td className="px-3 py-2 text-muted-foreground">{item.referenceRange}</td>
+                                    <td className="px-3 py-2">
+                                        {isEditing ? (
+                                            <input type="text" value={item.value} onChange={e => handleEditChange(idx, 'value', e.target.value)} className="border rounded px-1 w-20" />
+                                        ) : item.value}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {isEditing ? (
+                                            <input type="text" value={item.unit || ''} onChange={e => handleEditChange(idx, 'unit', e.target.value)} className="border rounded px-1 w-16" />
+                                        ) : item.unit}
+                                    </td>
+                                    <td className="px-3 py-2 text-muted-foreground">
+                                        {isEditing ? (
+                                            <input type="text" value={item.referenceRange || ''} onChange={e => handleEditChange(idx, 'referenceRange', e.target.value)} className="border rounded px-1 w-24" />
+                                        ) : item.referenceRange}
+                                    </td>
                                     <td className="px-3 py-2">
                                         <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${item.flag === 'High' ? 'bg-red-100 text-red-800' : item.flag === 'Low' ? 'bg-yellow-100 text-yellow-800' : item.flag === 'Normal' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{item.flag}</span>
                                     </td>
@@ -238,11 +260,20 @@ const ReportDetails = ({ result }) => {
                             ))}
                         </tbody>
                     </table>
+                    <div className="flex gap-2 p-2">
+                        {isEditing ? (
+                            <>
+                                <Button size="sm" variant="default" onClick={handleSave}>Save</Button>
+                                <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                            </>
+                        ) : (
+                            <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>Edit</Button>
+                        )}
+                    </div>
                 </div>
             ) : (
                 <div className="text-center text-muted-foreground italic p-8">No structured data was extracted from this report.</div>
             )}
-            
             <details>
                 <summary className="text-xs text-muted-foreground cursor-pointer hover:text-primary">Show raw AI results JSON</summary>
                 <pre className="mt-2 text-xs bg-secondary/30 p-2 rounded border overflow-x-auto max-h-40 whitespace-pre-wrap">{raw || 'No raw data.'}</pre>
@@ -251,7 +282,7 @@ const ReportDetails = ({ result }) => {
     );
 };
 
-const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl }) => {
+const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl, handleUpdateResults }) => {
     if (!selectedDoc) return null;
 
     return (
@@ -270,7 +301,7 @@ const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl }) => {
                             <TabsTrigger value="document"><FileType className="w-4 h-4 mr-2"/>Document</TabsTrigger>
                         </TabsList>
                         <TabsContent value="results" className="flex-grow overflow-y-auto p-4">
-                            <ReportDetails result={selectedDoc} />
+                            <ReportDetails result={selectedDoc} onUpdate={handleUpdateResults} />
                         </TabsContent>
                         <TabsContent value="document" className="flex-grow">
                              <iframe src={getSafeFilePreviewUrl(selectedDoc.fileId)} className="w-full h-full border-0" title={selectedDoc.fileName} />
@@ -283,7 +314,7 @@ const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl }) => {
                         <iframe src={getSafeFilePreviewUrl(selectedDoc.fileId)} className="w-full h-full" title={selectedDoc.fileName} />
                     </div>
                     <ScrollArea className="h-full">
-                         <ReportDetails result={selectedDoc} />
+                         <ReportDetails result={selectedDoc} onUpdate={handleUpdateResults} />
                     </ScrollArea>
                 </div>
 
@@ -317,6 +348,14 @@ const BloodworkPage = () => {
     const [biomarkerOptions, setBiomarkerOptions] = useState([]);
     const [biomarkerUnits, setBiomarkerUnits] = useState({});
     const [biomarkerRanges, setBiomarkerRanges] = useState({});
+
+    // Manual entry form state
+    const [manualEntry, setManualEntry] = useState({
+        testName: '',
+        recordedAt: '',
+        biomarkers: [{ name: '', value: '', unit: '', referenceRange: '' }],
+    });
+    const [isManualLoading, setIsManualLoading] = useState(false);
 
     const fetchBloodwork = useCallback(async () => {
         if (!user?.$id) return;
@@ -450,6 +489,76 @@ const BloodworkPage = () => {
         }
     }, [documents]);
 
+    // Update Appwrite document with edited results
+    const handleUpdateResults = async (newResultsArr) => {
+        if (!selectedDoc) return;
+        // Recalculate flags for each biomarker
+        const recalcFlag = (value, referenceRange) => {
+            if (!value || !referenceRange) return 'N/A';
+            const numValue = parseFloat(String(value).replace(/,/g, ''));
+            const match = String(referenceRange).match(/([\d.]+)\s*-\s*([\d.]+)/);
+            if (!isNaN(numValue) && match) {
+                const low = parseFloat(match[1]);
+                const high = parseFloat(match[2]);
+                if (numValue < low) return 'Low';
+                if (numValue > high) return 'High';
+                return 'Normal';
+            }
+            return 'N/A';
+        };
+        const updatedResultsArr = newResultsArr.map(item => ({
+            ...item,
+            flag: recalcFlag(item.value, item.referenceRange)
+        }));
+        try {
+            await updateBloodworkResult(selectedDoc.$id, updatedResultsArr);
+            const updatedDoc = { ...selectedDoc, results: JSON.stringify(updatedResultsArr) };
+            setDocuments(docs => docs.map(d => d.$id === selectedDoc.$id ? updatedDoc : d));
+            setSelectedDoc(updatedDoc);
+            toast({ title: "Update Successful", description: "Bloodwork values updated and flags recalculated.", variant: "success" });
+        } catch (error) {
+            toast({ title: "Update Failed", description: "Could not update the results.", variant: "destructive" });
+        }
+    };
+
+    const handleManualChange = (idx, field, value) => {
+        setManualEntry(entry => ({
+            ...entry,
+            biomarkers: entry.biomarkers.map((b, i) => i === idx ? { ...b, [field]: value } : b)
+        }));
+    };
+    const addManualBiomarker = () => {
+        setManualEntry(entry => ({ ...entry, biomarkers: [...entry.biomarkers, { name: '', value: '', unit: '', referenceRange: '' }] }));
+    };
+    const removeManualBiomarker = (idx) => {
+        setManualEntry(entry => ({ ...entry, biomarkers: entry.biomarkers.filter((_, i) => i !== idx) }));
+    };
+    const handleManualSubmit = async (e) => {
+        e.preventDefault();
+        if (!user?.$id || !manualEntry.testName || !manualEntry.recordedAt || manualEntry.biomarkers.some(b => !b.name || !b.value)) {
+            toast({ title: "Missing Information", description: "Please fill all required fields.", variant: "destructive" });
+            return;
+        }
+        setIsManualLoading(true);
+        try {
+            const data = {
+                userId: user.$id,
+                testName: manualEntry.testName,
+                recordedAt: manualEntry.recordedAt,
+                file: null,
+                results: JSON.stringify(manualEntry.biomarkers),
+            };
+            await createBloodworkResult(data);
+            toast({ title: "Success", description: "Manual entry added successfully." });
+            setManualEntry({ testName: '', recordedAt: '', biomarkers: [{ name: '', value: '', unit: '', referenceRange: '' }] });
+            fetchBloodwork();
+        } catch (error) {
+            toast({ title: "Manual Entry Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
+        } finally {
+            setIsManualLoading(false);
+        }
+    };
+
     return (
         <MainLayout requireAuth>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
@@ -524,6 +633,30 @@ const BloodworkPage = () => {
                                 </CardContent>
                             </form>
                         </Card>
+                        {/* Manual Entry Form */}
+                        <Card className="mt-6">
+                            <CardHeader><CardTitle className="flex items-center text-xl"><PlusCircle className="mr-2.5 h-6 w-6" /> Manual Entry</CardTitle></CardHeader>
+                            <form onSubmit={handleManualSubmit}>
+                                <CardContent className="space-y-5">
+                                    <div className="space-y-1.5"><Label htmlFor="manual-testName">Test Name *</Label><Input id="manual-testName" value={manualEntry.testName} onChange={e => setManualEntry(entry => ({ ...entry, testName: e.target.value }))} placeholder="e.g., Iron Panel, CBC" required disabled={isManualLoading} /></div>
+                                    <div className="space-y-1.5"><Label htmlFor="manual-recordedAt">Date of Test *</Label><Input id="manual-recordedAt" type="date" value={manualEntry.recordedAt} onChange={e => setManualEntry(entry => ({ ...entry, recordedAt: e.target.value }))} required disabled={isManualLoading} /></div>
+                                    <div className="space-y-2">
+                                        <Label>Biomarkers *</Label>
+                                        {manualEntry.biomarkers.map((b, idx) => (
+                                            <div key={idx} className="flex gap-2 items-center mb-2">
+                                                <Input placeholder="Name" value={b.name} onChange={e => handleManualChange(idx, 'name', e.target.value)} required disabled={isManualLoading} className="w-32" />
+                                                <Input placeholder="Value" value={b.value} onChange={e => handleManualChange(idx, 'value', e.target.value)} required disabled={isManualLoading} className="w-20" />
+                                                <Input placeholder="Unit" value={b.unit} onChange={e => handleManualChange(idx, 'unit', e.target.value)} disabled={isManualLoading} className="w-16" />
+                                                <Input placeholder="Reference Range" value={b.referenceRange} onChange={e => handleManualChange(idx, 'referenceRange', e.target.value)} disabled={isManualLoading} className="w-24" />
+                                                <Button type="button" size="icon" variant="destructive" onClick={() => removeManualBiomarker(idx)} disabled={isManualLoading || manualEntry.biomarkers.length === 1}>-</Button>
+                                            </div>
+                                        ))}
+                                        <Button type="button" size="sm" variant="outline" onClick={addManualBiomarker} disabled={isManualLoading}>Add Biomarker</Button>
+                                    </div>
+                                    <Button type="submit" disabled={isManualLoading || !manualEntry.testName || !manualEntry.recordedAt || manualEntry.biomarkers.some(b => !b.name || !b.value)} className="w-full">{isManualLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : <>Save Manual Entry</>}</Button>
+                                </CardContent>
+                            </form>
+                        </Card>
                     </aside>
 
                     <section className="lg:col-span-3">
@@ -570,6 +703,7 @@ const BloodworkPage = () => {
                 selectedDoc={selectedDoc}
                 onOpenChange={(open) => !open && setSelectedDoc(null)}
                 getSafeFilePreviewUrl={getSafeFilePreviewUrl}
+                handleUpdateResults={handleUpdateResults}
             />
         </MainLayout>
     );
