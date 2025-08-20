@@ -108,24 +108,6 @@ export const functions = new Functions(client);
  * Includes $id, $createdAt, $updatedAt, $permissions, $collectionId, $databaseId
  */
 export type AppwriteDocument = Models.Document;
-
-const getPermissionsForPatientData = async (patientUserId: string): Promise<string[]> => {
-    const patientProfile = await getUserProfile(patientUserId);
-    const patientRole = Role.user(patientUserId);
-    const permissions = [
-        Permission.read(patientRole),
-        Permission.update(patientRole),
-        Permission.delete(patientRole),
-    ];
-
-    if (patientProfile?.assignedDoctorId) {
-        const doctorRole = Role.user(patientProfile.assignedDoctorId);
-        permissions.push(Permission.read(doctorRole));
-    }
-
-    return permissions;
-};
-
 // --- NEW: Forum Types ---
 /** Represents a forum topic document. */
 export interface ForumTopic extends AppwriteDocument {
@@ -240,7 +222,6 @@ export interface UserProfile extends AppwriteDocument {
     assignedDoctorName?: string;
     lmpDate?: string; // ISO date string for Last Menstrual Period
     estimatedDueDate?: string; // ISO date string for Estimated Delivery Date
-    role?: 'patient' | 'doctor' | 'admin';
 }
 
 /**
@@ -339,14 +320,15 @@ export const createBloodworkResult = async (data: CreateBloodworkData): Promise<
   try {
     const aiData = await extractBloodworkDataFromImage(data.file);
 
-    const permissions = await getPermissionsForPatientData(data.userId);
-    const filePermissions = permissions.filter p => p.startsWith('read') || p.startsWith('delete');
-
     const fileResponse = await storage.createFile(
       medicalBucketId,
       ID.unique(),
       data.file,
-      filePermissions
+      [
+        Permission.read(Role.user(data.userId)),
+        Permission.update(Role.user(data.userId)),
+        Permission.delete(Role.user(data.userId)),
+      ]
     );
 
             const documentData = {
@@ -364,7 +346,11 @@ export const createBloodworkResult = async (data: CreateBloodworkData): Promise<
       bloodworksCollectionId,
       ID.unique(),
       documentData,
-      permissions
+      [
+        Permission.read(Role.user(data.userId)),
+        Permission.update(Role.user(data.userId)),
+        Permission.delete(Role.user(data.userId)),
+      ]
     );
     return docResponse;
   } catch (error) {
@@ -715,14 +701,7 @@ export const uploadProfilePhoto = async (file: File, userId: string): Promise<Mo
 export const uploadMedicalDocument = async (file: File, userId: string, description?: string): Promise<Models.File> => {
     if (!userId || !medicalBucketId || !medicalDocumentsCollectionId || !file) throw new Error("User ID, bucket/collection IDs, and file required.");
     let uploadedFile: Models.File | null = null; const fileId = ID.unique();
-    try { 
-        const permissions = await getPermissionsForPatientData(userId);
-        const filePermissions = permissions.filter(p => p.startsWith('read') || p.startsWith('delete'));
-        uploadedFile = await storage.createFile(medicalBucketId, fileId, file, filePermissions); 
-        const docData: Omit<MedicalDocument, keyof AppwriteDocument> = { userId, fileId: uploadedFile.$id, fileName: file.name, documentType: file.type || 'application/octet-stream', description: description?.trim() || undefined }; 
-        await databases.createDocument<MedicalDocument>( databaseId, medicalDocumentsCollectionId, ID.unique(), docData, permissions ); 
-        return uploadedFile; 
-    }
+    try { const userRole = Role.user(userId); const filePermissions = [ Permission.read(userRole), Permission.delete(userRole) ]; uploadedFile = await storage.createFile(medicalBucketId, fileId, file, filePermissions); const docData: Omit<MedicalDocument, keyof AppwriteDocument> = { userId, fileId: uploadedFile.$id, fileName: file.name, documentType: file.type || 'application/octet-stream', description: description?.trim() || undefined }; const docPermissions = [ Permission.read(userRole), Permission.update(userRole), Permission.delete(userRole) ]; await databases.createDocument<MedicalDocument>( databaseId, medicalDocumentsCollectionId, ID.unique(), docData, docPermissions ); return uploadedFile; }
     catch (error) { if (uploadedFile?.$id) { /*console.warn(`DB record failed after file upload (${uploadedFile.$id}). Deleting orphaned file.`);*/ try { await storage.deleteFile(medicalBucketId, uploadedFile.$id); /*console.log(`Orphaned file ${uploadedFile.$id} deleted.`);*/ } catch (deleteError) { /*console.error(`CRITICAL: Failed to delete orphaned file ${uploadedFile.$id}. Manual cleanup needed.`, deleteError);*/ handleAppwriteError(deleteError, `deleting orphaned file ${uploadedFile.$id}`, false); } } handleAppwriteError(error, `uploading medical document for user ${userId}`); throw error; }
 };
 export const getUserMedicalDocuments = async (userId: string): Promise<MedicalDocument[]> => {
@@ -748,11 +727,7 @@ export const getFilePreview = (fileId: string, bucketIdToUse: string): URL | nul
 // --- Appointment Functions ---
 export const createAppointment = async (userId: string, appointmentData: CreateAppointmentData): Promise<Appointment> => {
      if (!userId || !appointmentsCollectionId || !appointmentData?.date?.trim() || !appointmentData?.time?.trim()) throw new Error("User ID, collection ID, date, and time required.");
-    try { 
-        const dataToCreate: Omit<Appointment, keyof AppwriteDocument> = { userId: userId, date: appointmentData.date.trim(), time: appointmentData.time.trim(), isCompleted: appointmentData.isCompleted ?? false, appointmentType: appointmentData.appointmentType?.trim() || 'General', notes: appointmentData.notes?.trim() || undefined, }; 
-        const permissions = await getPermissionsForPatientData(userId); 
-        return await databases.createDocument<Appointment>( databaseId, appointmentsCollectionId, ID.unique(), dataToCreate, permissions ); 
-    }
+    try { const dataToCreate: Omit<Appointment, keyof AppwriteDocument> = { userId: userId, date: appointmentData.date.trim(), time: appointmentData.time.trim(), isCompleted: appointmentData.isCompleted ?? false, appointmentType: appointmentData.appointmentType?.trim() || 'General', notes: appointmentData.notes?.trim() || undefined, }; const userRole = Role.user(userId); const permissions = [ Permission.read(userRole), Permission.update(userRole), Permission.delete(userRole) ]; return await databases.createDocument<Appointment>( databaseId, appointmentsCollectionId, ID.unique(), dataToCreate, permissions ); }
     catch (error) { handleAppwriteError(error, `creating appointment for user ${userId}`); throw error; }
 };
 export const getUserAppointments = async (userId: string): Promise<Appointment[]> => {
@@ -793,11 +768,7 @@ const createHealthReading = async <T extends HealthReadingBase, D extends object
         if (typeof value === 'number' && value < 0 && !(collectionName === 'Blood Sugar' && field === 'level' && value === 0)) 
             throw new Error(`Field '${String(field)}' must be non-negative.`); 
     }
-    try { 
-        const payload = { userId, ...data, recordedAt: new Date().toISOString() } as Omit<T, keyof AppwriteDocument>; 
-        const permissions = await getPermissionsForPatientData(userId);
-        return await databases.createDocument<T>(databaseId, collectionId, ID.unique(), payload, permissions); 
-    }
+    try { const payload = { userId, ...data, recordedAt: new Date().toISOString() } as Omit<T, keyof AppwriteDocument>; const userRole = Role.user(userId); const permissions = [ Permission.read(userRole), Permission.delete(userRole) ]; return await databases.createDocument<T>(databaseId, collectionId, ID.unique(), payload, permissions); }
     catch (error) { handleAppwriteError(error, `creating ${collectionName} reading for user ${userId}`); throw error; }
 };
 const getHealthReadings = async <T extends HealthReadingBase>( userId: string, collectionId: string, collectionName: string, limit: number = 50 ): Promise<T[]> => {
@@ -824,11 +795,7 @@ export const deleteWeightReading = (documentId: string): Promise<void> => delete
 // --- Medication Reminder Functions ---
 export const createMedicationReminder = async (userId: string, data: CreateMedicationReminderData): Promise<MedicationReminder> => {
     if (!userId || !medicationRemindersCollectionId || !data.medicationName?.trim() || !data.dosage?.trim() || !data.frequency?.trim()) throw new Error("User ID, Collection ID, name, dosage, frequency required.");
-    try { 
-        const payload: Omit<MedicationReminder, keyof AppwriteDocument> = { userId, medicationName: data.medicationName.trim(), dosage: data.dosage.trim(), frequency: data.frequency.trim(), times: data.times?.map(t => t.trim()).filter(Boolean) || [], notes: data.notes?.trim() || undefined, isActive: data.isActive ?? true, }; 
-        const permissions = await getPermissionsForPatientData(userId); 
-        return await databases.createDocument<MedicationReminder>( databaseId, medicationRemindersCollectionId, ID.unique(), payload, permissions ); 
-    }
+    try { const payload: Omit<MedicationReminder, keyof AppwriteDocument> = { userId, medicationName: data.medicationName.trim(), dosage: data.dosage.trim(), frequency: data.frequency.trim(), times: data.times?.map(t => t.trim()).filter(Boolean) || [], notes: data.notes?.trim() || undefined, isActive: data.isActive ?? true, }; const userRole = Role.user(userId); const permissions = [ Permission.read(userRole), Permission.update(userRole), Permission.delete(userRole) ]; return await databases.createDocument<MedicationReminder>( databaseId, medicationRemindersCollectionId, ID.unique(), payload, permissions ); }
     catch (error) { handleAppwriteError(error, `creating medication reminder for user ${userId}`); throw error; }
 };
 export const getMedicationReminders = async (userId: string, onlyActive: boolean = true): Promise<MedicationReminder[]> => {
@@ -902,7 +869,7 @@ export const saveChatMessage = async ( userId: string, role: 'user' | 'model', c
     if (!trimmedContent) { /*console.warn("Attempted to save empty chat message.");*/ throw new Error("Cannot save empty message content."); }
     try {
         const payload: Omit<ChatHistoryMessage, keyof AppwriteDocument> = { userId, role, content: trimmedContent, timestamp: new Date().toISOString(), sessionId };
-        const permissions = await getPermissionsForPatientData(userId);
+        const userRole = Role.user(userId); const permissions = [ Permission.read(userRole), Permission.delete(userRole) ]; // User can read/delete their messages
         return await databases.createDocument<ChatHistoryMessage>( databaseId, chatHistoryCollectionId, ID.unique(), payload, permissions );
     } catch (error) { handleAppwriteError(error, `saving chat message for user ${userId} in session ${sessionId}`); throw error; }
 };
@@ -2109,7 +2076,6 @@ export const getDoctorsByHospital = async (hospitalId: string): Promise<UserProf
       profilesCollectionId,
       [
         Query.equal('hospitalId', hospitalId), // Filter by the patient's hospital
-        Query.equal('role', 'doctor'),   // Find users with the 'doctor' role
         Query.limit(100) // Adjust limit as needed for the number of doctors
       ]
     );
@@ -2120,41 +2086,4 @@ export const getDoctorsByHospital = async (hospitalId: string): Promise<UserProf
     console.error("Error fetching doctors by hospital:", error);
     throw new Error("Could not retrieve the list of doctors for your hospital.");
   }
-};
-
-export const assignDoctorToPatient = async (patientProfileId: string, doctor: UserProfile): Promise<UserProfile> => {
-    if (!patientProfileId || !doctor?.userId || !doctor.name) {
-        throw new Error("Patient profile ID and complete doctor profile are required.");
-    }
-
-    // Note: This function only assigns the doctor. It does NOT update permissions on existing documents.
-    // This should be handled by a server-side script for reliability.
-    console.warn("Doctor assigned. Existing data permissions are not updated by this client-side function.");
-
-    return await updateUserProfile(patientProfileId, {
-        assignedDoctorId: doctor.userId,
-        assignedDoctorName: doctor.name,
-    });
-};
-
-export const getPatientsForDoctor = async (doctorId: string): Promise<UserProfile[]> => {
-    if (!doctorId) {
-        console.warn("getPatientsForDoctor called without a doctorId.");
-        return [];
-    }
-
-    try {
-        const response = await databases.listDocuments<UserProfile>(
-            databaseId,
-            profilesCollectionId,
-            [
-                Query.equal('assignedDoctorId', doctorId),
-                Query.limit(100) // Adjust as needed
-            ]
-        );
-        return response.documents;
-    } catch (error) {
-        console.error("Error fetching patients for doctor:", error);
-        throw new Error("Could not retrieve the list of patients.");
-    }
 };
