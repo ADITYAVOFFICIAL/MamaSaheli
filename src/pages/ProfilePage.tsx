@@ -634,7 +634,8 @@ function ProfilePage() {
                                             const filteredDoctors = availableDoctors.filter(
                                                 (doctor) =>
                                                     doctor.hospitalId === selectedHospitalId &&
-                                                    doctor.hospitalName === selectedHospitalName
+                                                    doctor.hospitalName === selectedHospitalName &&
+                                                    doctor.userId !== user?.$id
                                             );
                                             return filteredDoctors.length > 0 ? (
                                                 <ul className="space-y-2">
