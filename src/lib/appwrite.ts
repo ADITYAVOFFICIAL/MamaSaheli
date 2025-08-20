@@ -2087,3 +2087,70 @@ export const getDoctorsByHospital = async (hospitalId: string): Promise<UserProf
     throw new Error("Could not retrieve the list of doctors for your hospital.");
   }
 };
+// NEW FUNCTION: Fetches appointments ONLY for patients assigned to a specific doctor.
+export const getAppointmentsForDoctor = async (doctorId: string): Promise<Appointment[]> => {
+  if (!doctorId) return [];
+
+  // Step 1: Find all patient profiles where 'assignedDoctorId' matches the logged-in doctor.
+  const patientProfiles = await databases.listDocuments(
+    databaseId,
+    profilesCollectionId,
+    [
+      Query.equal('assignedDoctorId', doctorId),
+      Query.limit(5000) // Adjust limit if a doctor can have more patients
+    ]
+  );
+
+  const patientUserIds = patientProfiles.documents.map(p => p.userId);
+
+  // If the doctor has no assigned patients, return an empty array immediately.
+  if (patientUserIds.length === 0) {
+    return [];
+  }
+
+  // Step 2: Fetch appointments where the 'userId' is in our list of patient IDs.
+  const response = await databases.listDocuments(
+    databaseId,
+    appointmentsCollectionId,
+    [
+      Query.equal('userId', patientUserIds), // Query against an array of patient IDs
+      Query.orderDesc('date'), // Show most recent appointments first
+      Query.limit(100) // Limit to the latest 100 appointments
+    ]
+  );
+  return response.documents.map(doc => doc as unknown as Appointment);
+};
+
+// NEW FUNCTION: Fetches medical documents ONLY for patients assigned to a specific doctor.
+export const getDocumentsForDoctor = async (doctorId: string): Promise<MedicalDocument[]> => {
+  if (!doctorId) return [];
+
+  // Step 1: Find all patient profiles assigned to this doctor.
+  const patientProfiles = await databases.listDocuments(
+    databaseId,
+    profilesCollectionId,
+    [
+      Query.equal('assignedDoctorId', doctorId),
+      Query.limit(5000)
+    ]
+  );
+
+  const patientUserIds = patientProfiles.documents.map(p => p.userId);
+
+  // If no patients are assigned, return an empty array.
+  if (patientUserIds.length === 0) {
+    return [];
+  }
+
+  // Step 2: Fetch documents where the 'userId' is in our list of patient IDs.
+  const response = await databases.listDocuments(
+    databaseId,
+    medicalDocumentsCollectionId,
+    [
+      Query.equal('userId', patientUserIds),
+      Query.orderDesc('$createdAt'), // Show most recently uploaded first
+      Query.limit(50)
+    ]
+  );
+  return response.documents.map(doc => doc as unknown as MedicalDocument);
+};
