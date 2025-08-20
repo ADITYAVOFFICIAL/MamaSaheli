@@ -30,7 +30,7 @@ const DoctorAppointmentsCard: React.FC = () => {
         queryFn: () => getAppointmentsForDoctor(doctor!.$id),
         enabled: !!doctor?.$id,
         staleTime: 1000 * 60 * 5,
-        gcTime: 1000 * 60 * 30, // Corrected: Renamed from cacheTime to gcTime for React Query v5
+        gcTime: 1000 * 60 * 30,
     });
 
     const patientUserIds = useMemo(() => {
@@ -48,7 +48,7 @@ const DoctorAppointmentsCard: React.FC = () => {
         queryFn: () => getUserProfilesByIds(patientUserIds),
         enabled: patientUserIds.length > 0,
         staleTime: 1000 * 60 * 5,
-        gcTime: 1000 * 60 * 30, // Corrected: Renamed from cacheTime to gcTime for React Query v5
+        gcTime: 1000 * 60 * 30,
     });
 
     const isLoading = isLoadingAppointments || (patientUserIds.length > 0 && isLoadingProfiles);
@@ -63,16 +63,29 @@ const DoctorAppointmentsCard: React.FC = () => {
         return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     };
 
+    const upcomingAppointments = useMemo(() => {
+        if (!appointmentsData) return [];
+
+        return appointmentsData
+            .filter(appointment => {
+                const [hours, minutes] = appointment.time.split(':').map(Number);
+                const appointmentDateTime = parseISO(appointment.date);
+                appointmentDateTime.setHours(hours, minutes);
+                return !isPast(appointmentDateTime);
+            })
+            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+    }, [appointmentsData]);
+
     const renderContent = () => {
         if (isLoading) {
             return (
-                <div className="space-y-3">
+                <div className="space-y-4 p-1">
                     {[...Array(3)].map((_, i) => (
-                         <div key={i} className="flex items-start space-x-3 p-3">
-                            <Skeleton className="h-10 w-10 rounded-full mt-1" />
-                            <div className="space-y-1.5 flex-grow">
+                        <div key={i} className="flex items-center space-x-4">
+                            <Skeleton className="h-12 w-12 rounded-full" />
+                            <div className="space-y-2 flex-grow">
+                                <Skeleton className="h-4 w-4/5" />
                                 <Skeleton className="h-4 w-3/5" />
-                                <Skeleton className="h-3 w-4/5" />
                             </div>
                         </div>
                     ))}
@@ -90,47 +103,51 @@ const DoctorAppointmentsCard: React.FC = () => {
             );
         }
 
-        if (!appointmentsData || appointmentsData.length === 0) {
-            return <p className="text-sm text-center text-gray-500 py-6">You have no upcoming appointments with your assigned patients.</p>;
+        if (!upcomingAppointments || upcomingAppointments.length === 0) {
+            return (
+                <div className="text-center py-8">
+                    <CalendarCheck className="mx-auto h-12 w-12 text-gray-400" />
+                    <p className="mt-4 text-sm text-gray-500">
+                        You have no upcoming appointments.
+                    </p>
+                </div>
+            );
         }
-
-        const sortedAppointments = [...appointmentsData].sort((a, b) =>
-            parseISO(a.date).getTime() - parseISO(b.date).getTime()
-        );
 
         return (
             <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                {sortedAppointments.map((appointment) => {
+                {upcomingAppointments.map((appointment) => {
                     const patientProfile = patientProfilesMap?.get(appointment.userId);
                     const appointmentDate = parseISO(appointment.date);
 
                     return (
-                        <li key={appointment.$id} className="flex items-start space-x-3 p-3 border rounded-md bg-white dark:bg-gray-800/50">
+                        <li key={appointment.$id} className="flex items-start space-x-3 p-3 border rounded-lg bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
                             {patientProfile?.profilePhotoUrl ? (
-                                <img src={patientProfile.profilePhotoUrl} alt={patientProfile.name} className="h-10 w-10 rounded-full object-cover flex-shrink-0 mt-1" />
-                             ) : (
-                                <UserCircle className="h-10 w-10 text-gray-400 flex-shrink-0 mt-1" />
-                             )}
+                                <img src={patientProfile.profilePhotoUrl} alt={patientProfile.name} className="h-11 w-11 rounded-full object-cover flex-shrink-0 mt-1" />
+                            ) : (
+                                <UserCircle className="h-11 w-11 text-gray-400 flex-shrink-0 mt-1" />
+                            )}
                             <div className="flex-grow overflow-hidden">
-                                <div className="flex justify-between items-start">
-                                    <p className="text-sm font-medium truncate pr-2">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                                    <p className="text-base font-semibold truncate pr-2">
                                         {patientProfile?.name || 'Loading patient...'}
                                     </p>
-                                    <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                                    <Badge variant="secondary" className="text-xs whitespace-nowrap mt-1 sm:mt-0">
                                         {formatAppointmentType(appointment.appointmentType)}
                                     </Badge>
                                 </div>
-                                <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
-                                    <CalendarCheck className="h-3 w-3" />
-                                    {format(appointmentDate, 'eee, MMM d, yyyy')}
-                                </p>
-                                <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {appointment.time}
-                                    {isPast(appointmentDate) && <Badge variant="outline" className="ml-2 text-xs">Past</Badge>}
-                                </p>
-                                <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-1">
-                                     <Link to={`/doctor/patient/${appointment.userId}`}>View Patient</Link>
+                                <div className="mt-2 space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
+                                    <div className="flex items-center gap-1.5">
+                                        <CalendarCheck className="h-3.5 w-3.5" />
+                                        <span>{format(appointmentDate, 'eee, MMM d, yyyy')}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <Clock className="h-3.5 w-3.5" />
+                                        <span>{appointment.time}</span>
+                                    </div>
+                                </div>
+                                <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 font-semibold">
+                                    <Link to={`/doctor/patient/${appointment.userId}`}>View Patient Details</Link>
                                 </Button>
                             </div>
                         </li>
@@ -141,18 +158,18 @@ const DoctorAppointmentsCard: React.FC = () => {
     };
 
     return (
-        <Card className="shadow-md border dark:border-gray-700">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div>
-                    <CardTitle className="flex items-center gap-2 text-xl font-semibold">
-                        <CalendarCheck className="h-5 w-5 text-mamasaheli-secondary" />
-                        Your Appointments
+        <Card className="shadow-lg border dark:border-gray-700 w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div className="grid gap-1.5">
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold">
+                        <CalendarCheck className="h-6 w-6 text-mamasaheli-secondary" />
+                        Upcoming Appointments
                     </CardTitle>
                     <CardDescription>Appointments with your assigned patients.</CardDescription>
                 </div>
-                 <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isLoading} aria-label="Refresh appointments">
-                     <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                 </Button>
+                <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isLoading} aria-label="Refresh appointments">
+                    <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+                </Button>
             </CardHeader>
             <CardContent>
                 {renderContent()}

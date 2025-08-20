@@ -261,7 +261,6 @@ const PatientDetailPage: React.FC = () => {
                         <div className="flex flex-wrap gap-2 mt-2">
                             {patientProfile.age && <Badge variant="secondary">Age: {patientProfile.age}</Badge>}
                             {patientProfile.weeksPregnant !== null && <Badge variant="secondary">Weeks: {patientProfile.weeksPregnant}</Badge>}
-                            <Badge variant="outline">ID: {userId.substring(0, 8)}...</Badge>
                         </div>
                     </div>
                 </div>
