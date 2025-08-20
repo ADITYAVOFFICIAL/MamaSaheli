@@ -1084,6 +1084,209 @@ export const uploadChatImage = async (file: File, userId: string): Promise<Model
     try { const userRole = Role.user(userId); const permissions = [ Permission.read(userRole), Permission.delete(userRole), ]; const fileId = ID.unique(); const uploadedFile = await storage.createFile(chatImagesBucketId, fileId, file, permissions); return uploadedFile; }
     catch (error) { handleAppwriteError(error, `uploading chat image for user ${userId}`); throw error; }
 };
+// --- Product Bookmark Functions ---
+export const addProductBookmark = async (
+    userId: string,
+    product: ProductRecommendation
+): Promise<BookmarkedProduct> => {
+    if (!userId || !bookmarkedProductsCollectionId || !product?.id || !product?.name || !product?.description) {
+        throw new Error("User ID, Collection ID, and product details (ID, Name, Description) are required to add bookmark.");
+    }
+    try {
+        const payload: Omit<BookmarkedProduct, keyof AppwriteDocument> = {
+            userId: userId,
+            productId: product.id,
+            productName: product.name,
+            description: product.description,
+            category: product.category,
+            searchKeywords: product.searchKeywords,
+            reasoning: product.reasoning,
+            bookmarkedAt: new Date().toISOString(),
+        };
+        const userRole = Role.user(userId);
+        const permissions = [
+            Permission.read(userRole),
+            Permission.update(userRole),
+            Permission.delete(userRole),
+        ];
+        const newBookmark = await databases.createDocument<BookmarkedProduct>(
+            databaseId,
+            bookmarkedProductsCollectionId,
+            ID.unique(),
+            payload,
+            permissions
+        );
+        return newBookmark;
+    } catch (error: unknown) {
+        if (error instanceof AppwriteException && error.code === 409) {
+            const existing = await findProductBookmarkByProductId(userId, product.id);
+            if (existing) return existing;
+            throw error;
+        }
+        handleAppwriteError(error, `adding product bookmark for user ${userId}, product ${product.id}`);
+        throw error;
+    }
+};
+
+export const removeProductBookmarkById = async (bookmarkDocumentId: string): Promise<void> => {
+    if (!bookmarkedProductsCollectionId || !bookmarkDocumentId) {
+        throw new Error("Collection ID and Bookmark Document ID are required for deletion.");
+    }
+    try {
+        await databases.deleteDocument(
+            databaseId,
+            bookmarkedProductsCollectionId,
+            bookmarkDocumentId
+        );
+    } catch (error: unknown) {
+        handleAppwriteError(error, `deleting product bookmark ${bookmarkDocumentId}`);
+        throw error;
+    }
+};
+
+export const findProductBookmarkByProductId = async (userId: string, productId: string): Promise<BookmarkedProduct | null> => {
+    if (!userId || !productId || !bookmarkedProductsCollectionId) {
+        return null;
+    }
+    try {
+        const response = await databases.listDocuments<BookmarkedProduct>(
+            databaseId,
+            bookmarkedProductsCollectionId,
+            [
+                Query.equal('userId', userId),
+                Query.equal('productId', productId),
+                Query.limit(1)
+            ]
+        );
+        return response.documents.length > 0 ? response.documents[0] : null;
+    } catch (error) {
+        handleAppwriteError(error, `finding bookmark for user ${userId}, product ${productId}`, false);
+        return null;
+    }
+};
+
+export const updateForumPost = async (postId: string, data: UpdateForumPostData): Promise<ForumPost> => {
+    if (!forumPostsCollectionId || !postId) {
+        throw new Error("Collection ID and Post ID required for update.");
+    }
+    const filteredData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+    if (Object.keys(filteredData).length === 0) {
+        throw new Error("No data provided for post update.");
+    }
+    try {
+        return await databases.updateDocument<ForumPost>(
+            databaseId,
+            forumPostsCollectionId,
+            postId,
+            filteredData
+        );
+    } catch (error) {
+        handleAppwriteError(error, `updating forum post ${postId}`);
+        throw error;
+    }
+};
+
+export const searchUserProfiles = async (query: string): Promise<UserProfile[]> => {
+    if (!profilesCollectionId) {
+        return [];
+    }
+    if (!query?.trim()) {
+        return [];
+    }
+    try {
+        const searchNamePromise = databases.listDocuments<UserProfile>(
+            databaseId,
+            profilesCollectionId,
+            [Query.search('name', query.trim()), Query.limit(15)]
+        );
+        const searchEmailPromise = databases.listDocuments<UserProfile>(
+            databaseId,
+            profilesCollectionId,
+            [Query.search('email', query.trim()), Query.limit(15)]
+        );
+        const [nameResults, emailResults] = await Promise.all([searchNamePromise, searchEmailPromise]);
+        const combinedResults = new Map<string, UserProfile>();
+        nameResults.documents.forEach(doc => combinedResults.set(doc.$id, doc));
+        emailResults.documents.forEach(doc => combinedResults.set(doc.$id, doc));
+        return Array.from(combinedResults.values());
+    } catch (error) {
+    handleAppwriteError(error, `searching user profiles with query "${query}"`, false);
+        return [];
+    }
+};
+
+export const getAllUpcomingAppointments = async (limit: number = 50): Promise<Appointment[]> => {
+    if (!appointmentsCollectionId) {
+        return [];
+    }
+    try {
+        const now = new Date().toISOString();
+        const response = await databases.listDocuments<Appointment>(
+            databaseId,
+            appointmentsCollectionId,
+            [
+                Query.greaterThanEqual('date', now),
+                Query.orderAsc('date'),
+                Query.limit(limit)
+            ]
+        );
+        return response.documents;
+    } catch (error) {
+        handleAppwriteError(error, `fetching all upcoming appointments (doctor view)`, false);
+        return [];
+    }
+};
+
+export const getAllRecentMedicalDocuments = async (limit: number = 50): Promise<MedicalDocument[]> => {
+    if (!medicalDocumentsCollectionId) {
+        return [];
+    }
+    try {
+        const response = await databases.listDocuments<MedicalDocument>(
+            databaseId,
+            medicalDocumentsCollectionId,
+            [
+                Query.orderDesc('$createdAt'),
+                Query.limit(limit)
+            ]
+        );
+        return response.documents;
+    } catch (error) {
+        handleAppwriteError(error, `fetching all recent medical documents (doctor view)`, false);
+        return [];
+    }
+};
+
+export const getUserProfilesByIds = async (userIds: string[]): Promise<Map<string, UserProfile>> => {
+    if (!profilesCollectionId) {
+        return new Map();
+    }
+    if (!userIds || userIds.length === 0) {
+        return new Map();
+    }
+    const uniqueUserIds = [...new Set(userIds)];
+    try {
+        const response = await databases.listDocuments<UserProfile>(
+            databaseId,
+            profilesCollectionId,
+            [
+                Query.equal('userId', uniqueUserIds),
+                Query.limit(uniqueUserIds.length)
+            ]
+        );
+        const profilesMap = new Map<string, UserProfile>();
+        response.documents.forEach(profile => {
+            if (profile.profilePhotoId && profileBucketId) {
+                try { profile.profilePhotoUrl = getFilePreview(profile.profilePhotoId, profileBucketId)?.href; } catch { /* ignore error */ }
+            }
+            profilesMap.set(profile.userId, profile);
+        });
+        return profilesMap;
+    } catch (error) {
+        handleAppwriteError(error, `fetching profiles for user IDs`, false);
+        return new Map();
+    }
+};
 // --- NEW: Forum Functions ---
 
 /**
@@ -1771,5 +1974,85 @@ export const getTotalUserCount = async (): Promise<{ totalUsers: number }> => {
         } else {
             throw new Error(`An unknown error occurred during ${context}.`);
         }
+    }
+};
+/**
+ * Fetches the most recently updated user profiles.
+ * Requires collection-level read permission for the caller on the 'profiles' collection.
+ * NOTE: Assumes the default Appwrite `$updatedAt` attribute is suitable for "latest activity".
+ *
+ * @param limit - The maximum number of profiles to fetch.
+ * @returns A promise that resolves to an array of UserProfile objects.
+ */
+export const getRecentUserProfiles = async (limit: number = 10): Promise<UserProfile[]> => {
+    if (!profilesCollectionId) {
+        // console.error("Profile Collection ID not configured!");
+        throw new Error("Profile Collection ID not configured.");
+    }
+    // console.log(`Fetching ${limit} most recent user profiles`);
+    try {
+        const response = await databases.listDocuments<UserProfile>(
+            databaseId,
+            profilesCollectionId,
+            [
+                Query.orderDesc('$updatedAt'), // Order by most recently updated
+                Query.limit(limit)
+            ]
+        );
+
+        // Generate profile photo URLs if needed
+        const profilesWithUrls = response.documents.map(profile => {
+            if (profile.profilePhotoId && profileBucketId) {
+                try {
+                    profile.profilePhotoUrl = getFilePreview(profile.profilePhotoId, profileBucketId)?.href;
+                } catch (e) {
+                    handleAppwriteError(e, `generating profile photo URL for recent profile ${profile.$id}`, false);
+                    profile.profilePhotoUrl = undefined;
+                }
+            } else {
+                profile.profilePhotoUrl = undefined;
+            }
+            // Ensure dietaryPreferences is an array
+            if (!Array.isArray(profile.dietaryPreferences)) {
+                profile.dietaryPreferences = [];
+            }
+            return profile;
+        });
+
+        // console.log(`Fetched ${profilesWithUrls.length} recent profiles.`);
+        return profilesWithUrls;
+
+    } catch (error) {
+        handleAppwriteError(error, `fetching recent user profiles`, false);
+        return []; // Return empty on error
+    }
+};
+
+export { ID, Permission, Role, Query };
+
+/**
+ * Retrieves all bookmarked products for a specific user.
+ * @param userId - The ID of the user whose bookmarks to fetch.
+ * @returns A Promise resolving to an array of BookmarkedProduct documents.
+ */
+export const getUserProductBookmarks = async (userId: string): Promise<BookmarkedProduct[]> => {
+    if (!userId || !bookmarkedProductsCollectionId) {
+        // console.warn("getUserProductBookmarks: User ID or Collection ID missing.");
+        return []; // Return empty array if prerequisites missing
+    }
+    try {
+        const response = await databases.listDocuments<BookmarkedProduct>(
+            databaseId,
+            bookmarkedProductsCollectionId,
+            [
+                Query.equal('userId', userId),
+                Query.orderDesc('bookmarkedAt'), // Show newest first
+                Query.limit(100) // Adjust limit as needed
+            ]
+        );
+        return response.documents;
+    } catch (error: unknown) {
+        handleAppwriteError(error, `fetching product bookmarks for user ${userId}`, false);
+        return []; // Return empty array on error
     }
 };
