@@ -2,21 +2,18 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import MainLayout from '@/components/layout/MainLayout'; // Adjust path if needed
+import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, ArrowRight, Star, HeartHandshake } from 'lucide-react'; // Use Check for included features, X for excluded
+import { Check, X, ArrowRight, Star, HeartHandshake } from 'lucide-react';
 
-// --- Define Pricing Plan Data ---
-// This makes it easier to manage and render plans
 const pricingPlans = [
   {
-    name: 'Starter',
-    priceMonthly: '$0',
-    priceYearly: '$0', // Usually free tiers don't have annual options like this
+    name: 'Free',
+    priceMonthly: '₹0',
     billingCycle: '/ month',
-    description: 'Perfect for exploring basic features and getting started.',
+    description: 'For individuals starting their journey, offering essential tools.',
     features: [
       { text: 'AI Chat Assistant (Limited Usage)', included: true },
       { text: 'Basic Appointment Scheduling', included: true },
@@ -24,22 +21,19 @@ const pricingPlans = [
       { text: 'Access to Resource Articles', included: true },
       { text: 'Community Forum Access', included: true },
       { text: 'Personalized Dashboard (Basic)', included: true },
-      { text: 'Product Suggestions', included: false },
-      { text: 'Meal & Exercise Ideas', included: false },
-      { text: 'Priority Support', included: false },
       { text: 'Stacking Game Access', included: true },
+      { text: 'Personalized Meal & Exercise Ideas', included: false },
+      { text: 'Priority Support', included: false },
     ],
-    ctaText: 'Get Started for Free',
-    ctaLink: '/signup', // Link to signup page
+    ctaText: 'Sign Up for Free',
+    ctaLink: '/signup',
     isFeatured: false,
-    themeColor: 'gray', // Tailwind color name for borders/badges if needed
   },
   {
     name: 'Pro',
-    priceMonthly: '$19',
-    priceYearly: '$190', // Example: ~2 months free annually
+    priceMonthly: '₹199',
     billingCycle: '/ month',
-    description: 'Ideal for expectant mothers wanting comprehensive support.',
+    description: 'The complete toolkit for individuals seeking in-depth support and personalization.',
     features: [
       { text: 'AI Chat Assistant (Unlimited)', included: true },
       { text: 'Full Appointment Scheduling & Management', included: true },
@@ -53,43 +47,33 @@ const pricingPlans = [
       { text: 'Stacking Game Access', included: true },
     ],
     ctaText: 'Choose Pro Plan',
-    ctaLink: '/signup?plan=pro', // Example: Link to signup with plan pre-selected
-    isFeatured: true, // Highlight this plan
-    themeColor: 'primary', // Use the main theme color
+    ctaLink: '/signup?plan=pro',
+    isFeatured: true,
   },
   {
-    name: 'Premium',
-    priceMonthly: '$49',
-    priceYearly: '$490', // Example: ~2 months free annually
-    billingCycle: '/ month',
-    description: 'The complete package with priority support and future premium features.',
+    name: 'Enterprise',
+    priceMonthly: 'Custom',
+    billingCycle: ' / For Clinics & Hospitals',
+    description: 'A tailored solution for healthcare providers to manage multiple patients.',
     features: [
-      { text: 'Everything in Pro Plan', included: true },
-      { text: 'Medical Document Storage (Unlimited)', included: true },
-      { text: 'Priority Email & Chat Support', included: true },
-      { text: 'Early Access to New Features', included: true },
-      { text: 'Detailed Health Analytics (Coming Soon)', included: true },
-      { text: 'Partner Account Linking (Coming Soon)', included: true },
-      // Add any other premium-only features here
+      { text: 'All Pro features for your patients', included: true },
+      { text: 'Doctor Dashboard for Patient Management', included: true },
+      { text: 'Secure Doctor-Patient Communication', included: true },
+      { text: 'Bulk Patient Onboarding', included: true },
+      { text: 'Patient Health Data Analytics', included: true },
+      { text: 'Dedicated Support & Training', included: true },
     ],
-    ctaText: 'Go Premium',
-    ctaLink: '/signup?plan=premium', // Example: Link to signup with plan pre-selected
+    ctaText: 'Contact Sales',
+    ctaLink: '/contact',
     isFeatured: false,
-    themeColor: 'accent', // Use another theme color
   },
 ];
 
 const PricingPage: React.FC = () => {
-  // Optional: State for toggling monthly/annual pricing if needed
-  // const [isAnnual, setIsAnnual] = useState(false);
-
   return (
-    // Use MainLayout for consistency, pricing is typically public (requireAuth=false)
     <MainLayout requireAuth={false}>
       <div className="bg-gradient-to-b from-white to-mamasaheli-light/30 dark:from-gray-900 dark:to-gray-800/30 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-
-          {/* Page Header */}
           <div className="text-center mb-12 md:mb-16 lg:mb-20">
             <h1 className="text-4xl font-extrabold text-mamasaheli-dark dark:text-mamasaheli-light sm:text-5xl tracking-tight">
               Choose Your Plan
@@ -97,15 +81,11 @@ const PricingPage: React.FC = () => {
             <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
               Simple, transparent pricing for every stage of your pregnancy journey. Get the support you need, when you need it.
             </p>
-            {/* Optional: Add Monthly/Annual Toggle Here */}
           </div>
-
-          {/* Pricing Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {pricingPlans.map((plan) => (
               <Card
                 key={plan.name}
-                // Add extra styling for the featured plan
                 className={`flex flex-col border-2 rounded-xl shadow-lg transition-all duration-300 hover:shadow-2xl dark:bg-gray-800/80
                   ${plan.isFeatured ? 'border-mamasaheli-primary dark:border-mamasaheli-accent scale-105 lg:scale-110 z-10' : 'border-gray-200 dark:border-gray-700'}
                   ${plan.isFeatured ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/50 dark:bg-gray-800/50'}
@@ -113,10 +93,10 @@ const PricingPage: React.FC = () => {
               >
                 {plan.isFeatured && (
                   <Badge
-                    variant="default" // Or use custom variant if defined
+                    variant="default"
                     className="absolute -top-4 left-1/2 transform -translate-x-1/2 px-4 py-1 rounded-full bg-mamasaheli-primary text-white text-sm font-semibold shadow-md"
                   >
-                    <Star className="w-4 h-4 mr-1.5" /> Most Popular
+                    <Star className="w-4 h-4 mr-1.5" /> Recommended
                   </Badge>
                 )}
                 <CardHeader className="p-6 text-center border-b dark:border-gray-700/50">
@@ -125,17 +105,13 @@ const PricingPage: React.FC = () => {
                   </CardTitle>
                   <div className="mb-3">
                     <span className="text-4xl font-extrabold text-gray-900 dark:text-white">
-                      {plan.priceMonthly /* Replace with annual price if toggled */}
+                      {plan.priceMonthly}
                     </span>
                     <span className="text-base font-medium text-gray-500 dark:text-gray-400">
                       {plan.billingCycle}
                     </span>
-                    {/* Optional: Add Annual Price display */}
-                    {/* {isAnnual && plan.priceYearly && plan.priceMonthly !== '$0' && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">({plan.priceYearly} billed annually)</p>
-                    )} */}
                   </div>
-                  <CardDescription className="text-gray-600 dark:text-gray-400 min-h-[40px]"> {/* Ensure consistent height */}
+                  <CardDescription className="text-gray-600 dark:text-gray-400 min-h-[40px]">
                     {plan.description}
                   </CardDescription>
                 </CardHeader>
@@ -174,8 +150,6 @@ const PricingPage: React.FC = () => {
               </Card>
             ))}
           </div>
-
-          {/* Optional: FAQ Section */}
           <div className="mt-20 md:mt-28 text-center max-w-3xl mx-auto">
             <h2 className="text-3xl font-bold text-mamasaheli-dark dark:text-white mb-6">
               Frequently Asked Questions
@@ -227,17 +201,14 @@ const PricingPage: React.FC = () => {
               </details>
             </div>
           </div>
-
-          {/* Optional: Final CTA */}
           <div className="mt-16 text-center">
              <p className="text-lg text-gray-700 dark:text-gray-300">Still have questions or need a custom solution?</p>
              <Button variant="outline" size="lg" className="mt-4 border-mamasaheli-primary text-mamasaheli-primary hover:bg-mamasaheli-light hover:text-mamasaheli-dark dark:border-mamasaheli-light dark:text-mamasaheli-light dark:hover:bg-gray-700 dark:hover:text-white" asChild>
-                <Link to="/contact"> {/* Assuming you have a contact page */}
+                <Link to="/contact">
                    <HeartHandshake className="mr-2 h-5 w-5" /> Contact Us
                 </Link>
              </Button>
           </div>
-
         </div>
       </div>
     </MainLayout>
@@ -245,27 +216,3 @@ const PricingPage: React.FC = () => {
 };
 
 export default PricingPage;
-
-// --- Add this animation to your tailwind.config.js or global CSS if you use the FAQ ---
-/*
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
-*/
-
-// --- Add these colors to your tailwind.config.js if not already defined ---
-/*
-extend: {
-  colors: {
-    'mamasaheli-primary': '#...', // Your primary color hex
-    'mamasaheli-secondary': '#...', // Your secondary color hex
-    'mamasaheli-accent': '#...', // Your accent color hex
-    'mamasaheli-light': '#...', // Your light background/variant color hex
-    'mamasaheli-dark': '#...', // Your dark text/variant color hex
-  },
-}
-*/
