@@ -27,6 +27,39 @@ import { Upload, Loader2, FileText, Trash2, Download, BriefcaseMedical, PlusCirc
 
 type BloodworkResultWithResults = BloodworkResult & { results?: string };
 
+const BIOMARKER_ALIASES = {
+    'Hemoglobin': ['hemoglobin', 'hgb', 'haemoglobin', 'hb'],
+    'RBC Count': ['rbc', 'red blood cell', 'r b c count'],
+    'Hematocrit': ['hematocrit', 'pcv', 'packed cell volume', 'p.c.v/haematocrit'],
+    'MCV': ['mcv', 'mean corpuscular volume'],
+    'MCH': ['mch', 'mean corpuscular hemoglobin'],
+    'MCHC': ['mchc', 'mean corpuscular hemoglobin concentration'],
+    'RDW-CV': ['rdw-cv', 'rdw_cv'],
+    'RDW-SD': ['rdw-sd', 'rdw_sd'],
+    'Platelet Count': ['platelet', 'plt'],
+    'MPV': ['mpv', 'mean platelet volume'],
+    'WBC Count': ['wbc', 'white blood cell', 'leucocyte', 'tlc', 'total leucocyte count'],
+    'Neutrophils': ['neutrophil'],
+    'Lymphocytes': ['lymphocyte'],
+    'Monocytes': ['monocyte'],
+    'Eosinophils': ['eosinophil'],
+    'Basophils': ['basophil'],
+    'PCT': ['pct', 'plateletcrit']
+};
+
+const normalizeString = (s) => (s || "").toLowerCase().replace(/[\s()-.,/]/g, '');
+
+const getCanonicalBiomarker = (rawName) => {
+    if (!rawName) return null;
+    const normalizedName = normalizeString(rawName);
+    for (const [canonical, aliases] of Object.entries(BIOMARKER_ALIASES)) {
+        if (aliases.some(alias => normalizedName.includes(normalizeString(alias)))) {
+            return canonical;
+        }
+    }
+    return rawName.trim();
+};
+
 const ResultsSkeleton = () => (
     <div className="space-y-4">
         {[...Array(3)].map((_, i) => (
@@ -51,63 +84,25 @@ const ResultsSkeleton = () => (
 
 const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) => {
     const chartData = useMemo(() => {
-        // Flexible key matching for all biomarkers
-        const keyVariants = {
-            hemoglobin: ["hemoglobin", "hgb", "hemoglobin (hgb)", "hemoglobin (g/dl)", "haemoglobin", "haemoglobin (hb)", "hemoglobin (hb)", "haemoglobin (g/dl)", "hb"],
-            mchc: ["mchc", "mean corpuscular hemoglobin concentration"],
-            "r b c count": ["r b c count", "rbc", "rbc count", "red blood cell count"],
-            "platelet count": ["platelet count", "platelets", "plt"],
-            hematocrit: ["hematocrit", "pcv", "p.c.v/haematocrit"],
-            leucocyte: ["leucocyte", "wbc", "white blood cell count", "total leucocyte count", "tlc"],
-        };
-        // Normalize dataKey for matching
-        const variants = keyVariants[dataKey] || [dataKey];
-        // Helper to normalize key: remove spaces, parentheses, and non-alphanumeric
-        const normalize = s => (s || "")
-            .replace(/\s+/g, '')
-            .replace(/\([^)]*\)/g, '')
-            .replace(/[^a-zA-Z0-9]/g, '')
-            .toLowerCase();
         return documents
             .map(doc => {
                 try {
-                    const rawResults = doc.results ? JSON.parse(doc.results) : {};
-                    let item = null;
-                    if (Array.isArray(rawResults)) {
-                        // Debug: log all normalized names and variants
-                        if (dataKey === 'leucocyte') {
-                            console.log('WBC debug:', rawResults.map(i => normalize(i.name || "")), variants.map(normalize));
-                        }
-                        item = rawResults.find(i => {
-                            const n = normalize(i.name || "");
-                            return variants.some(v => n.includes(normalize(v)));
-                        });
-                    } else {
-                        const key = Object.keys(rawResults).find(k => {
-                            const n = normalize(k);
-                            return variants.some(v => n.includes(normalize(v)));
-                        });
-                        if (key) {
-                            item = { value: rawResults[key], name: key, unit: unit };
-                        }
-                    }
+                    const rawResults = doc.results ? JSON.parse(doc.results) : [];
+                    if (!Array.isArray(rawResults)) return null;
+
+                    const item = rawResults.find(i => getCanonicalBiomarker(i.name) === dataKey);
+
                     if (item && item.value !== null && item.value !== undefined) {
-                        // Parse value robustly
                         const valStr = String(item.value).replace(/,/g, '');
                         const value = parseFloat(valStr);
+
                         if (!isNaN(value)) {
-                            // Use reference range from report if present
-                            let refRange = item.referenceRange || normalRange;
-                            if (typeof refRange === 'string') {
-                                const match = refRange.match(/([\d.]+)\s*-\s*([\d.]+)/);
-                                if (match) refRange = [parseFloat(match[1]), parseFloat(match[2])];
-                            }
                             return {
                                 date: new Date(doc.recordedAt),
                                 value,
                                 name: format(new Date(doc.recordedAt), 'MMM d'),
                                 unit: item.unit || unit,
-                                referenceRange: refRange,
+                                referenceRange: item.referenceRange || normalRange,
                                 flag: item.flag || null,
                             };
                         }
@@ -129,8 +124,7 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
     }
 
     const dataValues = chartData.map(d => d.value);
-    // Use reference range from data if available
-    const refRange = chartData.length > 0 && chartData[0].referenceRange ? chartData[0].referenceRange : normalRange;
+    const refRange = Array.isArray(normalRange) && normalRange.length === 2 ? normalRange : [0, 0];
     const yMin = Math.min(...dataValues, refRange[0]);
     const yMax = Math.max(...dataValues, refRange[1]);
     const yPadding = (yMax - yMin) * 0.2 || 5;
@@ -144,7 +138,9 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} unit={unit} domain={yDomain} />
                 <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} />
                 <Legend wrapperStyle={{ fontSize: '14px' }} />
-                <ReferenceArea y1={normalRange[0]} y2={normalRange[1]} fill="hsl(var(--primary))" fillOpacity={0.05} label={{ value: "Normal Range", position: "insideTopRight", fill: "hsl(var(--muted-foreground))", fontSize: 10, dy: 10, dx: -10 }} />
+                {refRange[0] > 0 && refRange[1] > 0 && (
+                    <ReferenceArea y1={refRange[0]} y2={refRange[1]} fill="hsl(var(--primary))" fillOpacity={0.05} label={{ value: "Normal Range", position: "insideTopRight", fill: "hsl(var(--muted-foreground))", fontSize: 10, dy: 10, dx: -10 }} />
+                )}
                 <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} name={name} dot={{ r: 4, fill: 'hsl(var(--primary))' }} activeDot={{ r: 8, stroke: 'hsl(var(--background))', strokeWidth: 2 }} />
             </LineChart>
         </ResponsiveContainer>
@@ -343,13 +339,11 @@ const BloodworkPage = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [docToDelete, setDocToDelete] = useState(null);
     const [selectedDoc, setSelectedDoc] = useState(null);
-    // Dynamic biomarker chart states
     const [selectedBiomarker, setSelectedBiomarker] = useState("");
     const [biomarkerOptions, setBiomarkerOptions] = useState([]);
     const [biomarkerUnits, setBiomarkerUnits] = useState({});
     const [biomarkerRanges, setBiomarkerRanges] = useState({});
 
-    // Manual entry form state
     const [manualEntry, setManualEntry] = useState({
         testName: '',
         recordedAt: '',
@@ -435,53 +429,51 @@ const BloodworkPage = () => {
         } catch { return ''; }
     };
 
-    // Aggregate all biomarkers with >1 data point
     useEffect(() => {
         if (!documents || documents.length === 0) {
             setBiomarkerOptions([]);
             setSelectedBiomarker("");
             return;
         }
-        const biomarkerMap = {};
+
+        const canonicalBiomarkerMap = {};
         const unitsMap = {};
         const rangesMap = {};
+
         documents.forEach(doc => {
             let results;
             try {
-                results = doc.results ? JSON.parse(doc.results) : {};
-            } catch { results = {}; }
-            if (Array.isArray(results)) {
-                results.forEach(item => {
-                    const name = item.name?.trim();
-                    if (!name) return;
-                    biomarkerMap[name] = biomarkerMap[name] || [];
-                    biomarkerMap[name].push({
-                        value: item.value,
-                        date: doc.recordedAt,
-                        unit: item.unit,
-                        referenceRange: item.referenceRange
-                    });
-                    if (item.unit) unitsMap[name] = item.unit;
-                    if (item.referenceRange) rangesMap[name] = item.referenceRange;
-                });
-            } else if (results && typeof results === "object") {
-                Object.entries(results).forEach(([key, value]) => {
-                    biomarkerMap[key] = biomarkerMap[key] || [];
-                    biomarkerMap[key].push({
-                        value,
-                        date: doc.recordedAt,
-                        unit: undefined,
-                        referenceRange: undefined
-                    });
-                });
-            }
+                results = doc.results ? JSON.parse(doc.results) : [];
+            } catch { results = []; }
+            
+            if (!Array.isArray(results)) return;
+
+            results.forEach(item => {
+                const canonicalName = getCanonicalBiomarker(item.name);
+                if (!canonicalName) return;
+
+                canonicalBiomarkerMap[canonicalName] = (canonicalBiomarkerMap[canonicalName] || 0) + 1;
+
+                if (!unitsMap[canonicalName] && item.unit) {
+                    unitsMap[canonicalName] = item.unit;
+                }
+                if (!rangesMap[canonicalName] && item.referenceRange) {
+                    const match = String(item.referenceRange).match(/([\d.]+)\s*-\s*([\d.]+)/);
+                    if (match) {
+                        rangesMap[canonicalName] = [parseFloat(match[1]), parseFloat(match[2])];
+                    }
+                }
+            });
         });
-        // Only include biomarkers with >1 data point
-        const options = Object.keys(biomarkerMap).filter(k => biomarkerMap[k].length > 1);
+
+        const options = Object.keys(canonicalBiomarkerMap)
+            .filter(key => canonicalBiomarkerMap[key] > 1)
+            .sort();
+
         setBiomarkerOptions(options);
         setBiomarkerUnits(unitsMap);
         setBiomarkerRanges(rangesMap);
-        // Default selection
+
         if (options.length > 0) {
             setSelectedBiomarker(prev => options.includes(prev) ? prev : options[0]);
         } else {
@@ -489,10 +481,8 @@ const BloodworkPage = () => {
         }
     }, [documents]);
 
-    // Update Appwrite document with edited results
     const handleUpdateResults = async (newResultsArr) => {
         if (!selectedDoc) return;
-        // Recalculate flags for each biomarker
         const recalcFlag = (value, referenceRange) => {
             if (!value || !referenceRange) return 'N/A';
             const numValue = parseFloat(String(value).replace(/,/g, ''));
@@ -515,7 +505,7 @@ const BloodworkPage = () => {
             const updatedDoc = { ...selectedDoc, results: JSON.stringify(updatedResultsArr) };
             setDocuments(docs => docs.map(d => d.$id === selectedDoc.$id ? updatedDoc : d));
             setSelectedDoc(updatedDoc);
-            toast({ title: "Update Successful", description: "Bloodwork values updated and flags recalculated.", variant: "success" });
+            toast({ title: "Update Successful", description: "Bloodwork values updated and flags recalculated.", variant: "default" });
         } catch (error) {
             toast({ title: "Update Failed", description: "Could not update the results.", variant: "destructive" });
         }
@@ -573,8 +563,6 @@ const BloodworkPage = () => {
                     <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">CBC Reports</CardTitle><TestTube2 className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent>{isLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold">{dashboardStats.commonTestCount}</div>}<p className="text-xs text-muted-foreground">complete blood count tests</p></CardContent></Card>
                 </section>
                 
-                {/* Pregnancy-relevant biomarker trend charts */}
-                {/* Dynamic biomarker trend chart */}
                 <section className="mb-10">
                     <Card>
                         <CardHeader>
@@ -603,15 +591,7 @@ const BloodworkPage = () => {
                                     dataKey={selectedBiomarker}
                                     name={selectedBiomarker}
                                     unit={biomarkerUnits[selectedBiomarker] || ""}
-                                    normalRange={(() => {
-                                        const r = biomarkerRanges[selectedBiomarker];
-                                        if (Array.isArray(r)) return r;
-                                        if (typeof r === "string") {
-                                            const m = r.match(/([\d.]+)\s*-\s*([\d.]+)/);
-                                            if (m) return [parseFloat(m[1]), parseFloat(m[2])];
-                                        }
-                                        return [0, 0];
-                                    })()}
+                                    normalRange={biomarkerRanges[selectedBiomarker] || [0, 0]}
                                 />
                             ) : (
                                 <div className="text-center text-muted-foreground">Select a biomarker to view its trend.</div>
@@ -633,7 +613,6 @@ const BloodworkPage = () => {
                                 </CardContent>
                             </form>
                         </Card>
-                        {/* Manual Entry Form */}
                         <Card className="mt-6">
                             <CardHeader><CardTitle className="flex items-center text-xl"><PlusCircle className="mr-2.5 h-6 w-6" /> Manual Entry</CardTitle></CardHeader>
                             <form onSubmit={handleManualSubmit}>

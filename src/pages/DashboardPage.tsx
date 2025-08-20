@@ -48,29 +48,44 @@ import { generateDashboardFeed } from '@/lib/geminiDash';
 const UserStatsCards: React.FC<{ profile: UserProfile | null; appointmentsCount: number }> = ({ profile, appointmentsCount }) => {
     const profileCompleteness = useMemo(() => {
         if (!profile) return 0;
-        const essentialFields: (keyof UserProfile)[] = ['name', 'age', 'gender', 'weeksPregnant', 'phoneNumber'];
+    // Phone number is optional, so remove it from essential fields
+    const essentialFields: (keyof UserProfile)[] = ['name', 'age', 'gender', 'weeksPregnant', 'lmpDate'];
         const extendedFields: (keyof UserProfile)[] = [
-            'address', 'preExistingConditions', 'previousPregnancies',
+            'preExistingConditions', 'previousPregnancies',
             'deliveryPreference', 'workSituation', 'activityLevel',
             'partnerSupport', 'dietaryPreferences', 'chatTonePreference'
         ];
-        const completedEssential = essentialFields.filter(field => {
+
+        let completedEssential = 0;
+        essentialFields.forEach(field => {
             const value = profile[field];
             if (field === 'weeksPregnant' || field === 'age' || field === 'previousPregnancies') {
-                return typeof value === 'number' && value >= 0;
+                if (typeof value === 'number' && value >= 0) completedEssential++;
+            } else if (field === 'lmpDate') {
+                if (value !== null && value !== undefined && String(value).trim() !== '') completedEssential++;
+            } else if (value !== null && value !== undefined && String(value).trim() !== '') {
+                completedEssential++;
             }
-            return value !== null && value !== undefined && String(value).trim() !== '';
-        }).length;
-        const completedExtended = extendedFields.filter(field => {
+        });
+
+        let completedExtended = 0;
+        extendedFields.forEach(field => {
             const value = profile[field];
-            if (field === 'dietaryPreferences') return Array.isArray(value) && value.length > 0;
-            if (field === 'previousPregnancies') return typeof value === 'number' && value >= 0;
-            return value !== null && value !== undefined && String(value).trim() !== '';
-        }).length;
-        const essentialWeight = 0.6; const extendedWeight = 0.4;
+            if (field === 'dietaryPreferences') {
+                if (Array.isArray(value) && value.length > 0) completedExtended++;
+            } else if (field === 'previousPregnancies') {
+                if (typeof value === 'number' && value >= 0) completedExtended++;
+            } else if (value !== null && value !== undefined && String(value).trim() !== '') {
+                completedExtended++;
+            }
+        });
+
+        const essentialWeight = 0.6;
+        const extendedWeight = 0.4;
         const essentialPercentage = essentialFields.length > 0 ? (completedEssential / essentialFields.length) * essentialWeight * 100 : 0;
         const extendedPercentage = extendedFields.length > 0 ? (completedExtended / extendedFields.length) * extendedWeight * 100 : 0;
-        return Math.round(essentialPercentage + extendedPercentage);
+        const total = essentialPercentage + extendedPercentage;
+        return Math.round(Math.min(total, 100));
     }, [profile]);
 
 
@@ -82,8 +97,6 @@ const UserStatsCards: React.FC<{ profile: UserProfile | null; appointmentsCount:
         if (profile.age === null || profile.age === undefined || (typeof profile.age === 'number' && profile.age < 0)) essential.push('Age');
         if (!profile.gender || String(profile.gender).trim() === '') essential.push('Gender');
         if (profile.weeksPregnant === null || profile.weeksPregnant === undefined || (typeof profile.weeksPregnant === 'number' && profile.weeksPregnant < 0)) essential.push('Current Weeks Pregnant');
-        if (!profile.phoneNumber || String(profile.phoneNumber).trim() === '') essential.push('Phone Number');
-        if (!profile.address || String(profile.address).trim() === '') extended.push('Address');
         if (!profile.preExistingConditions || String(profile.preExistingConditions).trim() === '') extended.push('Pre-existing Medical Conditions');
         if (profile.previousPregnancies === null || profile.previousPregnancies === undefined || (typeof profile.previousPregnancies === 'number' && profile.previousPregnancies < 0)) extended.push('Number of Previous Pregnancies');
         if (!profile.deliveryPreference || String(profile.deliveryPreference).trim() === '') extended.push('Delivery Preference');
@@ -96,6 +109,8 @@ const UserStatsCards: React.FC<{ profile: UserProfile | null; appointmentsCount:
     }, [profile]);
 
     const essentialFieldNames: string[] = useMemo(() => ['Full Name', 'Age', 'Gender', 'Current Weeks Pregnant', 'Phone Number'], []);
+    // Update essentialFieldNames to match essentialFields
+    const updatedEssentialFieldNames: string[] = ['Full Name', 'Age', 'Gender', 'Current Weeks Pregnant', 'Date of Last Menstrual Period (LMP)'];
 
     return (
         <Card className="border border-gray-200 bg-white mt-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
