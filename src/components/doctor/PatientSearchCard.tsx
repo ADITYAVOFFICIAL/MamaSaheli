@@ -32,7 +32,6 @@ const PatientSearchCard: React.FC = () => {
         queryFn: () => getRecentAssignedPatients(doctor!.$id, 10),
         enabled: !!doctor?.$id,
         staleTime: 1000 * 60 * 5, // Data is considered fresh for 5 minutes
-        cacheTime: 1000 * 60 * 30, // Data is kept in the cache for 30 minutes
     });
 
     const handleSearch = useCallback(async () => {

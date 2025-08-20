@@ -29,8 +29,8 @@ const DoctorAppointmentsCard: React.FC = () => {
         queryKey: ['doctorAppointments', doctor?.$id],
         queryFn: () => getAppointmentsForDoctor(doctor!.$id),
         enabled: !!doctor?.$id,
-        staleTime: 1000 * 60 * 5, // Cache data for 5 minutes
-        cacheTime: 1000 * 60 * 30, // Keep data in cache for 30 minutes
+        staleTime: 1000 * 60 * 5,
+        gcTime: 1000 * 60 * 30, // Corrected: Renamed from cacheTime to gcTime for React Query v5
     });
 
     const patientUserIds = useMemo(() => {
@@ -42,18 +42,20 @@ const DoctorAppointmentsCard: React.FC = () => {
     const {
         data: patientProfilesMap,
         isLoading: isLoadingProfiles,
+        refetch: refetchPatientProfiles,
     } = useQuery<Map<string, UserProfile>, Error>({
         queryKey: ['patientProfilesForDoctorAppointments', patientUserIds],
         queryFn: () => getUserProfilesByIds(patientUserIds),
         enabled: patientUserIds.length > 0,
         staleTime: 1000 * 60 * 5,
-        cacheTime: 1000 * 60 * 30,
+        gcTime: 1000 * 60 * 30, // Corrected: Renamed from cacheTime to gcTime for React Query v5
     });
 
     const isLoading = isLoadingAppointments || (patientUserIds.length > 0 && isLoadingProfiles);
 
     const handleRefresh = () => {
         refetchAppointments();
+        refetchPatientProfiles();
     };
 
     const formatAppointmentType = (type: string | undefined) => {

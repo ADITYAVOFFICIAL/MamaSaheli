@@ -79,7 +79,7 @@ const AppointmentPage: React.FC = () => {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState<string | undefined>(undefined);
   const [notes, setNotes] = useState<string>('');
-  const [appointmentType, setAppointmentType] = useState<string>('doctor');
+  const [appointmentType, setAppointmentType] = useState<string>('doctor_visit');
   const [isBookingLoading, setIsBookingLoading] = useState<boolean>(false);
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState<boolean>(true);
@@ -161,13 +161,13 @@ const AppointmentPage: React.FC = () => {
     setIsBookingLoading(true);
     try {
       const formattedDate = format(date, 'yyyy-MM-dd');
-      await createAppointment(user.$id, { date: formattedDate, time, notes: notes || undefined, appointmentType: appointmentType || 'doctor' });
+  await createAppointment(user.$id, { date: formattedDate, time, notes: notes || undefined, appointmentType: appointmentType || 'doctor_visit' });
       toast({
         title: "Appointment Booked!",
         description: `Scheduled for ${format(date, 'PPP')} at ${time}.`,
         variant: "default",
       });
-      setDate(undefined); setTime(undefined); setNotes(''); setAppointmentType('doctor');
+  setDate(undefined); setTime(undefined); setNotes(''); setAppointmentType('doctor_visit');
       fetchAppointments();
     } catch (error: any) {
       toast({ title: "Booking Failed", description: error.message || "Could not book appointment.", variant: "destructive" });
