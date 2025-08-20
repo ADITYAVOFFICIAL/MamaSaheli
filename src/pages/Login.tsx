@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
@@ -8,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
-import { Heart } from 'lucide-react';
+import { Heart, Loader2 } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -19,19 +18,43 @@ const Login = () => {
   const location = useLocation();
   const { toast } = useToast();
 
-  const from = location.state?.from || '/dashboard';
+  // Determine the page to redirect to after login.
+  // Defaults to '/dashboard' if no specific page was requested.
+  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      // --- FIX: Capture the returned user object from the login function ---
+      // The `login` function in the auth store now returns the user data on success.
+      const loggedInUser = await login(email, password);
+      
       toast({
         title: "Login successful",
         description: "Welcome back to MamaSaheli!",
       });
-      navigate(from);
+
+      // --- START: MODIFIED REDIRECTION LOGIC ---
+
+      // 1. Check if the logged-in user has the 'doctor' role (stored in Appwrite labels).
+      // This line is now valid because `loggedInUser` is a user object, not `void`.
+      const isDoctor = loggedInUser?.labels?.includes('doctor');
+
+      // 2. Determine the default destination based on the user's role.
+      const defaultRedirect = isDoctor ? '/doctor' : '/dashboard';
+
+      // 3. Decide the final redirection path.
+      // If the user was originally trying to go to the generic '/dashboard',
+      // we override it with their role-specific dashboard.
+      // Otherwise, we send them to the specific page they were trying to access (e.g., /medicaldocs).
+      const finalRedirectPath = from === '/dashboard' ? defaultRedirect : from;
+
+      navigate(finalRedirectPath, { replace: true });
+
+      // --- END: MODIFIED REDIRECTION LOGIC ---
+
     } catch (error: any) {
       toast({
         title: "Login failed",
@@ -73,6 +96,7 @@ const Login = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      disabled={isLoading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -92,6 +116,7 @@ const Login = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      disabled={isLoading}
                     />
                   </div>
                   <Button 
@@ -99,7 +124,14 @@ const Login = () => {
                     className="w-full bg-mamasaheli-primary hover:bg-mamasaheli-dark"
                     disabled={isLoading}
                   >
-                    {isLoading ? "Logging in..." : "Log in"}
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Logging in...
+                      </>
+                    ) : (
+                      "Log in"
+                    )}
                   </Button>
                 </div>
               </form>

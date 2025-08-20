@@ -33,15 +33,16 @@ import { getTotalUserCount } from '@/lib/appwrite';
 import HomeCta from '@/components/home/HomeCta';
 
 const HomePage = () => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const navigate = useNavigate();
 
   // Effect to redirect authenticated users to their dashboard
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      const isDoctor = user?.labels?.includes('doctor');
+      navigate(isDoctor ? '/doctor' : '/dashboard', { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user, navigate]);
 
   // Fetch total user count using React Query
   const {
