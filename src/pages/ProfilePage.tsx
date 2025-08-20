@@ -605,7 +605,7 @@ function ProfilePage() {
                                 <CardContent>
                                     {profile?.assignedDoctorName ? (
                                         <div className="flex items-center justify-between">
-                                            <p className="font-semibold">{profile.assignedDoctorName}</p>
+                                            <p className="font-semibold">Dr. {profile.assignedDoctorName}</p>
                                             <Button variant="outline" onClick={() => setIsDoctorDialogOpen(true)}>Change</Button>
                                         </div>
                                     ) : (
@@ -646,7 +646,7 @@ function ProfilePage() {
                                                                     <AvatarImage src={doctor.profilePhotoUrl} />
                                                                     <AvatarFallback>{doctor.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                                                                 </Avatar>
-                                                                <p className="font-medium">{doctor.name}</p>
+                                                                <p className="font-medium">Dr. {doctor.name}</p>
                                                             </div>
                                                             <Button size="sm" onClick={() => handleSelectDoctor(doctor)}>Select</Button>
                                                         </li>
