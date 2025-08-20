@@ -276,7 +276,6 @@ const PatientDetailPage: React.FC = () => {
                                 <DetailItem label="Phone" value={patientProfile.phoneNumber} />
                                 <DetailItem label="Age" value={patientProfile.age} />
                                 <DetailItem label="Gender" value={patientProfile.gender} />
-                                <DetailItem label="Address" value={patientProfile.address} />
                             </CardContent>
                         </Card>
                         <Card className="shadow border dark:border-gray-700">
