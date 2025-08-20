@@ -1,93 +1,86 @@
-import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import React, { useState, useCallback, ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UserSearch, Search, Loader2, AlertTriangle, UserCircle, Mail, CalendarDays, Activity, Inbox } from 'lucide-react';
-import { searchUserProfiles, getRecentUserProfiles, UserProfile } from '@/lib/appwrite';
+import { UserSearch, Search, Loader2, AlertTriangle, UserCircle, Mail, Activity, Inbox } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
+import { searchAssignedPatients, getRecentAssignedPatients, UserProfile } from '@/lib/appwrite';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 
 const PatientSearchCard: React.FC = () => {
-    const [searchTerm, setSearchTerm] = useState<string>('');
-    const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
-    const [initialPatients, setInitialPatients] = useState<UserProfile[]>([]);
-    const [isLoadingSearch, setIsLoadingSearch] = useState<boolean>(false);
-    const [isLoadingInitial, setIsLoadingInitial] = useState<boolean>(true); // Start loading initial list
-    const [error, setError] = useState<string | null>(null);
-    const [hasSearched, setHasSearched] = useState<boolean>(false);
+    const { user: doctor } = useAuthStore();
     const { toast } = useToast();
 
-    // Fetch initial list of recent patients
-    const fetchInitial = useCallback(async () => {
-        setIsLoadingInitial(true);
-        setError(null);
-        try {
-            const recentProfiles = await getRecentUserProfiles(10); // Fetch 10 recent
-            setInitialPatients(recentProfiles);
-        } catch (err: any) {
-            // console.error("Error fetching initial patients:", err);
-            setError(err.message || "Failed to load recent patients.");
-            toast({ title: "Load Failed", description: "Could not load recent patients.", variant: "destructive" });
-        } finally {
-            setIsLoadingInitial(false);
-        }
-    }, [toast]);
+    const [searchTerm, setSearchTerm] = useState<string>('');
+    const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+    const [isLoadingSearch, setIsLoadingSearch] = useState<boolean>(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
+    const [hasSearched, setHasSearched] = useState<boolean>(false);
 
-    useEffect(() => {
-        fetchInitial(); // Fetch initial list on component mount
-    }, [fetchInitial]);
+    const {
+        data: recentPatients = [],
+        isLoading: isLoadingInitial,
+        isError: isErrorInitial,
+        error: initialError,
+    } = useQuery<UserProfile[], Error>({
+        queryKey: ['recentAssignedPatients', doctor?.$id],
+        queryFn: () => getRecentAssignedPatients(doctor!.$id, 10),
+        enabled: !!doctor?.$id,
+        staleTime: 1000 * 60 * 5, // Data is considered fresh for 5 minutes
+        cacheTime: 1000 * 60 * 30, // Data is kept in the cache for 30 minutes
+    });
 
-    // Handle search execution
     const handleSearch = useCallback(async () => {
+        if (!doctor?.$id) {
+            toast({ title: "Error", description: "Cannot perform search. Doctor ID is missing.", variant: "destructive" });
+            return;
+        }
         if (!searchTerm.trim()) {
-            // If search term is empty, reset to show initial list
             setHasSearched(false);
             setSearchResults([]);
-            setError(null);
+            setSearchError(null);
             return;
         }
         setIsLoadingSearch(true);
-        setError(null);
-        setHasSearched(true); // Indicate that a search has been performed
-        setSearchResults([]); // Clear previous search results
+        setSearchError(null);
+        setHasSearched(true);
+        setSearchResults([]);
 
         try {
-            const foundProfiles = await searchUserProfiles(searchTerm.trim()); // Use search function
+            const foundProfiles = await searchAssignedPatients(doctor.$id, searchTerm.trim());
             setSearchResults(foundProfiles);
         } catch (err: any) {
             const errorMessage = err.message?.includes("index")
-                ? "Search functionality is not fully configured (missing index). Please contact support."
-                : err.message || "An error occurred while searching for patients.";
-            setError(errorMessage);
+                ? "Search is not fully configured. Please contact support."
+                : err.message || "An error occurred while searching.";
+            setSearchError(errorMessage);
             toast({ title: "Search Failed", description: errorMessage, variant: "destructive" });
         } finally {
             setIsLoadingSearch(false);
         }
-    }, [searchTerm, toast]);
+    }, [searchTerm, toast, doctor?.$id]);
 
-    // Handle input changes
     const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
         const newSearchTerm = e.target.value;
         setSearchTerm(newSearchTerm);
-        // If input is cleared, reset search state to show initial list
         if (!newSearchTerm.trim() && hasSearched) {
             setHasSearched(false);
             setSearchResults([]);
-            setError(null);
+            setSearchError(null);
         }
     };
 
-    // Handle Enter key press for search
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             handleSearch();
         }
     };
 
-    // Helper to format date relative to now
     const formatRelativeDate = (dateString: string | undefined): string => {
         if (!dateString) return 'unknown';
         try {
@@ -97,41 +90,33 @@ const PatientSearchCard: React.FC = () => {
         }
     };
 
-    // Render the list (either initial or search results)
     const renderPatientList = (patients: UserProfile[], listType: 'initial' | 'search') => {
         if (patients.length === 0) {
             if (listType === 'search') {
-                return <p className="text-sm text-center text-gray-500 dark:text-gray-400 mt-6">No patients found matching "{searchTerm}".</p>;
-            } else {
-                return (
-                    <div className="flex flex-col items-center justify-center text-center py-6 text-gray-400 dark:text-gray-500">
-                        <Inbox className="h-8 w-8 mb-2" />
-                        <p className="text-sm">No recently active patients found.</p>
-                    </div>
-                );
+                return <p className="text-sm text-center text-gray-500 mt-6">No assigned patients found matching "{searchTerm}".</p>;
             }
+            return (
+                <div className="flex flex-col items-center text-center py-6 text-gray-400">
+                    <Inbox className="h-8 w-8 mb-2" />
+                    <p className="text-sm">You have no assigned patients with recent activity.</p>
+                </div>
+            );
         }
 
         return (
             <ul className="space-y-3 mt-4 max-h-96 overflow-y-auto pr-2">
                 {patients.map((profile) => (
-                    <li key={profile.$id} className="flex items-center justify-between space-x-3 p-3 border dark:border-gray-700 rounded-md bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <li key={profile.$id} className="flex items-center justify-between space-x-3 p-3 border rounded-md bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                         <div className="flex items-center space-x-3 overflow-hidden">
                              {profile.profilePhotoUrl ? (
-                                <img src={profile.profilePhotoUrl} alt={profile.name || 'Patient'} className="h-10 w-10 rounded-full object-cover flex-shrink-0" />
+                                <img src={profile.profilePhotoUrl} alt={profile.name} className="h-10 w-10 rounded-full object-cover" />
                              ) : (
-                                <UserCircle className="h-10 w-10 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                <UserCircle className="h-10 w-10 text-gray-400" />
                              )}
                             <div className="overflow-hidden">
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{profile.name || 'N/A'}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
-                                    <Mail className="h-3 w-3 flex-shrink-0" /> {profile.email || 'No email'}
-                                </p>
-                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    {typeof profile.age === 'number' && <span><UserCircle className="h-3 w-3 inline mr-0.5"/>Age: {profile.age}</span>}
-                                    {typeof profile.weeksPregnant === 'number' && <span><CalendarDays className="h-3 w-3 inline mr-0.5"/>Weeks: {profile.weeksPregnant}</span>}
-                                    {profile.$updatedAt && <span title={new Date(profile.$updatedAt).toLocaleString()}><Activity className="h-3 w-3 inline mr-0.5"/>Active: {formatRelativeDate(profile.$updatedAt)}</span>}
-                                </div>
+                                <p className="text-sm font-medium truncate">{profile.name}</p>
+                                <p className="text-xs text-gray-500 truncate"><Mail className="h-3 w-3 inline mr-1" />{profile.email}</p>
+                                <p className="text-xs text-gray-500 mt-1"><Activity className="h-3 w-3 inline mr-1"/>Active: {formatRelativeDate(profile.$updatedAt)}</p>
                             </div>
                         </div>
                         <Button variant="outline" size="sm" asChild className="flex-shrink-0">
@@ -143,65 +128,75 @@ const PatientSearchCard: React.FC = () => {
         );
     };
 
-    // Render loading skeletons
     const renderSkeletons = (count = 3) => (
         <div className="space-y-3 mt-4">
             {[...Array(count)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-3 p-3 border dark:border-gray-700 rounded-md">
-                    <Skeleton className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700" />
+                <div key={i} className="flex items-center space-x-3 p-3 border rounded-md">
+                    <Skeleton className="h-10 w-10 rounded-full" />
                     <div className="space-y-1.5 flex-grow">
-                        <Skeleton className="h-4 w-3/5 bg-gray-200 dark:bg-gray-700" />
-                        <Skeleton className="h-3 w-4/5 bg-gray-200 dark:bg-gray-700" />
-                        <Skeleton className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700" />
+                        <Skeleton className="h-4 w-3/5" />
+                        <Skeleton className="h-3 w-4/5" />
                     </div>
-                    <Skeleton className="h-8 w-16 bg-gray-300 dark:bg-gray-600 rounded" />
+                    <Skeleton className="h-8 w-16 rounded" />
                 </div>
             ))}
         </div>
     );
 
+    const renderContent = () => {
+        if (isLoadingInitial) {
+            return renderSkeletons(5);
+        }
+        if (isErrorInitial) {
+            return (
+                <Alert variant="destructive" className="mt-4">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Error Loading Patients</AlertTitle>
+                    <AlertDescription>{initialError.message}</AlertDescription>
+                </Alert>
+            );
+        }
+        if (hasSearched) {
+            if (isLoadingSearch) return renderSkeletons(3);
+            if (searchError) {
+                 return (
+                    <Alert variant="destructive" className="mt-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Search Error</AlertTitle>
+                        <AlertDescription>{searchError}</AlertDescription>
+                    </Alert>
+                );
+            }
+            return renderPatientList(searchResults, 'search');
+        }
+        return renderPatientList(recentPatients, 'initial');
+    };
+
     return (
         <Card className="shadow-md border dark:border-gray-700">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl font-semibold text-gray-800 dark:text-gray-200">
+                <CardTitle className="flex items-center gap-2 text-xl font-semibold">
                     <UserSearch className="h-5 w-5 text-mamasaheli-primary" />
-                    Find Patient
+                    Find Your Patient
                 </CardTitle>
-                <CardDescription>Search by name/email or view recent patients.</CardDescription>
+                <CardDescription>Search within your assigned patients or view recent activity.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex space-x-2">
                     <Input
                         type="text"
-                        placeholder="Enter name or email..."
+                        placeholder="Search by name..."
                         value={searchTerm}
                         onChange={handleInputChange}
                         onKeyPress={handleKeyPress}
-                        disabled={isLoadingSearch || isLoadingInitial} // Disable input while loading either list
-                        className="flex-grow dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-                        aria-label="Search for patients"
+                        disabled={!doctor || isLoadingInitial}
+                        className="flex-grow dark:bg-gray-700"
                     />
-                    <Button onClick={handleSearch} disabled={isLoadingSearch || isLoadingInitial || !searchTerm.trim()} aria-label="Search patients">
+                    <Button onClick={handleSearch} disabled={!doctor || isLoadingInitial || isLoadingSearch || !searchTerm.trim()}>
                         {isLoadingSearch ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     </Button>
                 </div>
-
-                {/* Conditional Rendering Logic */}
-                {isLoadingInitial ? (
-                    renderSkeletons(5) // Show skeletons while loading initial list
-                ) : error ? (
-                    <Alert variant="destructive" className="mt-4">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                ) : hasSearched ? (
-                    // If a search has been performed, show search loading or results
-                    isLoadingSearch ? renderSkeletons(3) : renderPatientList(searchResults, 'search')
-                ) : (
-                    // Otherwise, show the initial list
-                    renderPatientList(initialPatients, 'initial')
-                )}
+                {renderContent()}
             </CardContent>
         </Card>
     );

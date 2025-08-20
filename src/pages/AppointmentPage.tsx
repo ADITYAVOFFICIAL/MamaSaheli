@@ -111,7 +111,7 @@ const AppointmentPage: React.FC = () => {
     '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'
   ];
   const appointmentTypes: ReadonlyArray<{ value: string; label: string }> = [
-    { value: 'doctor', label: 'Doctor Visit / Check-up' },
+    { value: 'doctor_visit', label: 'Doctor Visit / Check-up' },
     { value: 'lab_test', label: 'Lab Test' },
     { value: 'yoga_class', label: 'Yoga Class' },
     { value: 'childbirth_class', label: 'Childbirth Class' },

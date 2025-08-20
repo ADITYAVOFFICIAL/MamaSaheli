@@ -2154,3 +2154,32 @@ export const getDocumentsForDoctor = async (doctorId: string): Promise<MedicalDo
   );
   return response.documents.map(doc => doc as unknown as MedicalDocument);
 };
+
+// NEW FUNCTION: Gets the most recently active patients ASSIGNED to a specific doctor.
+export const getRecentAssignedPatients = async (doctorId: string, limit: number = 10): Promise<UserProfile[]> => {
+  if (!doctorId) return [];
+  const response = await databases.listDocuments(
+    databaseId,
+    profilesCollectionId,
+    [
+      Query.equal('assignedDoctorId', doctorId), // Filter by the doctor's ID
+      Query.orderDesc('$updatedAt'), // Get the most recently active
+      Query.limit(limit)
+    ]
+  );
+  return response.documents.map(doc => doc as unknown as UserProfile);
+};
+
+// NEW FUNCTION: Searches for patients by name ONLY within those assigned to a specific doctor.
+export const searchAssignedPatients = async (doctorId: string, searchTerm: string): Promise<UserProfile[]> => {
+  if (!doctorId || !searchTerm) return [];
+  const response = await databases.listDocuments(
+    databaseId,
+    profilesCollectionId,
+    [
+      Query.equal('assignedDoctorId', doctorId), // Filter by the doctor's ID
+      Query.search('name', searchTerm) // Search only within that filtered set
+    ]
+  );
+  return response.documents.map(doc => doc as unknown as UserProfile);
+};

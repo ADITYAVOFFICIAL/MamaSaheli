@@ -1,4 +1,3 @@
-// src/components/doctor/DoctorAppointmentsCard.tsx
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { CalendarCheck, AlertTriangle, RefreshCw, UserCircle, Clock } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import {
-    // MODIFIED: Import the new doctor-specific function
     getAppointmentsForDoctor,
     getUserProfilesByIds,
     Appointment,
@@ -19,10 +17,8 @@ import {
 } from '@/lib/appwrite';
 
 const DoctorAppointmentsCard: React.FC = () => {
-    // Get the currently logged-in doctor's user object
     const { user: doctor } = useAuthStore();
 
-    // 1. Fetch appointments specifically for the logged-in doctor
     const {
         data: appointmentsData,
         isLoading: isLoadingAppointments,
@@ -30,22 +26,19 @@ const DoctorAppointmentsCard: React.FC = () => {
         error: appointmentsError,
         refetch: refetchAppointments,
     } = useQuery<Appointment[], Error>({
-        // MODIFIED: Query key is now specific to the doctor
         queryKey: ['doctorAppointments', doctor?.$id],
-        // MODIFIED: Use the new getAppointmentsForDoctor function
         queryFn: () => getAppointmentsForDoctor(doctor!.$id),
-        // MODIFIED: Only run the query if the doctor's ID is available
         enabled: !!doctor?.$id,
+        staleTime: 1000 * 60 * 5, // Cache data for 5 minutes
+        cacheTime: 1000 * 60 * 30, // Keep data in cache for 30 minutes
     });
 
-    // 2. Extract unique patient IDs from the fetched appointments
     const patientUserIds = useMemo(() => {
         if (!appointmentsData) return [];
         const ids = appointmentsData.map(app => app.userId);
         return [...new Set(ids)];
     }, [appointmentsData]);
 
-    // 3. Fetch profiles for ONLY the relevant patients
     const {
         data: patientProfilesMap,
         isLoading: isLoadingProfiles,
@@ -53,13 +46,19 @@ const DoctorAppointmentsCard: React.FC = () => {
         queryKey: ['patientProfilesForDoctorAppointments', patientUserIds],
         queryFn: () => getUserProfilesByIds(patientUserIds),
         enabled: patientUserIds.length > 0,
+        staleTime: 1000 * 60 * 5,
+        cacheTime: 1000 * 60 * 30,
     });
 
-    // Combine loading states
     const isLoading = isLoadingAppointments || (patientUserIds.length > 0 && isLoadingProfiles);
 
     const handleRefresh = () => {
         refetchAppointments();
+    };
+
+    const formatAppointmentType = (type: string | undefined) => {
+        if (!type) return 'General';
+        return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     };
 
     const renderContent = () => {
@@ -93,7 +92,6 @@ const DoctorAppointmentsCard: React.FC = () => {
             return <p className="text-sm text-center text-gray-500 py-6">You have no upcoming appointments with your assigned patients.</p>;
         }
 
-        // Sort appointments by date (closest first)
         const sortedAppointments = [...appointmentsData].sort((a, b) =>
             parseISO(a.date).getTime() - parseISO(b.date).getTime()
         );
@@ -112,10 +110,15 @@ const DoctorAppointmentsCard: React.FC = () => {
                                 <UserCircle className="h-10 w-10 text-gray-400 flex-shrink-0 mt-1" />
                              )}
                             <div className="flex-grow overflow-hidden">
-                                <p className="text-sm font-medium truncate">
-                                    {patientProfile?.name || 'Loading patient...'}
-                                </p>
-                                <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                                <div className="flex justify-between items-start">
+                                    <p className="text-sm font-medium truncate pr-2">
+                                        {patientProfile?.name || 'Loading patient...'}
+                                    </p>
+                                    <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                                        {formatAppointmentType(appointment.appointmentType)}
+                                    </Badge>
+                                </div>
+                                <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
                                     <CalendarCheck className="h-3 w-3" />
                                     {format(appointmentDate, 'eee, MMM d, yyyy')}
                                 </p>
