@@ -635,7 +635,9 @@ function ProfilePage() {
                                                 (doctor) =>
                                                     doctor.hospitalId === selectedHospitalId &&
                                                     doctor.hospitalName === selectedHospitalName &&
-                                                    doctor.userId !== user?.$id
+                                                    doctor.userId !== user?.$id &&
+                                                    // ADD THIS LINE: Check if the user profile has the 'doctor' label
+                                                    Array.isArray(doctor.labels) && doctor.labels.includes('doctor')
                                             );
                                             return filteredDoctors.length > 0 ? (
                                                 <ul className="space-y-2">
