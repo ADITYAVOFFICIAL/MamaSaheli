@@ -1,3 +1,10 @@
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription
+} from '@/components/ui/dialog';
 // src/pages/ProfilePage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
@@ -31,7 +38,8 @@ import {
     getWeightReadings,
     createWeightReading,
     WeightReading,
-    AppwriteDocument // Ensure AppwriteDocument is imported
+    AppwriteDocument, // Ensure AppwriteDocument is imported
+    getDoctorsByHospital
 } from '@/lib/appwrite';
 import { Hospital, User as AuthUserIcon, UploadCloud, Save, Loader2, HeartPulse, Info, Settings, HeartHandshake, Briefcase, Utensils, Activity, MessageCircle } from 'lucide-react'; // Added Hospital icon
 
@@ -44,8 +52,36 @@ interface HospitalOption {
 }
 
 function ProfilePage() {
+    // --- Doctor Selection Handler ---
+    const handleSelectDoctor = async (doctor: UserProfile) => {
+        if (!profile || !profile.$id) {
+            toast({ title: "Profile not found", description: "Please save your profile first.", variant: "destructive" });
+            return;
+        }
+        try {
+            await updateUserProfile(profile.$id, {
+                assignedDoctorId: doctor.userId,
+                assignedDoctorName: doctor.name,
+            });
+            toast({ title: "Doctor Selected", description: `You have selected Dr. ${doctor.name} as your primary doctor.` });
+            setIsDoctorDialogOpen(false);
+            await fetchData(); // Refresh profile info
+        } catch (error: unknown) {
+            console.error("Error selecting doctor:", error);
+            if (error instanceof Error) {
+                toast({ title: "Selection Failed", description: error.message || "Could not select doctor.", variant: "destructive" });
+            } else {
+                toast({ title: "Selection Failed", description: "An unknown error occurred.", variant: "destructive" });
+            }
+        }
+    };
+
     // --- Existing State ---
     const [profile, setProfile] = useState<UserProfile | null>(null);
+        // --- Doctor Selection State ---
+        const [isDoctorDialogOpen, setIsDoctorDialogOpen] = useState(false);
+        const [availableDoctors, setAvailableDoctors] = useState<UserProfile[]>([]);
+        const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -94,6 +130,29 @@ function ProfilePage() {
     const [weight, setWeight] = useState('');
     const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
 
+    // --- Fetch Doctors for Selected Hospital ---
+    useEffect(() => {
+        const fetchDoctors = async () => {
+            if (!isDoctorDialogOpen || !selectedHospitalId) return;
+            setIsLoadingDoctors(true);
+            try {
+                const doctors = await getDoctorsByHospital(selectedHospitalId);
+                setAvailableDoctors(doctors);
+            } catch (error: unknown) {
+                console.error("Error fetching doctors:", error);
+                setAvailableDoctors([]);
+                if (error instanceof Error) {
+                    toast({ title: "Failed to load doctors", description: error.message || "Could not fetch doctors for this hospital.", variant: "destructive" });
+                } else {
+                    toast({ title: "Failed to load doctors", description: "An unknown error occurred.", variant: "destructive" });
+                }
+            } finally {
+                setIsLoadingDoctors(false);
+            }
+        };
+        fetchDoctors();
+    }, [isDoctorDialogOpen, selectedHospitalId, toast]);
+
     // --- Fetch Hospitals Data ---
     useEffect(() => {
         const fetchHospitalsData = async () => {
@@ -118,7 +177,7 @@ function ProfilePage() {
         };
 
         fetchHospitalsData();
-    }, []); // Empty dependency array means this runs once on mount
+    }, [toast]); // Empty dependency array means this runs once on mount
 
     // --- Combined Fetch Function (Updated) ---
     const fetchData = useCallback(async () => {
@@ -168,7 +227,6 @@ function ProfilePage() {
                 setDietaryPreferences(profileData.dietaryPreferences?.join(', ') || ''); // Join array into comma-separated string
                 setActivityLevel(profileData.activityLevel || '');
                 setChatTonePreference(profileData.chatTonePreference || '');
-                setLanguagePreference(profileData.languagePreference || 'en');
                 // Set new hospital fields from profileData
                 setSelectedHospitalId(profileData.hospitalId || '');
                 setSelectedHospitalName(profileData.hospitalName || '');
@@ -277,9 +335,13 @@ function ProfilePage() {
 
             await fetchData(); // Refresh all data to get the new photo URL
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error uploading photo:', error);
-            toast({ title: "Upload failed", description: error.message || "Could not upload photo.", variant: "destructive" });
+            if (error instanceof Error) {
+                toast({ title: "Upload failed", description: error.message || "Could not upload photo.", variant: "destructive" });
+            } else {
+                toast({ title: "Upload failed", description: "An unknown error occurred.", variant: "destructive" });
+            }
         } finally {
             setIsUploading(false);
         }
@@ -345,7 +407,6 @@ function ProfilePage() {
                 dietaryPreferences: dietaryPrefsArray, // Keep as is or empty array
                 activityLevel: activityLevel, // Allow empty string
                 chatTonePreference: chatTonePreference, // Allow empty string
-                languagePreference: languagePreference || 'en',
                 hospitalId: selectedHospitalId, // Include hospital ID
                 hospitalName: selectedHospitalName, // Include hospital Name
             };
@@ -384,9 +445,13 @@ function ProfilePage() {
             }
 
             toast({ title: "Profile saved successfully" });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error saving profile:', error);
-            toast({ title: "Save failed", description: error.message || "Could not save profile.", variant: "destructive" });
+            if (error instanceof Error) {
+                toast({ title: "Save failed", description: error.message || "Could not save profile.", variant: "destructive" });
+            } else {
+                toast({ title: "Save failed", description: "An unknown error occurred.", variant: "destructive" });
+            }
         } finally {
             setIsSaving(false);
         }
@@ -503,9 +568,9 @@ function ProfilePage() {
                                         <div className="space-y-2">
                                             <Label htmlFor="photo-upload">Upload New Photo</Label>
                                             <Input id="photo-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp" className='file:rounded-full file:border-0
-                             file:text-sm file:font-semibold
-                             file:bg-mamasaheli-light file:text-mamasaheli-primary
-                             hover:file:bg-mamasaheli-primary/10' onChange={handlePhotoChange} disabled={isUploading} />
+                                 file:text-sm file:font-semibold
+                                 file:bg-mamasaheli-light file:text-mamasaheli-primary
+                                 hover:file:bg-mamasaheli-primary/10' onChange={handlePhotoChange} disabled={isUploading} />
                                             <p className="text-xs text-gray-500">Accepted formats: JPG, PNG, GIF, WebP (max 5MB)</p>
                                         </div>
                                         {profilePhotoFile && (
@@ -523,6 +588,61 @@ function ProfilePage() {
                                     </div>
                                 </CardContent>
                             </Card>
+
+                            {/* --- My Doctor Card --- */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>My Doctor</CardTitle>
+                                    <CardDescription>Select or change your primary doctor at {profile?.hospitalName}.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    {profile?.assignedDoctorName ? (
+                                        <div className="flex items-center justify-between">
+                                            <p className="font-semibold">{profile.assignedDoctorName}</p>
+                                            <Button variant="outline" onClick={() => setIsDoctorDialogOpen(true)}>Change</Button>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center">
+                                            <p className="text-gray-500 mb-4">You have not selected a primary doctor yet.</p>
+                                            <Button onClick={() => setIsDoctorDialogOpen(true)}>Select a Doctor</Button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* --- Doctor Selection Dialog --- */}
+                            <Dialog open={isDoctorDialogOpen} onOpenChange={setIsDoctorDialogOpen}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Select Your Doctor at {profile?.hospitalName}</DialogTitle>
+                                        <DialogDescription>Choose your primary care provider from the list below.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="mt-4 max-h-80 overflow-y-auto">
+                                        {isLoadingDoctors ? (
+                                            <div className="flex justify-center items-center h-24">
+                                                <Loader2 className="animate-spin" />
+                                            </div>
+                                        ) : availableDoctors.length > 0 ? (
+                                            <ul className="space-y-2">
+                                                {availableDoctors.map((doctor) => (
+                                                    <li key={doctor.userId} className="flex items-center justify-between p-2 border rounded-md">
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar>
+                                                                <AvatarImage src={doctor.profilePhotoUrl} />
+                                                                <AvatarFallback>{doctor.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                                            </Avatar>
+                                                            <p className="font-medium">{doctor.name}</p>
+                                                        </div>
+                                                        <Button size="sm" onClick={() => handleSelectDoctor(doctor)}>Select</Button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-center text-gray-500 py-4">No doctors found for this hospital.</p>
+                                        )}
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
                         </div>
 
                         {/* --- Column 2: Personal Info & Health Inputs --- */}
@@ -825,7 +945,7 @@ function ProfilePage() {
                                         <Label className="font-semibold text-blue-700">Blood Sugar (mg/dL)</Label>
                                         <div className="grid grid-cols-2 gap-3">
                                             <Input type="number" placeholder="Level (e.g., 95)" value={sugarLevel} onChange={e => setSugarLevel(e.target.value)} disabled={isSavingHealthData === 'sugar'} />
-                                            <Select value={sugarType} onValueChange={(v) => setSugarType(v as any)} disabled={isSavingHealthData === 'sugar'}>
+                                            <Select value={sugarType} onValueChange={(v) => setSugarType(v as 'fasting' | 'post_meal' | 'random')} disabled={isSavingHealthData === 'sugar'}>
                                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="fasting">Fasting</SelectItem>
@@ -844,7 +964,7 @@ function ProfilePage() {
                                         <Label className="font-semibold text-green-700">Weight</Label>
                                         <div className="grid grid-cols-2 gap-3">
                                             <Input type="number" placeholder="Weight (e.g., 65.5)" value={weight} onChange={e => setWeight(e.target.value)} disabled={isSavingHealthData === 'weight'} />
-                                            <Select value={weightUnit} onValueChange={(v) => setWeightUnit(v as any)} disabled={isSavingHealthData === 'weight'}>
+                                            <Select value={weightUnit} onValueChange={(v) => setWeightUnit(v as 'kg' | 'lbs')} disabled={isSavingHealthData === 'weight'}>
                                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="kg">kg</SelectItem>
