@@ -387,6 +387,12 @@ function ProfilePage() {
                 .map(pref => pref.trim()) // Trim whitespace
                 .filter(pref => pref.length > 0); // Remove empty strings
 
+            // If hospital changed, clear doctor selection
+            let clearDoctor = false;
+            if (profile?.hospitalId && profile?.hospitalId !== selectedHospitalId) {
+                clearDoctor = true;
+            }
+
             const profileDataToSave: Partial<Omit<UserProfile, keyof AppwriteDocument | 'userId' | 'profilePhotoUrl' | 'email'>> = {
                 // Existing fields
                 name: name || user.name,
@@ -409,6 +415,7 @@ function ProfilePage() {
                 chatTonePreference: chatTonePreference, // Allow empty string
                 hospitalId: selectedHospitalId, // Include hospital ID
                 hospitalName: selectedHospitalName, // Include hospital Name
+                ...(clearDoctor && { assignedDoctorId: '', assignedDoctorName: '' })
             };
 
             // --- Save Logic ---
@@ -622,24 +629,32 @@ function ProfilePage() {
                                             <div className="flex justify-center items-center h-24">
                                                 <Loader2 className="animate-spin" />
                                             </div>
-                                        ) : availableDoctors.length > 0 ? (
-                                            <ul className="space-y-2">
-                                                {availableDoctors.map((doctor) => (
-                                                    <li key={doctor.userId} className="flex items-center justify-between p-2 border rounded-md">
-                                                        <div className="flex items-center gap-3">
-                                                            <Avatar>
-                                                                <AvatarImage src={doctor.profilePhotoUrl} />
-                                                                <AvatarFallback>{doctor.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                                                            </Avatar>
-                                                            <p className="font-medium">{doctor.name}</p>
-                                                        </div>
-                                                        <Button size="sm" onClick={() => handleSelectDoctor(doctor)}>Select</Button>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-center text-gray-500 py-4">No doctors found for this hospital.</p>
-                                        )}
+                                        ) : (() => {
+                                            // Filter doctors by both hospitalId and hospitalName
+                                            const filteredDoctors = availableDoctors.filter(
+                                                (doctor) =>
+                                                    doctor.hospitalId === selectedHospitalId &&
+                                                    doctor.hospitalName === selectedHospitalName
+                                            );
+                                            return filteredDoctors.length > 0 ? (
+                                                <ul className="space-y-2">
+                                                    {filteredDoctors.map((doctor) => (
+                                                        <li key={doctor.userId} className="flex items-center justify-between p-2 border rounded-md">
+                                                            <div className="flex items-center gap-3">
+                                                                <Avatar>
+                                                                    <AvatarImage src={doctor.profilePhotoUrl} />
+                                                                    <AvatarFallback>{doctor.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                                                </Avatar>
+                                                                <p className="font-medium">{doctor.name}</p>
+                                                            </div>
+                                                            <Button size="sm" onClick={() => handleSelectDoctor(doctor)}>Select</Button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-center text-gray-500 py-4">No doctors found for this hospital.</p>
+                                            );
+                                        })()}
                                     </div>
                                 </DialogContent>
                             </Dialog>
