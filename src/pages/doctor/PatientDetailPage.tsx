@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
@@ -15,9 +15,6 @@ import {
     UserProfile,
     Appointment,
     MedicalDocument,
-    BloodPressureReading,
-    BloodSugarReading,
-    WeightReading
 } from '@/lib/appwrite';
 import { Loader2, AlertTriangle, ArrowLeft, User, Mail, CalendarDays, HeartPulse, FileText, Download, Activity, Weight, Droplets, BriefcaseMedical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -78,17 +75,61 @@ const HealthReadingsCard: React.FC<{ userId: string }> = ({ userId }) => {
     });
 
     const renderChart = (data: any[], keys: string[], names: string[], colors: string[], unit: string) => {
-        if (!data || data.length < 2) return <div className="flex items-center justify-center h-48 text-xs text-gray-500">Not enough data for a trend chart.</div>;
-        const chartData = data.map(d => ({ ...d, name: format(parseISO(d.recordedAt), 'MMM d') })).reverse();
+        if (!data || data.length < 2) {
+            return <div className="flex items-center justify-center h-48 text-xs text-gray-500">Not enough data for a trend chart.</div>;
+        }
+
+        const chartData = data
+            .map(d => ({ ...d, timestamp: parseISO(d.recordedAt).getTime() }))
+            .sort((a, b) => a.timestamp - b.timestamp);
+
         return (
             <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={10} />
-                    <YAxis fontSize={10} unit={unit} />
-                    <Tooltip contentStyle={{ fontSize: '12px' }} />
+                    <XAxis
+                        dataKey="timestamp"
+                        fontSize={10}
+                        tickFormatter={(ts) => format(ts, 'MMM d')}
+                        type="number"
+                        domain={['dataMin', 'dataMax']}
+                    />
+                    <YAxis fontSize={10} unit={unit} allowDecimals={false} />
+                    <Tooltip
+                        contentStyle={{ fontSize: '12px', borderRadius: '0.5rem', border: '1px solid #e5e7eb' }}
+                        labelFormatter={(ts) => format(ts, 'MMM d, yyyy HH:mm')}
+                        formatter={(value, name, props) => {
+                            const { payload } = props;
+                            if (name === 'Systolic' || name === 'Diastolic') {
+                                return [`${value}${unit}`, name];
+                            }
+                            if (name === 'Level' && payload.measurementType) {
+                                return [`${value}${unit} (${payload.measurementType})`, 'Blood Sugar'];
+                            }
+                            if (name === 'Weight' && payload.unit) {
+                                return [`${value} ${payload.unit}`, 'Weight'];
+                            }
+                            return [`${value}${unit}`, name];
+                        }}
+                        itemSorter={(item) => {
+                            if (item.name === 'Systolic') return -1;
+                            if (item.name === 'Diastolic') return 1;
+                            return 0;
+                        }}
+                    />
                     <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    {keys.map((key, i) => <Line key={key} type="monotone" dataKey={key} name={names[i]} stroke={colors[i]} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 6 }} />)}
+                    {keys.map((key, i) => (
+                        <Line
+                            key={key}
+                            type="monotone"
+                            dataKey={key}
+                            name={names[i]}
+                            stroke={colors[i]}
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                            activeDot={{ r: 6 }}
+                        />
+                    ))}
                 </LineChart>
             </ResponsiveContainer>
         );
@@ -139,7 +180,7 @@ const HealthReadingsCard: React.FC<{ userId: string }> = ({ userId }) => {
                     <TabsContent value="weight" className="mt-4">
                         {isLoadingWeight ? <SectionLoadingSkeleton /> : isErrorWeight ? <p className="text-destructive text-sm">Error loading weight data.</p> :
                             <>
-                                {renderChart(weightData, ['weight'], ['Weight'], ['#16a34a'], weightData?.[0]?.unit || '')}
+                                {renderChart(weightData, ['weight'], ['Weight'], ['#16a34a'], weightData?.[0]?.unit ? ` ${weightData[0].unit}` : '')}
                                 <h4 className="text-sm font-medium mt-4 mb-2">Recent Readings</h4>
                                 {renderReadingList(weightData, item => `${item.weight} ${item.unit}`)}
                             </>

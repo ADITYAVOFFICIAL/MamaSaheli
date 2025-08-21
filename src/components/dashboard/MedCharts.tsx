@@ -99,8 +99,7 @@ const HealthChart: React.FC<HealthChartProps> = ({ data, dataKey, unit, name, co
     const formattedData = data
         .map(d => ({ ...d, timestamp: new Date(d.recordedAt || d.$createdAt).getTime() }))
         .filter(d => !isNaN(d.timestamp))
-        .sort((a, b) => a.timestamp - b.timestamp)
-        .map(d => ({ ...d, recordedAtLabel: format(new Date(d.timestamp), 'MMM d') }));
+        .sort((a, b) => a.timestamp - b.timestamp);
 
     if (!formattedData || formattedData.length === 0) {
         return <p className="text-xs text-gray-400 text-center py-8">No chart data available.</p>;
@@ -118,40 +117,36 @@ const HealthChart: React.FC<HealthChartProps> = ({ data, dataKey, unit, name, co
         <ResponsiveContainer width="100%" height={height}>
             <LineChart data={formattedData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="recordedAtLabel" fontSize={9} tick={{ fill: '#6b7280' }} interval="preserveStartEnd" padding={{ left: 10, right: 10 }} dy={5} />
+                <XAxis
+                    dataKey="timestamp"
+                    fontSize={9}
+                    tick={{ fill: '#6b7280' }}
+                    interval="preserveStartEnd"
+                    padding={{ left: 10, right: 10 }}
+                    dy={5}
+                    tickFormatter={(timestamp) => format(new Date(timestamp), 'MMM d')}
+                />
                 <YAxis fontSize={9} tick={{ fill: '#6b7280' }} domain={[Math.max(0, Math.floor(minY - padding)), Math.ceil(maxY + padding)]} unit={unit ? ` ${unit}` : ''} allowDecimals={false} width={35} dx={-2} />
                 <Tooltip
                     contentStyle={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb', background: 'rgba(255, 255, 255, 0.95)' }}
-                    labelFormatter={(label, payload) => {
-                        if (payload && payload.length > 0) {
-                            const point = formattedData.find(d => d.recordedAtLabel === label);
-                            if (point) {
-                                return format(new Date(point.timestamp), 'MMM d, yyyy HH:mm');
-                            }
-                        }
-                        return label;
-                    }}
+                    labelFormatter={(timestamp) => format(new Date(timestamp), 'MMM d, yyyy HH:mm')}
                     formatter={(value, tooltipName, props) => {
-                        // For BP chart (array dataKey)
-                        if (Array.isArray(dataKey)) {
-                            // Show actual value for each line
-                            if (tooltipName === 'Systolic' && props.payload.systolic !== undefined) {
-                                return [`Systolic: ${props.payload.systolic} ${unit || ''}`, 'Systolic'];
-                            }
-                            if (tooltipName === 'Diastolic' && props.payload.diastolic !== undefined) {
-                                return [`Diastolic: ${props.payload.diastolic} ${unit || ''}`, 'Diastolic'];
-                            }
-                            return [`${value}${unit ? ` ${unit}` : ''}`, tooltipName];
+                        const { payload } = props;
+                        if (tooltipName === 'Systolic' || tooltipName === 'Diastolic') {
+                            return [`${value} ${unit || 'mmHg'}`, tooltipName];
                         }
-                        // For sugar
-                        if (dataKey === 'level' && props.payload.measurementType) {
-                            return [`Blood Sugar: ${value} ${unit || ''} (${props.payload.measurementType})`, 'Blood Sugar'];
+                        if (dataKey === 'level' && payload.measurementType) {
+                            return [`${value} ${unit || ''} (${payload.measurementType})`, 'Blood Sugar'];
                         }
-                        // For weight
-                        if (dataKey === 'weight' && props.payload.unit) {
-                            return [`Weight: ${value} ${props.payload.unit}`, 'Weight'];
+                        if (dataKey === 'weight' && payload.unit) {
+                            return [`${value} ${payload.unit}`, 'Weight'];
                         }
-                        return [`${value}${unit ? ` ${unit}` : ''}`, tooltipName];
+                        return [`${value}${unit ? ` ${unit}` : ''}`, Array.isArray(name) ? name[0] : name];
+                    }}
+                    itemSorter={(item) => {
+                        if (item.name === 'Systolic') return -1;
+                        if (item.name === 'Diastolic') return 1;
+                        return 0;
                     }}
                     itemStyle={{ padding: '2px 0' }}
                     wrapperClassName="text-xs"
@@ -221,11 +216,10 @@ const MedCharts: React.FC<MedChartsProps> = ({
     const handleSaveEditReading = async (data: any) => {
         if (!editingReading || !editingType) return;
         setIsSavingEdit(true);
-        // Remove system attributes from the update payload
         let filteredData = Object.fromEntries(
             Object.entries(data).filter(([key]) => !key.startsWith('$'))
         );
-        // Ensure numeric fields are numbers, not strings
+        
         if (editingType === 'bp') {
             if (filteredData.systolic !== undefined) filteredData.systolic = parseFloat(filteredData.systolic);
             if (filteredData.diastolic !== undefined) filteredData.diastolic = parseFloat(filteredData.diastolic);
@@ -234,14 +228,16 @@ const MedCharts: React.FC<MedChartsProps> = ({
         } else if (editingType === 'weight') {
             if (filteredData.weight !== undefined) filteredData.weight = parseFloat(filteredData.weight);
         }
+        
         try {
-            if (editingType === 'bp') {
-                await updateBloodPressureReading(editingReading.$id, filteredData);
-            } else if (editingType === 'sugar') {
-                await updateBloodSugarReading(editingReading.$id, filteredData);
-            } else if (editingType === 'weight') {
-                await updateWeightReading(editingReading.$id, filteredData);
+            let updatePromise;
+            switch (editingType) {
+                case 'bp': updatePromise = updateBloodPressureReading(editingReading.$id, filteredData); break;
+                case 'sugar': updatePromise = updateBloodSugarReading(editingReading.$id, filteredData); break;
+                case 'weight': updatePromise = updateWeightReading(editingReading.$id, filteredData); break;
+                default: throw new Error("Invalid reading type for update");
             }
+            await updatePromise;
             toast({ title: "Reading Updated" });
             setIsEditModalOpen(false);
             onDataRefreshNeeded();
@@ -257,7 +253,7 @@ const MedCharts: React.FC<MedChartsProps> = ({
     if (isLoading) {
         return (
             <div className="flex justify-center items-center py-16 bg-gray-50 rounded-lg border">
-                <Loader2 className="h-8 w-8 text-mamasaheli-accent animate-spin mr-3" />
+                <Loader2 className="h-8 w-8 text-gray-400 animate-spin mr-3" />
                 <span className="text-gray-600">Loading health data...</span>
             </div>
         );
@@ -279,11 +275,7 @@ const MedCharts: React.FC<MedChartsProps> = ({
                 <CardContent className="p-4 flex-grow flex flex-col space-y-4">
                     <div className="flex-grow">
                         <h4 className="text-xs font-medium mb-1 text-gray-500 flex items-center"><BarChart3 className="mr-1 h-3 w-3" />Trend (mmHg)</h4>
-                        {bpReadings.length > 0 ? (
-                            <HealthChart data={bpReadings} dataKey={["systolic", "diastolic"]} unit="mmHg" name={["Systolic", "Diastolic"]} color={["#ef4444", "#f97316"]} />
-                        ) : (
-                             <p className="text-xs text-gray-400 text-center py-8">No chart data available.</p>
-                        )}
+                        <HealthChart data={bpReadings} dataKey={["systolic", "diastolic"]} unit="mmHg" name={["Systolic", "Diastolic"]} color={["#ef4444", "#f97316"]} />
                     </div>
                     <div className="border-t pt-3">
                         <h4 className="text-xs font-medium mb-2 text-gray-500 flex items-center"><List className="mr-1 h-3 w-3" />Recent Readings</h4>
@@ -310,11 +302,7 @@ const MedCharts: React.FC<MedChartsProps> = ({
                 <CardContent className="p-4 flex-grow flex flex-col space-y-4">
                      <div className="flex-grow">
                         <h4 className="text-xs font-medium mb-1 text-gray-500 flex items-center"><BarChart3 className="mr-1 h-3 w-3" />Trend (mg/dL)</h4>
-                        {sugarReadings.length > 0 ? (
-                            <HealthChart data={sugarReadings} dataKey="level" unit="mg/dL" name="Sugar Level" color="#3b82f6" />
-                         ) : (
-                             <p className="text-xs text-gray-400 text-center py-8">No chart data available.</p>
-                        )}
+                        <HealthChart data={sugarReadings} dataKey="level" unit="mg/dL" name="Blood Sugar" color="#3b82f6" />
                     </div>
                     <div className="border-t pt-3">
                         <h4 className="text-xs font-medium mb-2 text-gray-500 flex items-center"><List className="mr-1 h-3 w-3" />Recent Readings</h4>
@@ -341,11 +329,7 @@ const MedCharts: React.FC<MedChartsProps> = ({
                 <CardContent className="p-4 flex-grow flex flex-col space-y-4">
                      <div className="flex-grow">
                         <h4 className="text-xs font-medium mb-1 text-gray-500 flex items-center"><BarChart3 className="mr-1 h-3 w-3" />Trend ({weightReadings[0]?.unit || 'N/A'})</h4>
-                        {weightReadings.length > 0 ? (
-                            <HealthChart data={weightReadings} dataKey="weight" unit={weightReadings[0]?.unit} name="Weight" color="#16a34a" />
-                         ) : (
-                             <p className="text-xs text-gray-400 text-center py-8">No chart data available.</p>
-                        )}
+                        <HealthChart data={weightReadings} dataKey="weight" unit={weightReadings[0]?.unit} name="Weight" color="#16a34a" />
                     </div>
                     <div className="border-t pt-3">
                         <h4 className="text-xs font-medium mb-2 text-gray-500 flex items-center"><List className="mr-1 h-3 w-3" />Recent Readings</h4>
@@ -362,14 +346,17 @@ const MedCharts: React.FC<MedChartsProps> = ({
                     </div>
                 </CardContent>
             </Card>
-            <EditHealthReadingModal
-                isOpen={isEditModalOpen}
-                onClose={() => { setIsEditModalOpen(false); setEditingReading(null); setEditingType(null); }}
-                type={editingType || 'bp'}
-                reading={editingReading}
-                onSubmit={handleSaveEditReading}
-                isLoading={isSavingEdit}
-            />
+
+            {isEditModalOpen && (
+                 <EditHealthReadingModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => { setIsEditModalOpen(false); setEditingReading(null); setEditingType(null); }}
+                    type={editingType || 'bp'}
+                    reading={editingReading}
+                    onSubmit={handleSaveEditReading}
+                    isLoading={isSavingEdit}
+                />
+            )}
         </div>
     );
 };
