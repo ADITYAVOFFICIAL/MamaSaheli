@@ -470,6 +470,16 @@ export const createAccount = async (
     hospitalName?: string
 ): Promise<Models.User<Models.Preferences>> => {
     try {
+        const verificationUrl = `${window.location.origin}/verify-email`;
+
+    // The third argument to account.create is the name, the fourth is the URL
+    await account.create(ID.unique(), email, password, name);
+    
+    // After creating the account, create a verification process
+    await account.createVerification(verificationUrl);
+
+    // Log the user in after creating the account
+    const session = await account.createEmailPasswordSession(email, password);
         if (!email || !password || !name) throw new Error("Email, password, and name are required.");
         const newUserAccount = await account.create(ID.unique(), email, password, name);
         await login(email, password);

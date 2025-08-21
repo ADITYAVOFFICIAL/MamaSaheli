@@ -42,7 +42,9 @@ const SymPage = lazy(() => import("./pages/SymptomCheckerPage"));
 const MonadPage = lazy(() => import("./pages/MonadPage"));
 const PatientDetailPage = lazy(() => import("./pages/doctor/PatientDetailPage"));
 const BloodworkPage = lazy(() => import("./pages/BloodworkPage"));
-
+const PasswordForgot = lazy(() => import("./pages/verifi/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/verifi/ResPass"));
+const EmailVerificationPage = lazy(() => import("./pages/verifi/VerifyEmailPage"));
 // A loading component to show while lazy chunks are fetched
 const LoadingFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -93,6 +95,9 @@ const App = () => {
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="/emergency" element={<EmergencyPage />} />
+              <Route path="/forgot-password" element={<PasswordForgot />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/verify-email" element={<EmailVerificationPage />} />
 
               {/* Protected Routes */}
               <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
@@ -115,7 +120,6 @@ const App = () => {
               <Route path="/forum" element={<PrivateRoute><ForumPage /></PrivateRoute>} />
               <Route path="/bloodwork" element={<PrivateRoute><BloodworkPage /></PrivateRoute>} />
               <Route path="/forum/:topicId" element={<PrivateRoute><ForumPage /></PrivateRoute>} />
-
               {/* 404 Route */}
               <Route path="*" element={<NotFound />} />
             </Routes>

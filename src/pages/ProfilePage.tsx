@@ -5,6 +5,8 @@ import {
     DialogTitle,
     DialogDescription
 } from '@/components/ui/dialog';
+import { ChangePasswordCard } from '@/components/profile/ChangePasswordCard';
+
 // src/pages/ProfilePage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
@@ -936,7 +938,7 @@ function ProfilePage() {
                                     </form>
                                 </CardContent>
                             </Card>
-
+                            <ChangePasswordCard/>
                             {/* Health Reading Input Card (remains unchanged) */}
                             <Card className="border-mamasaheli-secondary/20">
                                 <CardHeader className="bg-mamasaheli-secondary/10">
