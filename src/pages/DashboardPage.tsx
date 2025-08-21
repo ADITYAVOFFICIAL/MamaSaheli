@@ -26,6 +26,7 @@ import AppointmentItem from '@/components/appointments/AppointmentItem';
 import EditAppointmentModal from '@/components/appointments/EditAppointmentModal';
 import MedCharts from '@/components/dashboard/MedCharts';
 import MedReminder from '@/components/dashboard/MedReminder';
+import EditMedReminderModal from '@/components/dashboard/EditMedReminderModal';
 import AddMedReminderModal from '@/components/dashboard/AddMedReminderModal';
 
 import { useAuthStore } from '@/store/authStore';
@@ -37,7 +38,7 @@ import {
     BloodPressureReading, BloodSugarReading, WeightReading,
     getBloodPressureReadings, getBloodSugarReadings, getWeightReadings,
     MedicationReminder, CreateMedicationReminderData,
-    getMedicationReminders, createMedicationReminder, deleteMedicationReminder,
+    getMedicationReminders, createMedicationReminder, deleteMedicationReminder, updateMedicationReminder,
 } from '@/lib/appwrite';
 
 import { Trimester, HealthTip, selectHealthTip, defaultHealthTip } from '@/lib/healthTips';
@@ -202,6 +203,9 @@ const DashboardPage: React.FC = () => {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
     const [appointmentToDelete, setAppointmentToDelete] = useState<string | null>(null);
     const [isMedModalOpen, setIsMedModalOpen] = useState<boolean>(false);
+    const [editingMedReminder, setEditingMedReminder] = useState<MedicationReminder | null>(null);
+    const [isEditMedReminderModalOpen, setIsEditMedReminderModalOpen] = useState<boolean>(false);
+    const [isSavingMedReminder, setIsSavingMedReminder] = useState<boolean>(false);
     const [deletingMedReminderId, setDeletingMedReminderId] = useState<string | null>(null);
     const [isDeleteMedReminderDialogOpen, setIsDeleteMedReminderDialogOpen] = useState<boolean>(false);
     const [medReminderToDelete, setMedReminderToDelete] = useState<string | null>(null);
@@ -436,6 +440,27 @@ const DashboardPage: React.FC = () => {
     const handleAddReminderClick = useCallback(() => { setIsMedModalOpen(true); }, []);
     const handleSaveReminder = useCallback(async (data: CreateMedicationReminderData) => { if (!user?.$id) { toast({ title: "Error", description: "User not found.", variant: "destructive" }); return; } try { await createMedicationReminder(user.$id, data); toast({ title: "Reminder Added" }); await fetchData(); } catch (error) { const msg = error instanceof Error ? error.message : "Could not save."; toast({ title: "Save Failed", description: msg, variant: "destructive" }); throw error; } }, [user?.$id, fetchData, toast]);
     const handleDeleteReminderClick = useCallback((reminderId: string) => { setMedReminderToDelete(reminderId); setIsDeleteMedReminderDialogOpen(true); }, []);
+    const handleEditReminderClick = useCallback((reminder: MedicationReminder) => {
+        console.log('Edit button clicked for reminder:', reminder);
+        setEditingMedReminder(reminder);
+        setIsEditMedReminderModalOpen(true);
+    }, []);
+    const handleSaveEditReminder = useCallback(async (data: Partial<MedicationReminder>) => {
+        if (!editingMedReminder) return;
+        setIsSavingMedReminder(true);
+        try {
+            await updateMedicationReminder(editingMedReminder.$id, data);
+            toast({ title: "Reminder Updated" });
+            await fetchData();
+            setIsEditMedReminderModalOpen(false);
+            setEditingMedReminder(null);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : "Could not update.";
+            toast({ title: "Update Failed", description: msg, variant: "destructive" });
+        } finally {
+            setIsSavingMedReminder(false);
+        }
+    }, [editingMedReminder, fetchData, toast]);
     const confirmDeleteReminder = useCallback(async () => { if (!medReminderToDelete) return; setDeletingMedReminderId(medReminderToDelete); try { await deleteMedicationReminder(medReminderToDelete); toast({ title: "Reminder Deleted" }); await fetchData(); } catch (error) { const msg = error instanceof Error ? error.message : "Could not delete."; toast({ title: "Deletion Failed", description: msg, variant: "destructive" }); } finally { setDeletingMedReminderId(null); setMedReminderToDelete(null); setIsDeleteMedReminderDialogOpen(false); } }, [medReminderToDelete, fetchData, toast]);
 
     const getMilestone = useCallback((week: number): string => { const milestones: { [key: number]: string } = { 1: "Pregnancy begins...", 4: "Implantation occurs...", 6: "Baby's heart begins to beat.", 8: "Fingers and toes are forming.", 12: "End of the first trimester.", 16: "You might feel baby's first flutters.", 20: "Halfway there! Anatomy scan time.", 24: "Baby is viable outside the womb.", 28: "Third trimester begins.", 32: "Baby practices breathing.", 36: "Baby 'drops' into the pelvis.", 39: "Baby is considered full term.", 40: "Your estimated due date!", 41: "Baby is 'late term'.", 42: "Considered 'post term'..."}; if (week <= 0) return "Planning..."; if (week > 42) return "Anticipating arrival..."; const relevantWeeks = Object.keys(milestones).map(Number).filter(w => w <= week); const currentMilestoneWeek = relevantWeeks.length > 0 ? Math.max(...relevantWeeks) : 0; return currentMilestoneWeek > 0 ? `${milestones[currentMilestoneWeek]}` : "Early development stages."; }, []);
@@ -735,6 +760,7 @@ const DashboardPage: React.FC = () => {
                                 onAddReminder={handleAddReminderClick}
                                 onDeleteReminder={handleDeleteReminderClick}
                                 deletingReminderId={deletingMedReminderId}
+                                onEditReminder={handleEditReminderClick}
                             />
 
                             <div className="space-y-3">
@@ -846,6 +872,13 @@ const DashboardPage: React.FC = () => {
                  <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Appointment Deletion</AlertDialogTitle> <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel onClick={() => setAppointmentToDelete(null)}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={confirmDeleteAppointment} className="bg-red-600 hover:bg-red-700" disabled={!!deletingAppointmentId} > {deletingAppointmentId === appointmentToDelete ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> : "Delete Appointment"} </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>
             </AlertDialog>
             <AddMedReminderModal isOpen={isMedModalOpen} onClose={() => setIsMedModalOpen(false)} onSubmit={handleSaveReminder} />
+            <EditMedReminderModal
+                isOpen={isEditMedReminderModalOpen}
+                onClose={() => { setIsEditMedReminderModalOpen(false); setEditingMedReminder(null); }}
+                reminder={editingMedReminder}
+                onSubmit={handleSaveEditReminder}
+                isLoading={isSavingMedReminder}
+            />
             <AlertDialog open={isDeleteMedReminderDialogOpen} onOpenChange={setIsDeleteMedReminderDialogOpen}>
                  <AlertDialogContent> <AlertDialogHeader> <AlertDialogTitle>Confirm Reminder Deletion</AlertDialogTitle> <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel onClick={() => setMedReminderToDelete(null)}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={confirmDeleteReminder} className="bg-red-600 hover:bg-red-700" disabled={!!deletingMedReminderId} > {deletingMedReminderId === medReminderToDelete ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> : "Delete Reminder"} </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent>
             </AlertDialog>

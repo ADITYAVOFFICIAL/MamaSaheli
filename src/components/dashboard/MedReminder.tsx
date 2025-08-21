@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Pill, Clock, Trash2, PlusCircle, Inbox } from 'lucide-react'; // Import icons
+import { Loader2, Pill, Clock, Trash2, PlusCircle, Inbox, Edit } from 'lucide-react'; // Import icons
 import type { MedicationReminder } from '@/lib/appwrite'; // Import the type
 
 interface MedReminderProps {
@@ -11,13 +11,15 @@ interface MedReminderProps {
     onAddReminder: () => void; // Function to open the add modal
     onDeleteReminder: (id: string) => void; // Function to initiate deletion
     deletingReminderId: string | null; // ID of the reminder currently being deleted
+    onEditReminder?: (reminder: MedicationReminder) => void;
 }
 
 const ReminderItem: React.FC<{
     reminder: MedicationReminder;
     onDelete: (id: string) => void;
     isDeleting: boolean;
-}> = ({ reminder, onDelete, isDeleting }) => {
+    onEditReminder,
+}> = ({ reminder, onDelete, isDeleting, onEditReminder }) => {
 
     const handleDelete = () => {
         if (!isDeleting) {
@@ -44,16 +46,27 @@ const ReminderItem: React.FC<{
                     )}
                 </div>
             </div>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-red-500 hover:bg-red-100 hover:text-red-700 flex-shrink-0 ml-2"
-                onClick={handleDelete}
-                disabled={isDeleting}
-                aria-label={`Delete reminder for ${reminder.medicationName}`}
-            >
-                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            </Button>
+            <div className="flex gap-2">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-blue-500 hover:bg-blue-100 hover:text-blue-700 flex-shrink-0"
+                    onClick={() => onEditReminder && onEditReminder(reminder)}
+                    aria-label={`Edit reminder for ${reminder.medicationName}`}
+                >
+                    <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-red-500 hover:bg-red-100 hover:text-red-700 flex-shrink-0"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    aria-label={`Delete reminder for ${reminder.medicationName}`}
+                >
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                </Button>
+            </div>
         </li>
     );
 };
@@ -64,7 +77,8 @@ const MedReminder: React.FC<MedReminderProps> = ({
     isLoading,
     onAddReminder,
     onDeleteReminder,
-    deletingReminderId
+    deletingReminderId,
+    onEditReminder
 }) => {
     return (
         <Card className="border border-mamasaheli-accent/30 shadow-sm bg-white">
@@ -95,6 +109,7 @@ const MedReminder: React.FC<MedReminderProps> = ({
                                 reminder={reminder}
                                 onDelete={onDeleteReminder}
                                 isDeleting={deletingReminderId === reminder.$id}
+                                onEditReminder={onEditReminder}
                             />
                         ))}
                     </ul>
