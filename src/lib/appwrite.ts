@@ -1,3 +1,33 @@
+// --- Update Health Reading Functions (stubs, implement as needed) ---
+export async function updateBloodPressureReading(id: string, data: Partial<any>): Promise<any> {
+    // Update the Blood Pressure reading document in Appwrite
+    return await databases.updateDocument(
+        databaseId,
+        bloodPressureCollectionId,
+        id,
+        data
+    );
+}
+
+export async function updateBloodSugarReading(id: string, data: Partial<any>): Promise<any> {
+    // Update the Blood Sugar reading document in Appwrite
+    return await databases.updateDocument(
+        databaseId,
+        bloodSugarCollectionId,
+        id,
+        data
+    );
+}
+
+export async function updateWeightReading(id: string, data: Partial<any>): Promise<any> {
+    // Update the Weight reading document in Appwrite
+    return await databases.updateDocument(
+        databaseId,
+        weightCollectionId,
+        id,
+        data
+    );
+}
 // src/lib/appwrite.ts
 import {
     Account,

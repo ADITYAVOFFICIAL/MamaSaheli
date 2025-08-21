@@ -752,7 +752,7 @@ const DashboardPage: React.FC = () => {
                                     </CardContent>
                                 </Card>
                             </div>
-{/* <SamsungHealthMock/> */}
+<SamsungHealthMock/>
 
                              <MedReminder
                                 reminders={medReminders}
