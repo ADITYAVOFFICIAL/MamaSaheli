@@ -87,17 +87,17 @@ Create a file named `.env.local` in the project's root directory and populate it
 
 ```env
 # Appwrite Configuration
-VITE_PUBLIC_APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
-VITE_PUBLIC_APPWRITE_PROJECT_ID="YOUR_APPWRITE_PROJECT_ID"
-VITE_PUBLIC_APPWRITE_BLOG_DATABASE_ID="YOUR_APPWRITE_DATABASE_ID"
-# ... (add all other VITE_PUBLIC_APPWRITE_* variables from the file list)
+VITE_APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
+VITE_APPWRITE_PROJECT_ID="YOUR_APPWRITE_PROJECT_ID"
+VITE_APPWRITE_BLOG_DATABASE_ID="YOUR_APPWRITE_DATABASE_ID"
+# ... (add all other VITE_APPWRITE_* variables from the file list)
 
 # Groq API Key
-VITE_PUBLIC_GROQ_API_KEY="YOUR_GROQ_API_KEY"
+VITE_GROQ_API_KEY="YOUR_GROQ_API_KEY"
 
 # Google Maps API Key
-VITE_PUBLIC_GOOGLE_MAPS_API_KEY="YOUR_GOOGLE_MAPS_API_KEY"
-```*(For a complete list of required `VITE_PUBLIC_APPWRITE_*` variables, refer to the `src/lib/appwrite.ts` file.)*
+VITE_GOOGLE_MAPS_API_KEY="YOUR_GOOGLE_MAPS_API_KEY"
+```*(For a complete list of required `VITE_APPWRITE_*` variables, refer to the `src/lib/appwrite.ts` file.)*
 
 **B. Backend Environment (`MamaSaheli-backend/.env`)**
 

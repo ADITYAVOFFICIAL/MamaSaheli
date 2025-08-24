@@ -114,13 +114,13 @@ type ChatCompletionCreateParams = ChatCompletionCreateParamsNonStreaming | ChatC
 
 // --- Configuration ---
 /** Groq API Key loaded from environment variables. */
-const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GROQ_API_KEY;
+const API_KEY: string | undefined = import.meta.env.VITE_GROQ_API_KEY;
 /** Specifies the Groq AI model to use for generation. */
 const MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "llama3-70b-8192";
 
 // Validate API Key presence
 if (!API_KEY) {
-    console.error("CRITICAL ERROR: VITE_PUBLIC_GROQ_API_KEY is missing. Meal/Exercise generation will be unavailable.");
+    console.error("CRITICAL ERROR: VITE_GROQ_API_KEY is missing. Meal/Exercise generation will be unavailable.");
     // NOTE: In a production environment, you might throw an Error here
     // to prevent the application module from loading incorrectly.
     // throw new Error("Groq API Key is missing. Cannot initialize groqMealService.");

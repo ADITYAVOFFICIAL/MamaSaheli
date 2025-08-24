@@ -50,14 +50,14 @@ export interface AdditionalChatContext {
 }
 
 // --- Configuration ---
-const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GROQ_API_KEY;
+const API_KEY: string | undefined = import.meta.env.VITE_GROQ_API_KEY;
 // Use the correctly imported Base type to correctly type the model property
 // Ensure this model supports vision and doesn't have the system prompt restriction, or handle as done in ChatPage.
 const MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "meta-llama/llama-4-maverick-17b-128e-instruct";
 
 
 if (!API_KEY) {
-    // console.error("CRITICAL: VITE_PUBLIC_GROQ_API_KEY environment variable is not set. Groq service will be unavailable.");
+    // console.error("CRITICAL: VITE_GROQ_API_KEY environment variable is not set. Groq service will be unavailable.");
 }
 
 // --- Initialization ---

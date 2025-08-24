@@ -15,7 +15,7 @@ type ChatCompletionCreateParams = ChatCompletionCreateParamsNonStreaming | ChatC
 
 // --- Configuration ---
 // Retrieve the Groq API key from environment variables
-const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GROQ_API_KEY;
+const API_KEY: string | undefined = import.meta.env.VITE_GROQ_API_KEY;
 
 // --- Model Selection ---
 // Consider using a more capable model like Llama 3 70b for potentially better instruction following and formatting nuance.
@@ -25,7 +25,7 @@ const MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "llama3-70b-8192"; /
 
 // Check if the API key is configured
 if (!API_KEY) {
-    // console.error("CRITICAL: VITE_PUBLIC_GROQ_API_KEY environment variable is not set. Groq formatting service will be unavailable.");
+    // console.error("CRITICAL: VITE_GROQ_API_KEY environment variable is not set. Groq formatting service will be unavailable.");
     // Depending on application requirements, you might throw an error here to halt execution
     // or allow the application to continue with degraded functionality.
     // throw new Error("Groq API Key is missing. Formatting feature disabled.");

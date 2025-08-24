@@ -82,7 +82,7 @@ const Emergency = () => {
   const [showHospitalsRequested, setShowHospitalsRequested] = useState<boolean>(false);
   const { toast } = useToast();
   const isMounted = useRef(true);
-  const googleMapsApiKey = import.meta.env.VITE_PUBLIC_GOOGLE_MAPS_API_KEY as string;
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
   const mapsApiLoaded = useRef(false);
   const mapsLoadInitiated = useRef(false); // Track if script load has been started
 
@@ -727,7 +727,7 @@ const Emergency = () => {
                     <KeyRound className="h-4 w-4" />
                     <AlertTitle>Action Required: Configuration Error</AlertTitle>
                     <AlertDescription>
-                        Google Maps API Key (`VITE_PUBLIC_GOOGLE_MAPS_API_KEY`) is missing. Set the environment variable correctly.
+                        Google Maps API Key (`VITE_GOOGLE_MAPS_API_KEY`) is missing. Set the environment variable correctly.
                     </AlertDescription>
                  </Alert>
             )}

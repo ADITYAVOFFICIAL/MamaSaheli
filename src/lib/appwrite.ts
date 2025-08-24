@@ -48,34 +48,34 @@ import { formatDistanceToNow, parseISO } from 'date-fns'; // Import date-fns
 import { ProductRecommendation } from './geminiProduct';
 // --- Configuration ---
 // Ensure your .env.local file (or environment variables) has these defined
-const endpoint: string = import.meta.env.VITE_PUBLIC_APPWRITE_ENDPOINT as string;
-const projectId: string = import.meta.env.VITE_PUBLIC_APPWRITE_PROJECT_ID as string;
-const databaseId: string = import.meta.env.VITE_PUBLIC_APPWRITE_BLOG_DATABASE_ID as string; // Main DB ID
+const endpoint: string = import.meta.env.VITE_APPWRITE_ENDPOINT as string;
+const projectId: string = import.meta.env.VITE_APPWRITE_PROJECT_ID as string;
+const databaseId: string = import.meta.env.VITE_APPWRITE_BLOG_DATABASE_ID as string; // Main DB ID
 
 // --- Collection IDs ---
 // Using descriptive names matching the purpose. Ensure these IDs exist in your Appwrite project.
-const blogCollectionId: string | undefined = import.meta.env.VITE_PUBLIC_APPWRITE_BLOG_COLLECTION_ID as string | undefined; // Optional
-const profilesCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_PROFILES_COLLECTION_ID as string;
-const medicalDocumentsCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_MEDICAL_DOCUMENTS_COLLECTION_ID as string;
-const appointmentsCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_APPOINTMENTS_COLLECTION_ID as string;
-const bloodPressureCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_BP_COLLECTION_ID as string;
-const bloodSugarCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_SUGAR_COLLECTION_ID as string;
-const weightCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_WEIGHT_COLLECTION_ID as string;
-const bloodworksCollectionId: string = (import.meta.env.VITE_PUBLIC_BLOODWORKS_COLLECTION_ID as string) || 'bloodworks';
-const medicationRemindersCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_MEDS_COLLECTION_ID as string;
-const chatHistoryCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_CHAT_HISTORY_COLLECTION_ID as string;
-const bookmarkedMessagesCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_BOOKMARKS_COLLECTION_ID as string;
-const forumTopicsCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_FORUM_TOPICS_COLLECTION_ID as string;
-const forumPostsCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_FORUM_POSTS_COLLECTION_ID as string;
-const bookmarkedProductsCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_BOOKMARKED_PRODUCTS_COLLECTION_ID as string || 'bookmarkedProducts';
-const forumVotesCollectionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_FORUM_VOTES_COLLECTION_ID as string || 'forumVotes';
-const userCountFunctionId: string = import.meta.env.VITE_PUBLIC_APPWRITE_USER_COUNT_FUNCTION_ID as string;
+const blogCollectionId: string | undefined = import.meta.env.VITE_APPWRITE_BLOG_COLLECTION_ID as string | undefined; // Optional
+const profilesCollectionId: string = import.meta.env.VITE_APPWRITE_PROFILES_COLLECTION_ID as string;
+const medicalDocumentsCollectionId: string = import.meta.env.VITE_APPWRITE_MEDICAL_DOCUMENTS_COLLECTION_ID as string;
+const appointmentsCollectionId: string = import.meta.env.VITE_APPWRITE_APPOINTMENTS_COLLECTION_ID as string;
+const bloodPressureCollectionId: string = import.meta.env.VITE_APPWRITE_BP_COLLECTION_ID as string;
+const bloodSugarCollectionId: string = import.meta.env.VITE_APPWRITE_SUGAR_COLLECTION_ID as string;
+const weightCollectionId: string = import.meta.env.VITE_APPWRITE_WEIGHT_COLLECTION_ID as string;
+const bloodworksCollectionId: string = (import.meta.env.VITE_BLOODWORKS_COLLECTION_ID as string) || 'bloodworks';
+const medicationRemindersCollectionId: string = import.meta.env.VITE_APPWRITE_MEDS_COLLECTION_ID as string;
+const chatHistoryCollectionId: string = import.meta.env.VITE_APPWRITE_CHAT_HISTORY_COLLECTION_ID as string;
+const bookmarkedMessagesCollectionId: string = import.meta.env.VITE_APPWRITE_BOOKMARKS_COLLECTION_ID as string;
+const forumTopicsCollectionId: string = import.meta.env.VITE_APPWRITE_FORUM_TOPICS_COLLECTION_ID as string;
+const forumPostsCollectionId: string = import.meta.env.VITE_APPWRITE_FORUM_POSTS_COLLECTION_ID as string;
+const bookmarkedProductsCollectionId: string = import.meta.env.VITE_APPWRITE_BOOKMARKED_PRODUCTS_COLLECTION_ID as string || 'bookmarkedProducts';
+const forumVotesCollectionId: string = import.meta.env.VITE_APPWRITE_FORUM_VOTES_COLLECTION_ID as string || 'forumVotes';
+const userCountFunctionId: string = import.meta.env.VITE_APPWRITE_USER_COUNT_FUNCTION_ID as string;
 // --- Bucket IDs ---
 // Ensure these Storage Buckets exist in your Appwrite project.
-export const profileBucketId: string = import.meta.env.VITE_PUBLIC_APPWRITE_PROFILE_BUCKET_ID as string;
-export const medicalBucketId: string = import.meta.env.VITE_PUBLIC_APPWRITE_MEDICAL_BUCKET_ID as string;
-export const chatImagesBucketId: string = import.meta.env.VITE_PUBLIC_APPWRITE_CHAT_IMAGES_BUCKET_ID as string;
-export const generatedImageBucketId: string = import.meta.env.VITE_PUBLIC_APPWRITE_CHAT_IMAGES_BUCKET_ID as string;
+export const profileBucketId: string = import.meta.env.VITE_APPWRITE_PROFILE_BUCKET_ID as string;
+export const medicalBucketId: string = import.meta.env.VITE_APPWRITE_MEDICAL_BUCKET_ID as string;
+export const chatImagesBucketId: string = import.meta.env.VITE_APPWRITE_CHAT_IMAGES_BUCKET_ID as string;
+export const generatedImageBucketId: string = import.meta.env.VITE_APPWRITE_CHAT_IMAGES_BUCKET_ID as string;
 // Checks if essential configuration variables are present and not placeholders.
 const requiredConfigs: Record<string, string | undefined> = {
     endpoint,
@@ -111,7 +111,7 @@ const missingConfigs: string[] = Object.entries(requiredConfigs)
     .map(([key]) => key);
 
 if (missingConfigs.length > 0) {
-    const errorMsg = `CRITICAL ERROR: Missing or invalid Appwrite configuration for: ${missingConfigs.join(', ')}. Check your environment variables (e.g., .env.local) and ensure all VITE_PUBLIC_APPWRITE_* variables are correctly set.`;
+    const errorMsg = `CRITICAL ERROR: Missing or invalid Appwrite configuration for: ${missingConfigs.join(', ')}. Check your environment variables (e.g., .env.local) and ensure all VITE_APPWRITE_* variables are correctly set.`;
     // console.error(errorMsg);
     // Throwing an error stops the app from potentially running incorrectly
     throw new Error(errorMsg);
@@ -609,7 +609,7 @@ export const updateBlogPost = async (documentId: string, postData: UpdateBlogPos
 export const deleteBlogPost = async (documentId: string, imageFileId?: string): Promise<void> => {
     // 1. Validate Inputs
     if (!blogCollectionId) {
-        console.error("Delete Error: Blog Collection ID is not configured. Check your .env file for VITE_PUBLIC_APPWRITE_BLOG_COLLECTION_ID.");
+        console.error("Delete Error: Blog Collection ID is not configured. Check your .env file for VITE_APPWRITE_BLOG_COLLECTION_ID.");
         throw new Error("Client-side configuration error: Blog Collection ID is missing.");
     }
     if (!documentId) {
@@ -618,7 +618,7 @@ export const deleteBlogPost = async (documentId: string, imageFileId?: string): 
     }
 
     // Note: To delete a file, you need its bucket ID. Add this to your .env if you use Appwrite storage for blog images.
-    const imageBucketId = import.meta.env.VITE_PUBLIC_APPWRITE_BLOG_IMAGE_BUCKET_ID as string | undefined;
+    const imageBucketId = import.meta.env.VITE_APPWRITE_BLOG_IMAGE_BUCKET_ID as string | undefined;
 
     // console.log(`[Delete Workflow] Starting deletion for post document: ${documentId}`);
 
@@ -1968,7 +1968,7 @@ export const updateBloodworkResult = async (documentId: string, newResultsArr: a
  */
 export const getTotalUserCount = async (): Promise<{ totalUsers: number }> => {
     if (!userCountFunctionId) {
-        // console.error("User Count Function ID not configured in .env (VITE_PUBLIC_APPWRITE_USER_COUNT_FUNCTION_ID)");
+        // console.error("User Count Function ID not configured in .env (VITE_APPWRITE_USER_COUNT_FUNCTION_ID)");
         throw new Error("Configuration error: User Count Function ID is missing.");
     }
     const context = `executing user count function (${userCountFunctionId})`;

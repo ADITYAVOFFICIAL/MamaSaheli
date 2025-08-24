@@ -50,7 +50,7 @@ export interface AdditionalChatContext {
 }
 
 // --- Configuration ---
-const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GROQ_API_KEY;
+const API_KEY: string | undefined = import.meta.env.VITE_GROQ_API_KEY;
 // Use the correctly imported Base type to correctly type the model property
 // Ensure this model supports vision and doesn't have the system prompt restriction, or handle as done in ChatPage.
 const MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "llama-3.2-90b-vision-preview"; // Example: Use a versatile model if vision has restrictions OR keep vision and rely on ChatPage filtering.
@@ -59,7 +59,7 @@ const MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "llama-3.2-90b-visio
 
 
 if (!API_KEY) {
-    console.error("CRITICAL: VITE_PUBLIC_GROQ_API_KEY environment variable is not set. Groq service will be unavailable.");
+    console.error("CRITICAL: VITE_GROQ_API_KEY environment variable is not set. Groq service will be unavailable.");
 }
 
 // --- Initialization ---

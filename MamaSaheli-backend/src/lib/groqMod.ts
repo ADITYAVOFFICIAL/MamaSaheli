@@ -54,14 +54,14 @@ export interface ModerationOptions {
 type ChatCompletionCreateParams = ChatCompletionCreateParamsNonStreaming | ChatCompletionCreateParamsStreaming;
 
 // --- Configuration ---
-const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GROQ_API_KEY;
+const API_KEY: string | undefined = import.meta.env.VITE_GROQ_API_KEY;
 // Using 70b model might offer better nuance and reduce false positives compared to 8b
 const MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "llama3-70b-8192";
 // const MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "llama3-8b-8192"; // Faster alternative
 
 // --- Initialization Check ---
 if (!API_KEY) {
-    console.error("CRITICAL ERROR: VITE_PUBLIC_GROQ_API_KEY is missing. Content moderation service will be unavailable.");
+    console.error("CRITICAL ERROR: VITE_GROQ_API_KEY is missing. Content moderation service will be unavailable.");
 }
 
 // --- Groq Client Initialization ---

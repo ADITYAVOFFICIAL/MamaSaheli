@@ -37,12 +37,12 @@ export interface ProductRecommendation {
 type ChatCompletionCreateParams = ChatCompletionCreateParamsNonStreaming | ChatCompletionCreateParamsStreaming;
 
 // --- Configuration ---
-const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GROQ_API_KEY;
+const API_KEY: string | undefined = import.meta.env.VITE_GROQ_API_KEY;
 const COMPLEX_MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "llama3-70b-8192"; // For personalized/prompt-based
 const SIMPLER_MODEL_NAME: ChatCompletionCreateParamsBase['model'] = "llama3-8b-8192";  // For general
 
 if (!API_KEY) {
-    console.error("CRITICAL ERROR: VITE_PUBLIC_GROQ_API_KEY missing.");
+    console.error("CRITICAL ERROR: VITE_GROQ_API_KEY missing.");
     // In a real app, you might want to throw an error or disable features relying on this.
 }
 

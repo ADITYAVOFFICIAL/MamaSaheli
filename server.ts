@@ -1,11 +1,11 @@
 // Minimal Bun API server for saving FCM tokens to Appwrite
 import { serve } from "bun";
 
-const APPWRITE_ENDPOINT = process.env.VITE_PUBLIC_APPWRITE_ENDPOINT || "";
-const APPWRITE_PROJECT_ID = process.env.VITE_PUBLIC_APPWRITE_PROJECT_ID || "";
-const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY || process.env.VITE_PUBLIC_APPWRITE_API_KEY || "";
-const FCM_COLLECTION_ID = process.env.VITE_PUBLIC_APPWRITE_FCM_COLLECTION_ID || "";
-const FCM_DATABASE_ID = process.env.VITE_PUBLIC_APPWRITE_BLOG_DATABASE_ID || "";
+const APPWRITE_ENDPOINT = process.env.VITE_APPWRITE_ENDPOINT || "";
+const APPWRITE_PROJECT_ID = process.env.VITE_APPWRITE_PROJECT_ID || "";
+const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY || process.env.VITE_APPWRITE_API_KEY || "";
+const FCM_COLLECTION_ID = process.env.VITE_APPWRITE_FCM_COLLECTION_ID || "";
+const FCM_DATABASE_ID = process.env.VITE_APPWRITE_BLOG_DATABASE_ID || "";
 
 serve({
   port: 8080,

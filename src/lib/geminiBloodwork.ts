@@ -6,7 +6,7 @@ import {
     Part,
 } from '@google/generative-ai';
 
-const API_KEY: string | undefined = import.meta.env.VITE_PUBLIC_GEMINI_API_KEY;
+const API_KEY: string | undefined = import.meta.env.VITE_GEMINI_API_KEY;
 const MODEL_NAME = "gemini-1.5-flash-latest";
 
 const genAI: GoogleGenerativeAI | null = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;

@@ -9,12 +9,12 @@ services:
       args:
         # Pass build-time environment variables for Vite here
         # Replace placeholders with your actual values or use a .env file
-        VITE_PUBLIC_APPWRITE_ENDPOINT: ${VITE_PUBLIC_APPWRITE_ENDPOINT}
-        VITE_PUBLIC_APPWRITE_PROJECT_ID: ${VITE_PUBLIC_APPWRITE_PROJECT_ID}
-        VITE_PUBLIC_APPWRITE_BLOG_DATABASE_ID: ${VITE_PUBLIC_APPWRITE_BLOG_DATABASE_ID}
-        VITE_PUBLIC_GROQ_API_KEY: ${VITE_PUBLIC_GROQ_API_KEY}
-        VITE_PUBLIC_GOOGLE_MAPS_API_KEY: ${VITE_PUBLIC_GOOGLE_MAPS_API_KEY}
-        # Add all other VITE_PUBLIC_* variables from your frontend's .env.local here
+        VITE_APPWRITE_ENDPOINT: ${VITE_APPWRITE_ENDPOINT}
+        VITE_APPWRITE_PROJECT_ID: ${VITE_APPWRITE_PROJECT_ID}
+        VITE_APPWRITE_BLOG_DATABASE_ID: ${VITE_APPWRITE_BLOG_DATABASE_ID}
+        VITE_GROQ_API_KEY: ${VITE_GROQ_API_KEY}
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY}
+        # Add all other VITE_* variables from your frontend's .env.local here
 
     ports:
       - "8080:80" # Map host port 8080 to container port 80 (Nginx)

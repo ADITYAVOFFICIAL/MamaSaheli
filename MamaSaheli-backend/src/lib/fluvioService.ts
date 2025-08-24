@@ -9,7 +9,7 @@ import Fluvio, {
 
 // Construct the Gateway URL using the access key from environment variables
 // Ensure this variable name matches your .env file
-const FLUVIO_ACCESS_KEY = process.env.VITE_PUBLIC_FLUVIO_ACCESS_KEY;
+const FLUVIO_ACCESS_KEY = process.env.VITE_FLUVIO_ACCESS_KEY;
 const FLUVIO_GATEWAY_URL = FLUVIO_ACCESS_KEY
     ? `wss://infinyon.cloud/wsr/v1/fluvio?access_key=${FLUVIO_ACCESS_KEY}`
     : null;
@@ -18,7 +18,7 @@ let fluvioClientInstance: Fluvio | null = null; // Store the Fluvio instance
 
 /**
  * Connects to the Fluvio cluster.
- * Uses WebSocket Gateway URL if VITE_PUBLIC_FLUVIO_ACCESS_KEY is set.
+ * Uses WebSocket Gateway URL if VITE_FLUVIO_ACCESS_KEY is set.
  * Note: The library's defined 'Options' type doesn't explicitly support 'addr'.
  * This relies on the underlying native implementation potentially handling it.
  *
@@ -27,8 +27,8 @@ let fluvioClientInstance: Fluvio | null = null; // Store the Fluvio instance
  */
 export const connectFluvio = async (): Promise<Fluvio> => {
     if (!FLUVIO_GATEWAY_URL) {
-        console.error("Fluvio Access Key (VITE_PUBLIC_FLUVIO_ACCESS_KEY) is missing in environment variables.");
-        throw new Error("Fluvio configuration missing: VITE_PUBLIC_FLUVIO_ACCESS_KEY not set.");
+        console.error("Fluvio Access Key (VITE_FLUVIO_ACCESS_KEY) is missing in environment variables.");
+        throw new Error("Fluvio configuration missing: VITE_FLUVIO_ACCESS_KEY not set.");
     }
 
     if (fluvioClientInstance) {
