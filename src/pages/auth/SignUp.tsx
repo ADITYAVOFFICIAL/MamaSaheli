@@ -29,6 +29,7 @@ const SignUp = () => {
   const [isLoadingHospitals, setIsLoadingHospitals] = useState(true);
   const [hospitalFetchError, setHospitalFetchError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { signup } = useAuthStore();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -85,6 +86,15 @@ const SignUp = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!agreedToTerms) {
+      toast({
+        title: "Agreement Required",
+        description: "You must agree to the Terms of Service and Privacy Policy to create an account.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (password !== confirmPassword) {
       toast({
@@ -253,10 +263,32 @@ const SignUp = () => {
                       </div>
                     )}
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="agreeTerms"
+                      checked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      required
+                      className="accent-mamasaheli-primary"
+                    />
+                    <Label htmlFor="agreeTerms" className="text-xs text-gray-500">
+                      I agree to the{' '}
+                      <Link to="/terms" className="underline text-mamasaheli-primary">Terms of Service</Link>
+                      {' '}and{' '}
+                      <Link to="/privacy" className="underline text-mamasaheli-primary">Privacy Policy</Link>
+                    </Label>
+                  </div>
                   <Button
                     type="submit"
                     className="w-full bg-mamasaheli-primary hover:bg-mamasaheli-dark"
-                    disabled={isLoading || isLoadingHospitals || !!hospitalFetchError || !selectedHospitalId}
+                    disabled={
+                      isLoading ||
+                      isLoadingHospitals ||
+                      !!hospitalFetchError ||
+                      !selectedHospitalId ||
+                      !agreedToTerms
+                    }
                   >
                     {isLoading ? "Creating Account..." : "Create Account"}
                   </Button>
@@ -272,12 +304,6 @@ const SignUp = () => {
                 >
                   Log in
                 </Link>
-              </div>
-              <div className="text-center text-xs text-gray-500">
-                By creating an account, you agree to our{' '}
-                <Link to="/terms" className="underline">Terms of Service</Link>
-                {' '}and{' '}
-                <Link to="/privacy" className="underline">Privacy Policy</Link>
               </div>
             </CardFooter>
           </Card>
