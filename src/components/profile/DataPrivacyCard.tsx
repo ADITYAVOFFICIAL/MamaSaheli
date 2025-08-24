@@ -36,7 +36,7 @@ export const DataPrivacyCard: React.FC = () => {
         try {
             // Call the combined function with the 'export' action
             const result = await functions.createExecution(
-                'manageUserData', // The Function Name or ID
+                import.meta.env.VITE_APPWRITE_MANAGE_USER_DATA,
                 JSON.stringify({ action: 'export' }), // The body payload specifying the action
                 false // `async` parameter, false for a synchronous response
             );
@@ -72,7 +72,7 @@ export const DataPrivacyCard: React.FC = () => {
         try {
             // Call the combined function with the 'delete' action
             await functions.createExecution(
-                'manageUserData', // The Function Name or ID
+                import.meta.env.VITE_APPWRITE_MANAGE_USER_DATA,
                 JSON.stringify({ action: 'delete' }), // The body payload
                 false
             );
