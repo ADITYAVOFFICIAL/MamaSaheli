@@ -15,8 +15,8 @@ import { PublicRoute, PrivateRoute } from '@/components/auth/AuthRoute.tsx';
 // --- Lazy Load Page Components ---
 // This tells Vite/React to load the code for these pages only when they are needed.
 const HomePage = lazy(() => import("./pages/HomePage"));
-const Login = lazy(() => import("./pages/Login"));
-const SignUp = lazy(() => import("./pages/SignUp"));
+const Login = lazy(() => import("./pages/auth/Login"));
+const SignUp = lazy(() => import("./pages/auth/SignUp"));
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const EmergencyPage = lazy(() => import("./pages/Emergency"));
 const AppointmentPage = lazy(() => import("./pages/AppointmentPage"));

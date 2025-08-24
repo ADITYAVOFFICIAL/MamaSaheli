@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
+import { DataPrivacyCard } from '@/components/profile/DataPrivacyCard';
 import {
     getUserProfile,
     updateUserProfile,
@@ -997,7 +997,11 @@ function ProfilePage() {
                                         </Button>
                                     </div>
                                 </CardContent>
+                                
                             </Card>
+                             <div className="space-y-8">
+                                 <ChangePasswordCard />
+                                 <DataPrivacyCard /></div>
                         </div>
 
                     </div>

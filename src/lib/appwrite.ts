@@ -491,39 +491,49 @@ export const handleAppwriteError = (error: unknown, context: string, throwGeneri
 };
 
 
-// --- Authentication Functions ---
-export const createAccount = async (
+export async function createAccount(
     email: string,
     password: string,
     name: string,
     hospitalId?: string,
     hospitalName?: string
-): Promise<Models.User<Models.Preferences>> => {
+): Promise<void> {
     try {
+        // Step 1: Create the user account.
+        const newUser = await account.create('unique()', email, password, name);
+
+        // Step 2: Log the user in to create an active session.
+        await account.createEmailPasswordSession(email, password);
+
+        // Step 3: Now that a session exists, create the email verification.
         const verificationUrl = `${window.location.origin}/verify-email`;
+        await account.createVerification(verificationUrl);
 
-    // The third argument to account.create is the name, the fourth is the URL
-    await account.create(ID.unique(), email, password, name);
-    
-    // After creating the account, create a verification process
-    await account.createVerification(verificationUrl);
-
-    // Log the user in after creating the account
-    const session = await account.createEmailPasswordSession(email, password);
-        if (!email || !password || !name) throw new Error("Email, password, and name are required.");
-        const newUserAccount = await account.create(ID.unique(), email, password, name);
-        await login(email, password);
-        try {
-            await createUserProfile(newUserAccount.$id, {
-                name: name,
+        // Step 4: Create the user's profile document in the database.
+        // This will now work because an authenticated session is active.
+        await databases.createDocument(
+            databaseId,
+            profilesCollectionId,
+            newUser.$id,
+            {
+                userId: newUser.$id,
                 email: email,
-                hospitalId: hospitalId ?? '',
-                hospitalName: hospitalName ?? ''
-            });
-        } catch (profileError) { /*console.warn(`Failed to auto-create profile for ${newUserAccount.$id}:`, profileError);*/ }
-        return newUserAccount;
-    } catch (error) { handleAppwriteError(error, 'creating account'); throw error; }
-};
+                name: name,
+                hospitalId: hospitalId,
+                hospitalName: hospitalName
+            },
+            [
+                Permission.read(Role.user(newUser.$id)),
+                Permission.update(Role.user(newUser.$id)),
+                Permission.delete(Role.user(newUser.$id)),
+            ]
+        );
+    } catch (error) {
+        console.error("Error during account creation:", error);
+        throw error;
+    }
+}
+
 export const login = async (email: string, password: string): Promise<Models.Session> => {
     try { if (!email || !password) throw new Error("Email and password required."); return await account.createEmailPasswordSession(email, password); }
     catch (error) { handleAppwriteError(error, 'logging in'); throw error; }
