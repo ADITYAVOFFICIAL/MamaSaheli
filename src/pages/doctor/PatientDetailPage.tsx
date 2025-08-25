@@ -34,6 +34,39 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 const REQUIRED_LABEL = 'doctor';
 
+const BIOMARKER_ALIASES = {
+    'Hemoglobin': ['hemoglobin', 'hgb', 'haemoglobin', 'hb'],
+    'RBC Count': ['rbc', 'red blood cell', 'r b c count'],
+    'Hematocrit': ['hematocrit', 'pcv', 'packed cell volume', 'p.c.v/haematocrit'],
+    'MCV': ['mcv', 'mean corpuscular volume'],
+    'MCH': ['mch', 'mean corpuscular hemoglobin'],
+    'MCHC': ['mchc', 'mean corpuscular hemoglobin concentration'],
+    'RDW-CV': ['rdw-cv', 'rdw_cv'],
+    'RDW-SD': ['rdw-sd', 'rdw_sd'],
+    'Platelet Count': ['platelet', 'plt'],
+    'MPV': ['mpv', 'mean platelet volume'],
+    'WBC Count': ['wbc', 'white blood cell', 'leucocyte', 'tlc', 'total leucocyte count'],
+    'Neutrophils': ['neutrophil'],
+    'Lymphocytes': ['lymphocyte'],
+    'Monocytes': ['monocyte'],
+    'Eosinophils': ['eosinophil'],
+    'Basophils': ['basophil'],
+    'PCT': ['pct', 'plateletcrit']
+};
+
+const normalizeString = (s) => (s || "").toLowerCase().replace(/[\s()-.,/]/g, '');
+
+const getCanonicalBiomarker = (rawName) => {
+    if (!rawName) return null;
+    const normalizedName = normalizeString(rawName);
+    for (const [canonical, aliases] of Object.entries(BIOMARKER_ALIASES)) {
+        if (aliases.some(alias => normalizedName.includes(normalizeString(alias)))) {
+            return canonical;
+        }
+    }
+    return rawName.trim();
+};
+
 const DetailItem: React.FC<{ label: string; value?: string | number | null | string[]; icon?: React.ElementType }> = ({ label, value, icon: Icon }) => (
     <div className="grid grid-cols-3 gap-2 py-1.5">
         <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5 col-span-1">
@@ -125,15 +158,14 @@ const HealthReadingsCard: React.FC<{ userId: string }> = ({ userId }) => {
                     <Legend wrapperStyle={{ fontSize: '12px' }} />
                     {keys.map((key, i) => (
                         <Line
-                            key={key}
-                            type="monotone"
-                            dataKey={key}
-                            name={names[i]}
-                            stroke={colors[i]}
-                            strokeWidth={2}
-                            dot={{ r: 3 }}
-                            activeDot={{ r: 6 }}
-                        />
+                    type="monotone"
+                    dataKey={key}
+                    stroke={colors[i] || "hsl(var(--primary))"}
+                    name={names[i]}
+                    strokeWidth={4} // Thicker line
+                    dot={{ r: 6 }}   // Thicker dots
+                    activeDot={{ r: 10 }} // Thicker active dot
+                />
                     ))}
                 </LineChart>
             </ResponsiveContainer>
@@ -197,142 +229,108 @@ const HealthReadingsCard: React.FC<{ userId: string }> = ({ userId }) => {
     );
 };
 
-const ReportDetails = ({ result, onUpdate, isDoctorView = false }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editRows, setEditRows] = useState([]);
-    const parsedData = useMemo(() => {
-        const raw = result?.results || '';
-        let resultsArr = [];
-        let summaryText = '';
-        try {
-            const parsed = raw ? JSON.parse(raw) : {};
-            resultsArr = Array.isArray(parsed) ? parsed : (parsed.results && Array.isArray(parsed.results) ? parsed.results : []);
-            summaryText = parsed.summary || '';
-        } catch (error) {
-            return { error: 'Error parsing results.', raw };
-        }
-        const processFlag = (value, referenceRange) => {
-            if (!value || !referenceRange) return 'N/A';
-            const numValue = parseFloat(String(value).replace(/,/g, ''));
-            const match = String(referenceRange).match(/([\d.]+)\s*-\s*([\d.]+)/);
-            if (!isNaN(numValue) && match) {
-                const low = parseFloat(match[1]);
-                const high = parseFloat(match[2]);
-                if (numValue < low) return 'Low';
-                if (numValue > high) return 'High';
-                return 'Normal';
-            }
-            return 'N/A';
-        };
-        resultsArr = resultsArr.map(item => ({...item, flag: item.flag || processFlag(item.value, item.referenceRange)}));
-        if (!summaryText && resultsArr.length > 0) {
-            const abnormal = resultsArr.filter(r => r.flag === 'Low' || r.flag === 'High');
-            if (abnormal.length > 0) {
-                summaryText = abnormal.map(r => `${r.name} is ${r.flag.toLowerCase()}`).join(', ') + '.';
-            }
-        }
-        return { resultsArr, summaryText, raw };
-    }, [result]);
+const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) => {
+    const chartData = useMemo(() => {
+        return documents
+            .map(doc => {
+                try {
+                    const rawResults = doc.results ? JSON.parse(doc.results) : [];
+                    if (!Array.isArray(rawResults)) return null;
+                    const item = rawResults.find(i => getCanonicalBiomarker(i.name) === dataKey);
+                    if (item && item.value !== null && item.value !== undefined) {
+                        const valStr = String(item.value).replace(/,/g, '');
+                        const value = parseFloat(valStr);
+                        if (!isNaN(value)) {
+                            return {
+                                date: new Date(doc.recordedAt),
+                                value,
+                                name: format(new Date(doc.recordedAt), 'MMM d'),
+                            };
+                        }
+                    }
+                } catch { return null; }
+                return null;
+            })
+            .filter(item => item !== null)
+            .sort((a, b) => a.date.getTime() - b.date.getTime());
+    }, [documents, dataKey]);
 
-    useEffect(() => {
-        if (isEditing) {
-            setEditRows(parsedData.resultsArr.map(r => ({ ...r })));
-        }
-    }, [isEditing, parsedData.resultsArr]);
+    if (chartData.length < 2) {
+        return <div className="flex items-center justify-center h-[200px] text-xs text-gray-500">Not enough data to display a trend for {name}.</div>;
+    }
 
-    const handleEditChange = (idx, field, value) => {
-        setEditRows(rows => rows.map((row, i) => i === idx ? { ...row, [field]: value } : row));
-    };
-
-    const handleSave = () => {
-        if (onUpdate) onUpdate(editRows);
-        setIsEditing(false);
-    };
-
-    if (parsedData.error) return <div className="text-center text-red-500 italic p-4">{parsedData.error}</div>;
-    const { resultsArr, summaryText, raw } = parsedData;
+    const dataValues = chartData.map(d => d.value);
+    const refRange = Array.isArray(normalRange) && normalRange.length === 2 ? normalRange : [0, 0];
+    const yMin = Math.min(...dataValues, refRange[0]);
+    const yMax = Math.max(...dataValues, refRange[1]);
+    const yPadding = (yMax - yMin) * 0.2 || 5;
+    const yDomain = [Math.max(0, Math.floor(yMin - yPadding)), Math.ceil(yMax + yPadding)];
 
     return (
-        <div className="space-y-4 p-1">
-            {summaryText && (
-                <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900/50">
-                    <CardHeader><CardTitle className="text-base text-blue-900 dark:text-blue-200">AI Summary</CardTitle></CardHeader>
-                    <CardContent><p className="text-sm text-blue-800 dark:text-blue-300">{summaryText}</p></CardContent>
-                </Card>
-            )}
-            {resultsArr.length > 0 ? (
-                <div className="overflow-x-auto border rounded-lg">
-                    <table className="min-w-full text-sm">
-                        <thead className="bg-secondary/50">
-                            <tr>
-                                <th className="px-3 py-2 text-left font-medium">Name</th>
-                                <th className="px-3 py-2 text-left font-medium">Value</th>
-                                <th className="px-3 py-2 text-left font-medium">Unit</th>
-                                <th className="px-3 py-2 text-left font-medium">Reference Range</th>
-                                <th className="px-3 py-2 text-left font-medium">Flag</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {(isEditing ? editRows : resultsArr).map((item, idx) => (
-                                <tr key={idx} className="border-t">
-                                    <td className="px-3 py-2 font-semibold">{item.name}</td>
-                                    <td className="px-3 py-2">{isEditing ? <input type="text" value={item.value} onChange={e => handleEditChange(idx, 'value', e.target.value)} className="border rounded px-1 w-20" /> : item.value}</td>
-                                    <td className="px-3 py-2">{isEditing ? <input type="text" value={item.unit || ''} onChange={e => handleEditChange(idx, 'unit', e.target.value)} className="border rounded px-1 w-16" /> : item.unit}</td>
-                                    <td className="px-3 py-2 text-muted-foreground">{isEditing ? <input type="text" value={item.referenceRange || ''} onChange={e => handleEditChange(idx, 'referenceRange', e.target.value)} className="border rounded px-1 w-24" /> : item.referenceRange}</td>
-                                    <td className="px-3 py-2"><span className={`px-2 py-0.5 text-xs font-bold rounded-full ${item.flag === 'High' ? 'bg-red-100 text-red-800' : item.flag === 'Low' ? 'bg-yellow-100 text-yellow-800' : item.flag === 'Normal' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{item.flag}</span></td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {isDoctorView && (
-                        <div className="flex gap-2 p-2">
-                            {isEditing ? (
-                                <><Button size="sm" variant="default" onClick={handleSave}>Save</Button><Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button></>
-                            ) : (
-                                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>Edit Results</Button>
-                            )}
-                        </div>
-                    )}
-                </div>
-            ) : <div className="text-center text-muted-foreground italic p-8">No structured data was extracted.</div>}
-            <details><summary className="text-xs text-muted-foreground cursor-pointer hover:text-primary">Show raw JSON</summary><pre className="mt-2 text-xs bg-secondary/30 p-2 rounded border overflow-x-auto max-h-40 whitespace-pre-wrap">{raw || 'No raw data.'}</pre></details>
-        </div>
-    );
-};
-
-const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl, handleUpdateResults, isDoctorView }) => {
-    if (!selectedDoc) return null;
-    return (
-        <Dialog open={!!selectedDoc} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-0">
-                <DialogHeader className="p-4 border-b flex-shrink-0"><DialogTitle className="truncate">{selectedDoc.testName}</DialogTitle><DialogDescription>{format(new Date(selectedDoc.recordedAt), 'MMMM d, yyyy')}</DialogDescription><DialogClose className="absolute right-4 top-4" /></DialogHeader>
-                <div className="lg:hidden flex-grow min-h-0">
-                    <Tabs defaultValue="results" className="flex flex-col h-full">
-                        <TabsList className="grid w-full grid-cols-2 flex-shrink-0"><TabsTrigger value="results"><FileJson className="w-4 h-4 mr-2"/>AI Results</TabsTrigger><TabsTrigger value="document"><FileType className="w-4 h-4 mr-2"/>Document</TabsTrigger></TabsList>
-                        <TabsContent value="results" className="flex-grow overflow-y-auto p-4"><ReportDetails result={selectedDoc} onUpdate={handleUpdateResults} isDoctorView={isDoctorView} /></TabsContent>
-                        <TabsContent value="document" className="flex-grow"><iframe src={getSafeFilePreviewUrl(selectedDoc.fileId)} className="w-full h-full border-0" title={selectedDoc.fileName} /></TabsContent>
-                    </Tabs>
-                </div>
-                <div className="hidden lg:grid lg:grid-cols-2 gap-6 p-4 flex-grow min-h-0">
-                    <div className="border rounded-lg overflow-hidden h-full flex flex-col"><iframe src={getSafeFilePreviewUrl(selectedDoc.fileId)} className="w-full h-full" title={selectedDoc.fileName} /></div>
-                    <ScrollArea className="h-full"><ReportDetails result={selectedDoc} onUpdate={handleUpdateResults} isDoctorView={isDoctorView} /></ScrollArea>
-                </div>
-                <div className="p-4 border-t flex justify-end flex-shrink-0">
-                    <Button asChild variant="outline"><a href={getSafeFilePreviewUrl(selectedDoc.fileId)} download={selectedDoc.fileName} target="_blank" rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" /> Download File</a></Button>
-                </div>
-            </DialogContent>
-        </Dialog>
+        <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" fontSize={10} />
+                <YAxis fontSize={10} unit={unit} domain={yDomain} />
+                <Tooltip contentStyle={{ fontSize: '12px', borderRadius: '0.5rem' }} />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                {refRange[0] > 0 && refRange[1] > 0 && (
+                    <ReferenceArea y1={refRange[0]} y2={refRange[1]} fill="hsl(var(--primary))" fillOpacity={0.05} label={{ value: "Normal", position: "insideTopRight", fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+                )}
+                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" name={name} />
+            </LineChart>
+        </ResponsiveContainer>
     );
 };
 
 const BloodworkCard: React.FC<{ userId: string }> = ({ userId }) => {
     const { toast } = useToast();
     const [selectedDoc, setSelectedDoc] = useState<BloodworkResult | null>(null);
+    const [selectedBiomarker, setSelectedBiomarker] = useState("");
+    const [biomarkerOptions, setBiomarkerOptions] = useState([]);
+    const [biomarkerUnits, setBiomarkerUnits] = useState({});
+    const [biomarkerRanges, setBiomarkerRanges] = useState({});
+
     const { data: bloodworkDocs, isLoading, isError, error, refetch } = useQuery<BloodworkResult[], Error>({
         queryKey: ['patientBloodwork', userId],
         queryFn: () => getUserBloodworkResults(userId),
         enabled: !!userId,
     });
+
+    useEffect(() => {
+        if (!bloodworkDocs || bloodworkDocs.length === 0) {
+            setBiomarkerOptions([]);
+            setSelectedBiomarker("");
+            return;
+        }
+        const canonicalBiomarkerMap = {};
+        const unitsMap = {};
+        const rangesMap = {};
+        bloodworkDocs.forEach(doc => {
+            let results;
+            try { results = doc.results ? JSON.parse(doc.results) : []; } catch { results = []; }
+            if (!Array.isArray(results)) return;
+            results.forEach(item => {
+                const canonicalName = getCanonicalBiomarker(item.name);
+                if (!canonicalName) return;
+                canonicalBiomarkerMap[canonicalName] = (canonicalBiomarkerMap[canonicalName] || 0) + 1;
+                if (!unitsMap[canonicalName] && item.unit) unitsMap[canonicalName] = item.unit;
+                if (!rangesMap[canonicalName] && item.referenceRange) {
+                    const match = String(item.referenceRange).match(/([\d.]+)\s*-\s*([\d.]+)/);
+                    if (match) rangesMap[canonicalName] = [parseFloat(match[1]), parseFloat(match[2])];
+                }
+            });
+        });
+        const options = Object.keys(canonicalBiomarkerMap).filter(key => canonicalBiomarkerMap[key] > 1).sort();
+        setBiomarkerOptions(options);
+        setBiomarkerUnits(unitsMap);
+        setBiomarkerRanges(rangesMap);
+        if (options.length > 0) {
+            setSelectedBiomarker(prev => options.includes(prev) ? prev : options[0]);
+        } else {
+            setSelectedBiomarker("");
+        }
+    }, [bloodworkDocs]);
 
     const handleUpdateResults = async (newResultsArr) => {
         if (!selectedDoc) return;
@@ -357,25 +355,232 @@ const BloodworkCard: React.FC<{ userId: string }> = ({ userId }) => {
             <Card className="shadow border dark:border-gray-700">
                 <CardHeader><CardTitle className="text-lg font-semibold flex items-center gap-2"><TestTube2 className="h-5 w-5 text-purple-600"/>Bloodwork Reports</CardTitle></CardHeader>
                 <CardContent>
-                    {isLoading ? <SectionLoadingSkeleton /> :
-                     isError ? <p className="text-sm text-red-600">{error?.message}</p> :
-                     !bloodworkDocs || bloodworkDocs.length === 0 ? <p className="text-sm text-gray-500">No bloodwork reports found.</p> :
-                     <ul className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                         {bloodworkDocs.map(doc => (
-                             <li key={doc.$id} className="flex items-center justify-between space-x-3 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/50">
-                                 <div className="overflow-hidden">
-                                     <p className="text-sm font-medium truncate" title={doc.testName}>{doc.testName}</p>
-                                     <p className="text-xs text-gray-500">Recorded: {format(parseISO(doc.recordedAt), 'MMM d, yyyy')}</p>
-                                 </div>
-                                 <Button variant="outline" size="sm" onClick={() => setSelectedDoc(doc)} className="flex-shrink-0">View Details</Button>
-                             </li>
-                         ))}
-                     </ul>
-                    }
+                    <Tabs defaultValue="trends">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="trends">Trends</TabsTrigger>
+                            <TabsTrigger value="history">History</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="trends" className="mt-4">
+                            <div className="mb-4">
+                                <label htmlFor="biomarker-select" className="mr-2 text-sm font-medium">Biomarker:</label>
+                                <select id="biomarker-select" value={selectedBiomarker} onChange={e => setSelectedBiomarker(e.target.value)} className="border rounded px-2 py-1 text-sm">
+                                    {biomarkerOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                            </div>
+                            {selectedBiomarker ? (
+                                <BloodworkTrendChart documents={bloodworkDocs || []} dataKey={selectedBiomarker} name={selectedBiomarker} unit={biomarkerUnits[selectedBiomarker] || ""} normalRange={biomarkerRanges[selectedBiomarker] || [0, 0]} />
+                            ) : <div className="text-center text-sm text-muted-foreground py-8">Select a biomarker with multiple data points to view its trend.</div>}
+                        </TabsContent>
+                        <TabsContent value="history" className="mt-4">
+                            {isLoading ? <SectionLoadingSkeleton /> :
+                             isError ? <p className="text-sm text-red-600">{error?.message}</p> :
+                             !bloodworkDocs || bloodworkDocs.length === 0 ? <p className="text-sm text-gray-500">No bloodwork reports found.</p> :
+                             <ul className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                                 {bloodworkDocs.map(doc => (
+                                     <li key={doc.$id} className="flex items-center justify-between space-x-3 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/50">
+                                         <div className="overflow-hidden">
+                                             <p className="text-sm font-medium truncate" title={doc.testName}>{doc.testName}</p>
+                                             <p className="text-xs text-gray-500">Recorded: {format(parseISO(doc.recordedAt), 'MMM d, yyyy')}</p>
+                                         </div>
+                                         <Button variant="outline" size="sm" onClick={() => setSelectedDoc(doc)} className="flex-shrink-0">View Details</Button>
+                                     </li>
+                                 ))}
+                             </ul>
+                            }
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
             <ReportModal selectedDoc={selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)} getSafeFilePreviewUrl={getSafeFilePreviewUrl} handleUpdateResults={handleUpdateResults} isDoctorView={true} />
         </>
+    );
+};
+
+const ReportDetails = ({ result, onUpdate }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editRows, setEditRows] = useState([]);
+    const parsedData = useMemo(() => {
+        const raw = result?.results || '';
+        let resultsArr = [];
+        let summaryText = '';
+        let tags = [];
+        try {
+            const parsed = raw ? JSON.parse(raw) : {};
+            if (Array.isArray(parsed)) {
+                resultsArr = parsed;
+            } else if (parsed.results && Array.isArray(parsed.results)) {
+                resultsArr = parsed.results;
+                summaryText = parsed.summary || '';
+                tags = parsed.tags || [];
+            }
+        } catch (error) {
+            return { error: 'Error parsing results.', raw };
+        }
+        const processFlag = (value, referenceRange) => {
+            if (!value || !referenceRange) return 'N/A';
+            const numValue = parseFloat(String(value).replace(/,/g, ''));
+            const match = String(referenceRange).match(/([\d.]+)\s*-\s*([\d.]+)/);
+            if (!isNaN(numValue) && match) {
+                const low = parseFloat(match[1]);
+                const high = parseFloat(match[2]);
+                if (numValue < low) return 'Low';
+                if (numValue > high) return 'High';
+                return 'Normal';
+            }
+            return 'N/A';
+        };
+        resultsArr = resultsArr.map(item => ({
+            ...item,
+            flag: item.flag || processFlag(item.value, item.referenceRange)
+        }));
+        if (!summaryText && resultsArr.length > 0) {
+            const abnormal = resultsArr.filter(r => r.flag === 'Low' || r.flag === 'High');
+            if (abnormal.length > 0) {
+                summaryText = abnormal.map(r => `${r.name} is ${r.flag.toLowerCase()}`).join(', ') + '.';
+            }
+        }
+        return { resultsArr, summaryText, tags, raw };
+    }, [result]);
+
+    useEffect(() => {
+        if (isEditing) {
+            setEditRows(parsedData.resultsArr.map(r => ({ ...r })));
+        }
+    }, [isEditing, parsedData.resultsArr]);
+
+    const handleEditChange = (idx, field, value) => {
+        setEditRows(rows => rows.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+    };
+
+    const handleSave = () => {
+        if (onUpdate) onUpdate(editRows);
+        setIsEditing(false);
+    };
+
+    if (parsedData.error) {
+        return <div className="text-center text-red-500 italic p-4">{parsedData.error}</div>;
+    }
+    const { resultsArr, summaryText, tags, raw } = parsedData;
+    return (
+        <div className="space-y-4 p-1">
+            {summaryText && (
+                <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900/50">
+                    <CardHeader><CardTitle className="text-base text-blue-900 dark:text-blue-200">AI Summary</CardTitle></CardHeader>
+                    <CardContent><p className="text-sm text-blue-800 dark:text-blue-300">{summaryText}</p></CardContent>
+                </Card>
+            )}
+            {tags && tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                    {tags.map((tag, idx) => (
+                        <span key={idx} className="px-2 py-0.5 text-xs rounded bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{tag}</span>
+                    ))}
+                </div>
+            )}
+            {resultsArr.length > 0 ? (
+                <div className="overflow-x-auto border rounded-lg">
+                    <table className="min-w-full text-sm">
+                        <thead className="bg-secondary/50">
+                            <tr>
+                                <th className="px-3 py-2 text-left font-medium">Name</th>
+                                <th className="px-3 py-2 text-left font-medium">Value</th>
+                                <th className="px-3 py-2 text-left font-medium">Unit</th>
+                                <th className="px-3 py-2 text-left font-medium">Reference Range</th>
+                                <th className="px-3 py-2 text-left font-medium">Flag</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(isEditing ? editRows : resultsArr).map((item, idx) => (
+                                <tr key={idx} className="border-t">
+                                    <td className="px-3 py-2 font-semibold">{item.name}</td>
+                                    <td className="px-3 py-2">
+                                        {isEditing ? (
+                                            <input type="text" value={item.value} onChange={e => handleEditChange(idx, 'value', e.target.value)} className="border rounded px-1 w-20" />
+                                        ) : item.value}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {isEditing ? (
+                                            <input type="text" value={item.unit || ''} onChange={e => handleEditChange(idx, 'unit', e.target.value)} className="border rounded px-1 w-16" />
+                                        ) : item.unit}
+                                    </td>
+                                    <td className="px-3 py-2 text-muted-foreground">
+                                        {isEditing ? (
+                                            <input type="text" value={item.referenceRange || ''} onChange={e => handleEditChange(idx, 'referenceRange', e.target.value)} className="border rounded px-1 w-24" />
+                                        ) : item.referenceRange}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${item.flag === 'High' ? 'bg-red-100 text-red-800' : item.flag === 'Low' ? 'bg-yellow-100 text-yellow-800' : item.flag === 'Normal' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{item.flag}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <div className="flex gap-2 p-2">
+                        {isEditing ? (
+                            <>
+                                <Button size="sm" variant="default" onClick={handleSave}>Save</Button>
+                                <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                            </>
+                        ) : (
+                            <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>Edit</Button>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <div className="text-center text-muted-foreground italic p-8">No structured data was extracted from this report.</div>
+            )}
+            <details>
+                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-primary">Show raw AI results JSON</summary>
+                <pre className="mt-2 text-xs bg-secondary/30 p-2 rounded border overflow-x-auto max-h-40 whitespace-pre-wrap">{raw || 'No raw data.'}</pre>
+            </details>
+        </div>
+    );
+};
+
+const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl, handleUpdateResults }) => {
+    if (!selectedDoc) return null;
+
+    return (
+        <Dialog open={!!selectedDoc} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-0">
+                <DialogHeader className="p-4 border-b flex-shrink-0">
+                    <DialogTitle className="truncate">{selectedDoc.testName}</DialogTitle>
+                    <DialogDescription>{format(new Date(selectedDoc.recordedAt), 'MMMM d, yyyy')}</DialogDescription>
+                    <DialogClose className="absolute right-4 top-4" />
+                </DialogHeader>
+
+                <div className="lg:hidden flex-grow min-h-0">
+                    <Tabs defaultValue="results" className="flex flex-col h-full">
+                        <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+                            <TabsTrigger value="results"><FileJson className="w-4 h-4 mr-2"/>AI Results</TabsTrigger>
+                            <TabsTrigger value="document"><FileType className="w-4 h-4 mr-2"/>Document</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="results" className="flex-grow overflow-y-auto p-4">
+                            <ReportDetails result={selectedDoc} onUpdate={handleUpdateResults} />
+                        </TabsContent>
+                        <TabsContent value="document" className="flex-grow">
+                             <iframe src={getSafeFilePreviewUrl(selectedDoc.fileId)} className="w-full h-full border-0" title={selectedDoc.fileName} />
+                        </TabsContent>
+                    </Tabs>
+                </div>
+                
+                <div className="hidden lg:grid lg:grid-cols-2 gap-6 p-4 flex-grow min-h-0">
+                    <div className="border rounded-lg overflow-hidden h-full flex flex-col">
+                        <iframe src={getSafeFilePreviewUrl(selectedDoc.fileId)} className="w-full h-full" title={selectedDoc.fileName} />
+                    </div>
+                    <ScrollArea className="h-full">
+                         <ReportDetails result={selectedDoc} onUpdate={handleUpdateResults} />
+                    </ScrollArea>
+                </div>
+
+                <div className="p-4 border-t flex justify-end flex-shrink-0">
+                    <Button asChild variant="outline">
+                        <a href={getSafeFilePreviewUrl(selectedDoc.fileId)} download={selectedDoc.fileName} target="_blank" rel="noopener noreferrer">
+                            <Download className="mr-2 h-4 w-4" /> Download File
+                        </a>
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 
