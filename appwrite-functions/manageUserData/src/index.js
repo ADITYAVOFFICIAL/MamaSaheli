@@ -15,9 +15,7 @@ async function getAllUserDocuments(databases, databaseId, collectionId, userId, 
             if (cursor) {
                 queries.push(Query.cursorAfter(cursor));
             }
-
             const response = await databases.listDocuments(databaseId, collectionId, queries);
-
             if (response.documents.length > 0) {
                 documents.push(...response.documents);
                 cursor = response.documents[response.documents.length - 1].$id;
@@ -26,9 +24,8 @@ async function getAllUserDocuments(databases, databaseId, collectionId, userId, 
             }
         } while (cursor);
     } catch (e) {
-        error(`Failed to list documents for collection '${collectionId}'. Error: ${e.message}. This might be due to a missing index on the 'userId' attribute, incorrect permissions, or the collection not existing.`);
+        error(`Failed to list documents for collection '${collectionId}'. Error: ${e.message}. This might be due to a missing 'userId' index or incorrect permissions.`);
     }
-    
     return documents;
 }
 
@@ -37,7 +34,6 @@ async function deleteAllUserDocuments(databases, databaseId, collectionId, userI
         error(`deleteAllUserDocuments was called with an invalid collectionId.`);
         return;
     }
-
     try {
         let documents;
         let cursor = null;
@@ -68,7 +64,6 @@ async function deleteAllUserFiles(storage, bucketId, userId, log, error) {
         error(`deleteAllUserFiles was called with an invalid bucketId.`);
         return;
     }
-    
     try {
         let files;
         let cursor = null;
@@ -83,7 +78,6 @@ async function deleteAllUserFiles(storage, bucketId, userId, log, error) {
                 const userFiles = files.files.filter(file =>
                     file.permissions.some(p => p.includes(`user:${userId}`))
                 );
-
                 await Promise.all(userFiles.map(file => 
                     storage.deleteFile(bucketId, file.$id)
                 ));
@@ -108,9 +102,7 @@ module.exports = async ({ req, res, log, error }) => {
         'FORUM_POSTS_COLLECTION_ID', 'FORUM_VOTES_COLLECTION_ID', 'PROFILE_BUCKET_ID',
         'MEDICAL_BUCKET_ID', 'CHAT_IMAGES_BUCKET_ID'
     ];
-
     const missingEnv = requiredEnv.filter(envVar => !process.env[envVar]);
-
     if (missingEnv.length > 0) {
         const errorMessage = `Function is missing required environment variables: ${missingEnv.join(', ')}. Please configure them in your Appwrite function settings.`;
         error(errorMessage);
@@ -125,8 +117,7 @@ module.exports = async ({ req, res, log, error }) => {
 
     let action;
     try {
-        const body = JSON.parse(req.body || '{}');
-        action = body.action;
+        action = JSON.parse(req.body || '{}').action;
     } catch (e) {
         error('Invalid JSON body.');
         return res.send(JSON.stringify({ success: false, error: 'Invalid request body.' }), 400, { 'Content-Type': 'application/json' });
@@ -134,11 +125,10 @@ module.exports = async ({ req, res, log, error }) => {
 
     if (!action || !['export', 'delete'].includes(action)) {
         error(`Invalid or missing action: '${action}'`);
-        return res.send(JSON.stringify({ success: false, error: 'Action (either "export" or "delete") must be specified.' }), 400, { 'Content-Type': 'application/json' });
+        return res.send(JSON.stringify({ success: false, error: 'Action ("export" or "delete") must be specified.' }), 400, { 'Content-Type': 'application/json' });
     }
 
-    const client = new Client();
-    client
+    const client = new Client()
         .setEndpoint(process.env.APPWRITE_ENDPOINT)
         .setProject(process.env.APPWRITE_PROJECT_ID)
         .setKey(process.env.APPWRITE_API_KEY_MANAGE_USER_SCOPE);
@@ -168,13 +158,19 @@ module.exports = async ({ req, res, log, error }) => {
                     forumVotes: process.env.FORUM_VOTES_COLLECTION_ID,
                 };
 
-                const userData = {};
-                for (const [key, collectionId] of Object.entries(collectionsToExport)) {
+                const exportPromises = Object.entries(collectionsToExport).map(async ([key, collectionId]) => {
                     const documents = await getAllUserDocuments(databases, databaseId, collectionId, userId, log, error);
+                    return { key, documents };
+                });
+
+                const results = await Promise.all(exportPromises);
+                
+                const userData = {};
+                results.forEach(({ key, documents }) => {
                     if (documents.length > 0) {
                         userData[key] = documents;
                     }
-                }
+                });
 
                 log(`Data export complete for user: ${userId}. Found data in ${Object.keys(userData).length} collection(s).`);
                 
@@ -201,16 +197,17 @@ module.exports = async ({ req, res, log, error }) => {
                     process.env.FORUM_TOPICS_COLLECTION_ID, process.env.FORUM_POSTS_COLLECTION_ID,
                     process.env.FORUM_VOTES_COLLECTION_ID,
                 ];
-                for (const collectionId of collectionsToClear) {
-                    await deleteAllUserDocuments(databases, databaseId, collectionId, userId, log, error);
-                }
                 
                 const bucketsToClear = [
                     process.env.PROFILE_BUCKET_ID, process.env.MEDICAL_BUCKET_ID, process.env.CHAT_IMAGES_BUCKET_ID,
                 ];
-                for (const bucketId of bucketsToClear) {
-                    await deleteAllUserFiles(storage, bucketId, userId, log, error);
-                }
+
+                const deletionPromises = [
+                    ...collectionsToClear.map(id => deleteAllUserDocuments(databases, databaseId, id, userId, log, error)),
+                    ...bucketsToClear.map(id => deleteAllUserFiles(storage, id, userId, log, error))
+                ];
+
+                await Promise.all(deletionPromises);
                 
                 await users.delete(userId);
                 log(`SUCCESS: Permanently deleted user account: ${userId}`);
