@@ -179,7 +179,7 @@ useEffect(() => {
 
   const mobileGridItemVariants = {
     hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } },
+    visible: { opacity: 1, y: 0, transition: { stiffness: 300, damping: 25 } },
   };
 
   const getNavLinkClass = ({ isActive }: { isActive: boolean }): string =>
