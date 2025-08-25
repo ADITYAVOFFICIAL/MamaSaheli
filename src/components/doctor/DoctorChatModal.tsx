@@ -207,24 +207,14 @@ const DoctorChatModal: React.FC<DoctorChatModalProps> = ({ isOpen, onClose, pati
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl w-[90vw] h-[85vh] flex flex-col p-0">
-          <DialogHeader className="p-4 border-b flex flex-row justify-between items-center">
-            <div>
-              <DialogTitle>Chat with {patientProfile?.name || 'Patient'}</DialogTitle>
-              <DialogDescription>
-                This is a direct and secure line of communication.
-              </DialogDescription>
-            </div>
-            {messages.length > 0 && (
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() => handleDeleteRequest('all')}
-                disabled={isDeleting}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
+        <DialogContent className="max-w-2xl w-[90vw] h-[85vh] flex flex-col p-0 sm:rounded-none rounded-2xl lg:rounded-xl">
+         <DialogHeader className="p-4 border-b flex flex-row justify-between items-center text-left">
+  <div>
+    <DialogTitle>Chat with {patientProfile?.name || 'Patient'}</DialogTitle>
+    <DialogDescription>
+      This is a direct and secure line of communication.
+    </DialogDescription>
+  </div>
           </DialogHeader>
 
           <div className="flex-1 overflow-hidden">
@@ -261,7 +251,23 @@ const DoctorChatModal: React.FC<DoctorChatModalProps> = ({ isOpen, onClose, pati
             </ScrollArea>
           </div>
 
-          <div className="p-4 border-t bg-gray-50 dark:bg-gray-800/50">
+          {/* Add Delete Chat History Button Below Messages */}
+          {messages.length > 0 && (
+            <div className="flex justify-end px-4 py-2 border-t bg-gray-50 dark:bg-gray-800/50">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleDeleteRequest('all')}
+                disabled={isDeleting}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Chat History
+              </Button>
+            </div>
+          )}
+
+          <div className="p-4 border-t bg-gray-50 dark:bg-gray-800/50 rounded-2xl lg:rounded-xl">
             <div className="flex items-center gap-2">
               <Textarea
                 placeholder="Type your message..."

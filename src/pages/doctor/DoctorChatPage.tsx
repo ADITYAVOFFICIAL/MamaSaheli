@@ -53,7 +53,7 @@ const MemoizedMessage: React.FC<MessageProps> = memo(({ msg, currentUserId, onDe
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity "
           onClick={() => onDelete(msg.$id)}
         >
           <Trash2 className="h-4 w-4 text-red-500" />
@@ -161,7 +161,21 @@ const DoctorChatPage: React.FC = () => {
       clearInterval(interval);
     };
   }, []);
-
+useEffect(() => {
+  // Background prefetch when user opens the screen
+  if (userId && doctorUserId) {
+    queryClient.prefetchQuery({
+      queryKey: chatQueryKey,
+      queryFn: async () => {
+        const history = (await getDoctorChatHistory(userId, doctorUserId)) as ChatMessage[] | undefined;
+        return history ?? [];
+      },
+      staleTime: 1000 * 60 * 2,
+    });
+  }
+  // Only run once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
   useEffect(() => {
     if (!userId || !doctorUserId) return;
     const databaseId = import.meta.env.VITE_APPWRITE_BLOG_DATABASE_ID;
@@ -330,16 +344,6 @@ const DoctorChatPage: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
               Chat with Dr. {doctorProfile?.name ?? 'your doctor'}
             </h2>
-            {messages.length > 0 && (
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() => handleDeleteRequest('all')}
-                disabled={isDeleting}
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
-            )}
           </header>
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length > displayLimit && (
