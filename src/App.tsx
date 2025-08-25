@@ -35,7 +35,7 @@ const ForumPage = lazy(() => import("./pages/ForumPage"));
 const ProductsPage = lazy(() => import("./pages/ProductPage"));
 const MealPage = lazy(() => import("./pages/MealPage"));
 const GamesPage = lazy(() => import("./pages/GamesPage"));
-const DoctorPage = lazy(() => import("./pages/DoctorPage"));
+const DoctorPage = lazy(() => import("./pages/doctor/DoctorPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const SymPage = lazy(() => import("./pages/SymptomCheckerPage"));
