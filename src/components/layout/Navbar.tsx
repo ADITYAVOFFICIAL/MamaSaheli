@@ -1,7 +1,5 @@
-// src/components/layout/Navbar.tsx (or your file path)
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom'; // Use NavLink for active styling
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import {
@@ -9,17 +7,26 @@ import {
   X,
   User,
   Heart,
-  ChevronDown,
   LogOut,
   LayoutDashboard,
-  Settings, // Example icon for profile
-  FileText, // Example icon for documents
+  Settings,
+  FileText,
   Gamepad2,
-  ListCheck, 
+  ListCheck,
   Salad,
+  MessageSquare,
+  Calendar,
+  Users,
+  TestTube2,
+  Package,
+  HeartPulse,
+  AlertTriangle,
+  BookOpen,
+  LogIn,
+  UserPlus
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useToast } from '@/hooks/use-toast'; // Corrected import path assuming hooks dir
+import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,116 +36,125 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getUserProfile, getFilePreview, profileBucketId } from '@/lib/appwrite';
-import { cn } from '@/lib/utils'; // Import cn utility for conditional classes
-import { motion, AnimatePresence, easeInOut } from 'framer-motion'; // For mobile menu animation
+import { cn } from '@/lib/utils';
+import { motion, AnimatePresence, easeInOut } from 'framer-motion';
 import icon256 from '/icons/icon-256x256.png';
 
-// Define Navigation Item Structure
 interface NavItem {
   path: string;
   label: string;
-  requiresAuth: boolean; // Flag to indicate if auth is needed
-  hideWhenAuth?: boolean; // Optional: Flag to hide when authenticated (e.g., Login/Signup)
-  isDesktopOnly?: boolean; // Optional: Hide on mobile if needed
-  isMobileOnly?: boolean; // Optional: Hide on desktop if needed
+  icon: React.ElementType;
+  requiresAuth: boolean;
+  hideWhenAuth?: boolean;
+  isDesktopOnly?: boolean;
+  isMobileOnly?: boolean;
 }
 
-// Centralized Navigation Items
 const navItems: NavItem[] = [
-  // --- Links shown ONLY when logged OUT ---
-  { path: '/login', label: 'Log In', requiresAuth: false, hideWhenAuth: true, isMobileOnly: true }, // Mobile only login
-  { path: '/signup', label: 'Sign Up', requiresAuth: false, hideWhenAuth: true, isMobileOnly: true }, // Mobile only signup
+  { path: '/login', label: 'Log In', icon: LogIn, requiresAuth: false, hideWhenAuth: true, isMobileOnly: true },
+  { path: '/signup', label: 'Sign Up', icon: UserPlus, requiresAuth: false, hideWhenAuth: true, isMobileOnly: true },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiresAuth: true },
+  { path: '/chat', label: 'AI Chat', icon: MessageSquare, requiresAuth: true },
+  { path: '/doctor-chat', label: 'Doctor Chat', icon: HeartPulse, requiresAuth: true },
+  { path: '/appointment', label: 'Appointments', icon: Calendar, requiresAuth: true },
+  { path: '/forum', label: 'Forum', icon: Users, requiresAuth: true },
+  { path: '/bloodwork', label: 'Bloodwork', icon: TestTube2, requiresAuth: true },
+  { path: '/products', label: 'Products', icon: Package, requiresAuth: true },
+  { path: '/meals', label: 'Meals & Exe.', icon: Salad, requiresAuth: true, isMobileOnly: true },
+  { path: '/profile', label: 'Profile', icon: Settings, requiresAuth: true, isMobileOnly: true },
+  { path: '/medicaldocs', label: 'Documents', icon: FileText, requiresAuth: true, isMobileOnly: true },
+  { path: '/schecker', label: 'Symptom Ckr.', icon: HeartPulse, requiresAuth: true, isMobileOnly: true },
+  { path: '/games', label: 'Games', icon: Gamepad2, requiresAuth: true, isMobileOnly: true },
+  { path: '/milestones', label: 'Milestones', icon: ListCheck, requiresAuth: true, isMobileOnly: true },
+  { path: '/resources', label: 'Knowledge', icon: BookOpen, requiresAuth: true },
+  { path: '/emergency', label: 'Emergency', icon: AlertTriangle, requiresAuth: false },
+];
 
-  // --- Links shown ONLY when logged IN ---
-  { path: '/chat', label: 'Chat', requiresAuth: true },
-  { path: '/appointment', label: 'Appointments', requiresAuth: true },
-  { path: '/forum', label: 'Forum', requiresAuth: true },
-  { path: '/bloodwork', label: 'Bloodwork', requiresAuth: true },
-  { path: '/products', label: 'Products', requiresAuth: true },
-  { path: '/meals', label: 'Meals & Exercises', requiresAuth: true, isMobileOnly: true },
-  { path: '/profile', label: 'Profile', requiresAuth: true, isMobileOnly: true }, // Show Profile in mobile nav too
-  { path: '/medicaldocs', label: 'Documents', requiresAuth: true, isMobileOnly: true }, // Show Docs in mobile nav too
-  { path: '/schecker', label: 'Symptom Checker', requiresAuth: true, isMobileOnly: true },
-  { path: '/games', label: 'Games', requiresAuth: true, isMobileOnly: true }, // Show Games in mobile nav too
-  { path: '/milestones', label: 'NFT Milestones', requiresAuth: true, isMobileOnly: true },
-
-  // --- Links shown REGARDLESS of auth status ---
-  { path: '/resources', label: 'Resources', requiresAuth: true },
-  { path: '/emergency', label: 'Emergency', requiresAuth: false },
-  { path: '/dashboard', label: 'Dashboard', requiresAuth: true },
+const doctorNavItems: NavItem[] = [
+    { path: '/doctor', label: 'Dashboard', icon: LayoutDashboard, requiresAuth: true },
+    { path: '/profile', label: 'Profile', icon: Settings, requiresAuth: true },
+    { path: '/medicaldocs', label: 'Documents', icon: FileText, requiresAuth: true },
+    { path: '/games', label: 'Games', icon: Gamepad2, requiresAuth: true },
+    { path: '/emergency', label: 'Emergency', icon: AlertTriangle, requiresAuth: false },
+    { path: '/resources', label: 'Knowledge', icon: BookOpen, requiresAuth: true },
+    { path: '/forum', label: 'Forum', icon: Users, requiresAuth: true },
 ];
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
-  const [isFetchingPhoto, setIsFetchingPhoto] = useState(false);
-
   const { isAuthenticated, user, logout } = useAuthStore();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Memoize filtered navigation items for performance
-  const filteredDesktopNavItems = useMemo(() =>
-    navItems.filter(item =>
-      !item.isMobileOnly && // Exclude mobile-only items
+  const isDoctor = useMemo(() => Array.isArray(user?.labels) && user.labels.includes('doctor'), [user]);
+
+  const activeDesktopNavItems = useMemo(() => {
+    const items = isDoctor ? doctorNavItems : navItems;
+    return items.filter(item =>
+      !item.isMobileOnly &&
       (isAuthenticated ? item.requiresAuth || !item.hideWhenAuth : !item.requiresAuth)
-    ), [isAuthenticated]);
+    );
+  }, [isAuthenticated, isDoctor]);
 
-  const filteredMobileNavItems = useMemo(() =>
-  navItems.filter(item =>
-    !item.isDesktopOnly && // Exclude desktop-only items
-    (isAuthenticated ? item.requiresAuth || !item.hideWhenAuth : !item.requiresAuth)
-  ), [isAuthenticated]);
-
-
-  // Fetch Profile Photo Effect
+  const activeMobileNavItems = useMemo(() => {
+    const items = isDoctor ? doctorNavItems : navItems;
+    return items.filter(item =>
+      !item.isDesktopOnly &&
+      (isAuthenticated ? item.requiresAuth || !item.hideWhenAuth : !item.requiresAuth)
+    );
+  }, [isAuthenticated, isDoctor]);
+useEffect(() => {
+  if (isOpen) {
+    document.body.classList.add('overflow-hidden');
+  } else {
+    document.body.classList.remove('overflow-hidden');
+  }
+  // Clean up on unmount
+  return () => {
+    document.body.classList.remove('overflow-hidden');
+  };
+}, [isOpen]);
   useEffect(() => {
-    let isMounted = true; // Prevent state updates on unmounted component
+    let isMounted = true;
     const fetchProfilePhoto = async () => {
       if (!user?.$id || !profileBucketId) {
-        setProfilePhotoUrl(null); // Reset if no user or bucket ID
+        setProfilePhotoUrl(null);
         return;
       }
-      setIsFetchingPhoto(true);
       try {
         const profile = await getUserProfile(user.$id);
         if (isMounted && profile?.profilePhotoId) {
           const photoUrl = getFilePreview(profile.profilePhotoId, profileBucketId);
-          // Use nullish coalescing for safety, though getFilePreview should handle it
           setProfilePhotoUrl(photoUrl?.toString() ?? null);
         } else if (isMounted) {
-          setProfilePhotoUrl(null); // Reset if no photo ID found
+          setProfilePhotoUrl(null);
         }
       } catch (error) {
-        // console.error("Error fetching profile photo for navbar:", error);
-        if (isMounted) setProfilePhotoUrl(null); // Reset on error
-      } finally {
-         if (isMounted) setIsFetchingPhoto(false);
+        if (isMounted) setProfilePhotoUrl(null);
       }
     };
 
     if (isAuthenticated) {
       fetchProfilePhoto();
     } else {
-      setProfilePhotoUrl(null); // Clear photo if logged out
+      setProfilePhotoUrl(null);
     }
 
-    return () => { isMounted = false }; // Cleanup function
-  }, [user?.$id, isAuthenticated]); // Depend on user ID and auth status
+    return () => { isMounted = false };
+  }, [user?.$id, isAuthenticated]);
 
-  // Logout Handler
   const handleLogout = async () => {
     try {
       await logout();
-      setProfilePhotoUrl(null); // Clear photo immediately on logout action
-      setIsOpen(false); // Close mobile menu if open
+      setProfilePhotoUrl(null);
+      setIsOpen(false);
       toast({
         title: "Logged out successfully",
         description: "See you again soon!",
       });
-      navigate('/'); // Navigate to home after logout
+      navigate('/');
     } catch (error) {
-      // console.error("Logout failed:", error);
       toast({
         title: "Logout failed",
         description: error instanceof Error ? error.message : "Please try again later.",
@@ -147,35 +163,39 @@ const Navbar: React.FC = () => {
     }
   };
 
-  // Mobile Menu Toggle
   const toggleMenu = () => setIsOpen(!isOpen);
-  const closeMenu = () => setIsOpen(false); // Helper to explicitly close
+  const closeMenu = () => setIsOpen(false);
 
-   // Mobile menu animation variants
-   const mobileMenuVariants = {
-    hidden: { opacity: 0, y: -20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: easeInOut } },
-    exit: { opacity: 0, y: -20, transition: { duration: 0.15, ease: easeInOut } },
+  const mobileMenuVariants = {
+    hidden: { opacity: 0, height: 0 },
+    visible: { opacity: 1, height: 'auto', transition: { duration: 0.3, ease: easeInOut } },
+    exit: { opacity: 0, height: 0, transition: { duration: 0.2, ease: easeInOut } },
   };
 
+  const mobileGridContainerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
+  };
 
-  // Common NavLink class generator
+  const mobileGridItemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } },
+  };
+
   const getNavLinkClass = ({ isActive }: { isActive: boolean }): string =>
     cn(
       "rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
       isActive
-        ? "bg-mamasaheli-light/70 text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white" // Active state styles
-        : "text-gray-700 hover:bg-mamasaheli-light/50 hover:text-mamasaheli-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white" // Default state styles
+        ? "bg-mamasaheli-light/70 text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white"
+        : "text-gray-700 hover:bg-mamasaheli-light/50 hover:text-mamasaheli-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
     );
 
   return (
     <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/90">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex flex-shrink-0 items-center" aria-label="MamaSaheli Homepage">
-              {/* Replace Heart icon with PNG logo */}
               <img src={icon256} alt="MamaSaheli Logo" className="h-8 w-8" aria-hidden="true" />
               <span className="ml-2 text-xl font-bold text-mamasaheli-primary dark:text-mamasaheli-light">
                 MamaSaheli
@@ -183,16 +203,13 @@ const Navbar: React.FC = () => {
             </Link>
           </div>
 
-          {/* Desktop Navigation & Auth Section */}
           <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
-            {/* Map over filtered desktop items */}
-            {filteredDesktopNavItems.map((item) => (
+            {activeDesktopNavItems.map((item) => (
               <NavLink key={item.path} to={item.path} className={getNavLinkClass}>
                 {item.label}
               </NavLink>
             ))}
 
-            {/* Desktop Auth Buttons / User Menu */}
             {isAuthenticated && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -207,8 +224,6 @@ const Navbar: React.FC = () => {
                         {user.name?.substring(0, 2).toUpperCase() || <User className="h-4 w-4" />}
                       </AvatarFallback>
                     </Avatar>
-                    {/* Optional: Add a small indicator or ChevronDown */}
-                    {/* <ChevronDown className="ml-1 h-4 w-4 text-gray-500 dark:text-gray-400" /> */}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -221,34 +236,13 @@ const Navbar: React.FC = () => {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Profile Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/meals')}>
-                    <Salad className="mr-2 h-4 w-4" />
-                    <span>Meals & Exercises</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/medicaldocs')}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    <span>Medical Documents</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/schecker')}>
-                    <Heart className="mr-2 h-4 w-4" />
-                    <span>Symptom Checker</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/milestones')}>
-                    <ListCheck className="mr-2 h-4 w-4" />
-                    <span>NFT Milestones</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/games')}>
-                    <Gamepad2 className="mr-2 h-4 w-4" />
-                    <span>Games</span>
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate(isDoctor ? '/doctor' : '/dashboard')}><LayoutDashboard className="mr-2 h-4 w-4" /><span>Dashboard</span></DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/profile')}><Settings className="mr-2 h-4 w-4" /><span>Profile Settings</span></DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/medicaldocs')}><FileText className="mr-2 h-4 w-4" /><span>Medical Documents</span></DropdownMenuItem>
+                  {!isDoctor && <DropdownMenuItem onClick={() => navigate('/meals')}><Salad className="mr-2 h-4 w-4" /><span>Meals & Exercises</span></DropdownMenuItem>}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:bg-red-100 focus:text-red-700 dark:focus:bg-red-900/50 dark:focus:text-red-400">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    <LogOut className="mr-2 h-4 w-4" /><span>Log out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -264,7 +258,6 @@ const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Mobile menu button */}
           <div className="-mr-2 flex md:hidden">
             <button
               onClick={toggleMenu}
@@ -274,75 +267,81 @@ const Navbar: React.FC = () => {
               aria-expanded={isOpen}
               aria-label={isOpen ? "Close main menu" : "Open main menu"}
             >
-              {isOpen ? (
-                <X className="block h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Menu className="block h-6 w-6" aria-hidden="true" />
-              )}
+              {isOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Navigation Menu */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            className="border-t border-gray-200 md:hidden dark:border-gray-700"
+            className="md:hidden overflow-hidden"
             id="mobile-menu"
             variants={mobileMenuVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
           >
-            <div className="space-y-1 px-2 pb-3 pt-2 sm:px-3">
+            <div className="px-2 pt-2 pb-4 sm:px-3 space-y-4">
+              <NavLink
+                to='/emergency'
+                className="flex items-center justify-center rounded-lg px-3 py-3 text-base font-semibold bg-red-600 text-red-100 hover:bg-red-700 shadow-lg"
+                onClick={closeMenu}
+              >
+                <AlertTriangle className="mr-2 h-5 w-5" />
+                Emergency
+              </NavLink>
 
-              {/* Map over filtered mobile items */}
-                {/* Map over filtered mobile items, hide Home and NFT Milestones, highlight Emergency in red */}
-                {filteredMobileNavItems
-                  .filter(item => item.label !== 'Home' && item.label !== 'NFT Milestones')
+              <motion.div
+                className="grid grid-cols-3 gap-2"
+                variants={mobileGridContainerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {activeMobileNavItems
+                  .filter(item => item.path !== '/emergency' && !item.hideWhenAuth)
                   .map((item) => (
-                    item.label === 'Emergency' ? (
+                    <motion.div key={item.path} variants={mobileGridItemVariants}>
                       <NavLink
-                        key={item.path}
                         to={item.path}
                         className={({ isActive }) => cn(
-                          "block rounded-md px-3 py-2 text-base font-semibold",
-                          "bg-red-600 text-red-100 hover:bg-red-700 hover:text-red-200 dark:bg-red-800 dark:text-red-200 dark:hover:bg-red-900 dark:hover:text-red-100",
-                          isActive && "ring-2 ring-red-400"
-                        )}
-                        onClick={closeMenu}
-                      >
-                        {item.label}
-                      </NavLink>
-                    ) : (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        className={({ isActive }) => cn(
-                          "block rounded-md px-3 py-2 text-base font-medium",
+                          "flex flex-col items-center justify-center text-center p-2 rounded-lg aspect-square transition-colors",
                           isActive
                             ? "bg-mamasaheli-light text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white"
-                            : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                            : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                         )}
                         onClick={closeMenu}
                       >
-                        {item.label}
+                        <item.icon className="h-6 w-6 mb-1" strokeWidth={1.5} />
+                        <span className="text-xs font-medium truncate w-full">{item.label}</span>
                       </NavLink>
-                    )
+                    </motion.div>
                   ))}
+              </motion.div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+                {isAuthenticated ? (
+                  <Button
+                    onClick={handleLogout}
+                    variant="ghost"
+                    className="flex w-full justify-center rounded-md px-3 py-2 text-base font-medium text-red-600 hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+                  >
+                    <LogOut className="mr-2 h-5 w-5" />
+                    Log Out
+                  </Button>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button asChild variant="outline" className="w-full justify-center py-3">
+                      <Link to="/login" onClick={closeMenu}>Log In</Link>
+                    </Button>
+                    <Button asChild className="w-full justify-center py-3">
+                      <Link to="/signup" onClick={closeMenu}>Sign Up</Link>
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
-             {/* Mobile Logout Button */}
-            {isAuthenticated && (
-                <div className="border-t border-gray-200 px-2 py-3 dark:border-gray-700">
-                     <button
-                        onClick={handleLogout} // Logout function already closes menu
-                        className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-red-600 hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
-                    >
-                        Log Out
-                    </button>
-                </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
