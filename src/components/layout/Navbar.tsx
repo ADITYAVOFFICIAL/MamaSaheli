@@ -31,7 +31,7 @@ import {
 import { getUserProfile, getFilePreview, profileBucketId } from '@/lib/appwrite';
 import { cn } from '@/lib/utils'; // Import cn utility for conditional classes
 import { motion, AnimatePresence, easeInOut } from 'framer-motion'; // For mobile menu animation
-import icon256 from '/public/icons/icon-256x256.png';
+import icon256 from '/icons/icon-256x256.png';
 
 // Define Navigation Item Structure
 interface NavItem {

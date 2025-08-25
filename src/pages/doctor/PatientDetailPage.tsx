@@ -19,7 +19,7 @@ import {
     MedicalDocument,
     BloodworkResult,
 } from '@/lib/appwrite';
-import { Loader2, AlertTriangle, ArrowLeft, User, Mail, CalendarDays, HeartPulse, FileText, Download, Activity, Weight, Droplets, BriefcaseMedical, TestTube2, FileJson, FileType } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, User, Mail, CalendarDays, HeartPulse, FileText, Download, Activity, Weight, Droplets, BriefcaseMedical, TestTube2, FileJson, FileType, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea } from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
+import DoctorChatModal from '@/components/doctor/DoctorChatModal';
 
 const REQUIRED_LABEL = 'doctor';
 
@@ -589,6 +591,7 @@ const PatientDetailPage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
     const { toast } = useToast();
     const navigate = useNavigate();
+    const [isChatModalOpen, setIsChatModalOpen] = useState(false);
     const { user: doctorUser, isAuthenticated } = useAuthStore();
 
     useEffect(() => {
@@ -697,6 +700,9 @@ const PatientDetailPage: React.FC = () => {
                             {patientProfile.weeksPregnant !== null && <Badge variant="secondary">Weeks: {patientProfile.weeksPregnant}</Badge>}
                         </div>
                     </div>
+                    <div className="ml-auto flex-shrink-0 print:hidden">
+                        <Button onClick={() => setIsChatModalOpen(true)}><MessageSquare className="mr-2 h-4 w-4" /> Chat with Patient</Button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
@@ -769,6 +775,11 @@ const PatientDetailPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+            <DoctorChatModal
+                isOpen={isChatModalOpen}
+                onClose={() => setIsChatModalOpen(false)}
+                patientProfile={patientProfile}
+            />
         </MainLayout>
     );
 };

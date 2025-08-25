@@ -131,6 +131,24 @@ export const appwriteSchemaConfig = {
       indexes: [
         { key: 'userId_recordedAt_idx', type: 'key', attributes: ['userId', 'recordedAt'], orders: ['ASC', 'DESC'] },
       ],
+        doctorChatMessages: {
+          id: 'doctorChatMessages', // Or use an environment variable like appwriteEnvConfig.doctorChatMessagesCollectionId
+          name: 'Doctor Chat Messages',
+          attributes: [
+            { key: 'userId', type: 'string', required: true, size: 255, array: false },
+            { key: 'doctorId', type: 'string', required: true, size: 255, array: false },
+            { key: 'sessionId', type: 'string', required: true, size: 255, array: false },
+            { key: 'senderId', type: 'string', required: true, size: 255, array: false }, // To know who sent the message (patient or doctor)
+            { key: 'role', type: 'string', required: true, size: 10, array: false }, // 'user' for patient, 'doctor' for doctor
+            { key: 'content', type: 'string', required: true, size: 65535, array: false },
+            { key: 'timestamp', type: 'datetime', required: true, array: false },
+            { key: 'isRead', type: 'boolean', required: false, default: false, array: false }, // To track if the message has been read
+          ],
+          indexes: [
+            { key: 'userId_doctorId_timestamp_idx', type: 'key', attributes: ['userId', 'doctorId', 'timestamp'], orders: ['ASC', 'ASC', 'ASC'] },
+            { key: 'sessionId_timestamp_idx', type: 'key', attributes: ['sessionId', 'timestamp'], orders: ['ASC', 'ASC'] },
+          ],
+        },
     },
     weight: {
       id: appwriteEnvConfig.weightCollectionId,

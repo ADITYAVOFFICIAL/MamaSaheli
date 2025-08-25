@@ -2255,3 +2255,43 @@ export const searchAssignedPatients = async (doctorId: string, searchTerm: strin
     return profile;
   });
 };
+export const createDoctorChatMessage = async (
+  userId: string,
+  doctorId: string,
+  sessionId: string,
+  senderId: string,
+  role: 'user' | 'doctor',
+  content: string
+): Promise<Models.Document> => {
+    const doctorChatMessagesCollectionId = import.meta.env.VITE_APPWRITE_DRCHAT_KEY as string;
+    return await databases.createDocument(
+        databaseId,
+        doctorChatMessagesCollectionId,
+        ID.unique(),
+        {
+            userId,
+            doctorId,
+            sessionId,
+            senderId,
+            role,
+            content,
+            timestamp: new Date().toISOString(),
+            isRead: false,
+        }
+    );
+};
+
+export const getDoctorChatHistory = async (userId: string, doctorId: string): Promise<Models.Document[]> => {
+    const doctorChatMessagesCollectionId = import.meta.env.VITE_APPWRITE_DRCHAT_KEY as string;
+    const response = await databases.listDocuments(
+        databaseId,
+        doctorChatMessagesCollectionId,
+        [
+            Query.equal('userId', userId),
+            Query.equal('doctorId', doctorId),
+            Query.orderAsc('timestamp'),
+            Query.limit(100), // Adjust limit as needed
+        ]
+    );
+    return response.documents;
+};
