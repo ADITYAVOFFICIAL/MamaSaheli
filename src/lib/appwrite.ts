@@ -2295,3 +2295,41 @@ export const getDoctorChatHistory = async (userId: string, doctorId: string): Pr
     );
     return response.documents;
 };
+export const deleteDoctorChatHistory = async (userId: string, doctorId: string): Promise<void> => {
+  const doctorChatMessagesCollectionId = import.meta.env.VITE_APPWRITE_DRCHAT_KEY as string;
+  if (!doctorChatMessagesCollectionId || !userId || !doctorId) {
+    throw new Error("Collection ID, User ID, and Doctor ID are required for deletion.");
+  }
+  // Fetch all messages for this user-doctor pair
+  const response = await databases.listDocuments(
+    databaseId,
+    doctorChatMessagesCollectionId,
+    [
+      Query.equal('userId', userId),
+      Query.equal('doctorId', doctorId),
+      Query.limit(1000), // adjust as needed
+    ]
+  );
+  // Delete each message
+  await Promise.all(
+    response.documents.map((msg) =>
+      databases.deleteDocument(databaseId, doctorChatMessagesCollectionId, msg.$id)
+    )
+  );
+};
+export const deleteDoctorChatMessage = async (messageId: string): Promise<void> => {
+    const doctorChatMessagesCollectionId = import.meta.env.VITE_APPWRITE_DRCHAT_KEY as string;
+    if (!doctorChatMessagesCollectionId || !messageId) {
+        throw new Error("Collection ID and Message ID are required for deletion.");
+    }
+    try {
+        await databases.deleteDocument(
+            databaseId,
+            doctorChatMessagesCollectionId,
+            messageId
+        );
+    } catch (error) {
+        handleAppwriteError(error, `deleting doctor chat message ${messageId}`);
+        throw error;
+    }
+};
