@@ -157,15 +157,16 @@ const HealthReadingsCard: React.FC<{ userId: string }> = ({ userId }) => {
                     />
                     <Legend wrapperStyle={{ fontSize: '12px' }} />
                     {keys.map((key, i) => (
-                        <Line
-                    type="monotone"
-                    dataKey={key}
-                    stroke={colors[i] || "hsl(var(--primary))"}
-                    name={names[i]}
-                    strokeWidth={4} // Thicker line
-                    dot={{ r: 6 }}   // Thicker dots
-                    activeDot={{ r: 10 }} // Thicker active dot
-                />
+                      <Line
+                            key={key}
+                            type="monotone"
+                            dataKey={key}
+                            name={names[i]}
+                            stroke={colors[i]}
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                            activeDot={{ r: 6 }}
+                        />
                     ))}
                 </LineChart>
             </ResponsiveContainer>
@@ -277,7 +278,7 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
                 {refRange[0] > 0 && refRange[1] > 0 && (
                     <ReferenceArea y1={refRange[0]} y2={refRange[1]} fill="hsl(var(--primary))" fillOpacity={0.05} label={{ value: "Normal", position: "insideTopRight", fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
                 )}
-                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" name={name} />
+                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} name={name} />
             </LineChart>
         </ResponsiveContainer>
     );
