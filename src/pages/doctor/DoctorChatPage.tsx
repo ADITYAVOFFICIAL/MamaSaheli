@@ -73,6 +73,9 @@ const MemoizedMessage: React.FC<MessageProps> = memo(({ msg, currentUserId, onDe
   );
 });
 
+const MESSAGE_WINDOW = 100;
+const ACTIVE_THRESHOLD_MS = 1000 * 60 * 2;
+
 const DoctorChatPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
@@ -81,6 +84,10 @@ const DoctorChatPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | 'all' | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
+  const [isUserActive, setIsUserActive] = useState(true);
+  const [displayLimit, setDisplayLimit] = useState<number>(MESSAGE_WINDOW);
+  const [loadingOlder, setLoadingOlder] = useState(false);
 
   const userId = user?.$id;
 
@@ -100,39 +107,80 @@ const DoctorChatPage: React.FC = () => {
   const doctorUserId = doctorProfile?.userId ?? doctorProfile?.$id ?? null;
   const chatQueryKey = useMemo(() => ['doctorChat', userId, doctorUserId], [userId, doctorUserId]);
 
-  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ChatMessage[], Error>({
+  const computeDynamicTiming = (): { staleTime: number; cacheTime: number; refetchInterval: false | number } => {
+    const sinceLast = Date.now() - lastActivityRef.current;
+    const isActive = sinceLast < ACTIVE_THRESHOLD_MS && isUserActive;
+    if (isActive) {
+      return { staleTime: 0, cacheTime: 1000 * 60 * 5, refetchInterval: false };
+    }
+    return { staleTime: 1000 * 60 * 5, cacheTime: 1000 * 60 * 60, refetchInterval: false };
+  };
+
+  const dynamicTiming = computeDynamicTiming();
+
+  const { data: messages = [], isLoading: isLoadingMessages, refetch } = useQuery<ChatMessage[], Error>({
     queryKey: chatQueryKey,
     queryFn: async () => {
       if (!userId || !doctorUserId) return [];
-      const history = await getDoctorChatHistory(userId, doctorUserId);
-      return (history as ChatMessage[]) ?? [];
+      const history = (await getDoctorChatHistory(userId, doctorUserId)) as ChatMessage[] | undefined;
+      return history ?? [];
     },
     enabled: !!userId && !!doctorUserId,
+    staleTime: dynamicTiming.staleTime,
+    refetchOnWindowFocus: (query) => {
+      const sinceLast = Date.now() - lastActivityRef.current;
+      return sinceLast < ACTIVE_THRESHOLD_MS;
+    },
+    refetchOnReconnect: (query) => {
+      const sinceLast = Date.now() - lastActivityRef.current;
+      return sinceLast < ACTIVE_THRESHOLD_MS;
+    },
+    refetchInterval: dynamicTiming.refetchInterval,
+    notifyOnChangeProps: ['data'],
   });
 
   useEffect(() => {
-    if (!userId || !doctorUserId) return;
+    const onUserActivity = () => {
+      lastActivityRef.current = Date.now();
+      setIsUserActive(true);
+    };
+    const onIdleCheck = () => {
+      const sinceLast = Date.now() - lastActivityRef.current;
+      if (sinceLast > ACTIVE_THRESHOLD_MS) setIsUserActive(false);
+    };
+    window.addEventListener('mousemove', onUserActivity);
+    window.addEventListener('keydown', onUserActivity);
+    window.addEventListener('focus', onUserActivity);
+    window.addEventListener('blur', onIdleCheck);
+    const interval = setInterval(onIdleCheck, 1000);
+    return () => {
+      window.removeEventListener('mousemove', onUserActivity);
+      window.removeEventListener('keydown', onUserActivity);
+      window.removeEventListener('focus', onUserActivity);
+      window.removeEventListener('blur', onIdleCheck);
+      clearInterval(interval);
+    };
+  }, []);
 
+  useEffect(() => {
+    if (!userId || !doctorUserId) return;
     const databaseId = import.meta.env.VITE_APPWRITE_BLOG_DATABASE_ID;
     const collectionId = import.meta.env.VITE_APPWRITE_DRCHAT_KEY;
     const channel = `databases.${databaseId}.collections.${collectionId}.documents`;
 
     const unsubscribe = client.subscribe(channel, (response: any) => {
       const payload = response.payload ?? {};
-      const events: string[] = (response.events ?? response.events) || [];
-
-      const payloadUserId = payload.userId ?? payload.senderId ?? payload.sender ?? null;
-      const payloadDoctorId = payload.doctorId ?? payload.toDoctorId ?? payload.doctor ?? null;
-
+      const events: string[] = response.events ?? [];
+      const payloadUserId = payload.userId ?? payload.senderId ?? null;
+      const payloadDoctorId = payload.doctorId ?? payload.toDoctorId ?? null;
       const isRelevant =
         (payloadUserId === userId && (payloadDoctorId === doctorUserId || payloadDoctorId === doctorProfileId)) ||
         (payloadUserId === doctorUserId && (payloadDoctorId === userId || payloadDoctorId === userId));
-
       if (!isRelevant) return;
-
+      lastActivityRef.current = Date.now();
+      setIsUserActive(true);
       const event = (events[0] ?? '').toLowerCase();
-
-      if (event.includes('create') || event.includes('update') || event.includes('upsert')) {
+      if (event.includes('create') || event.includes('upsert') || event.includes('update')) {
         queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => {
           const exists = oldData.some((m) => m.$id === payload.$id);
           if (exists) {
@@ -142,7 +190,6 @@ const DoctorChatPage: React.FC = () => {
         });
         return;
       }
-
       if (event.includes('delete')) {
         queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) =>
           oldData.filter((msg) => msg.$id !== payload.$id)
@@ -152,35 +199,23 @@ const DoctorChatPage: React.FC = () => {
     });
 
     return () => {
-      if (typeof unsubscribe === 'function') {
-        try {
-          unsubscribe();
-        } catch {
-          // ignore
-        }
-        return;
-      }
-      if (unsubscribe && typeof (unsubscribe as any).close === 'function') {
-        try {
-          (unsubscribe as any).close();
-        } catch {
-          // ignore
-        }
+      try {
+        if (typeof unsubscribe === 'function') unsubscribe();
+        if (unsubscribe && typeof (unsubscribe as any).close === 'function') (unsubscribe as any).close();
+      } catch {
+        // ignore
       }
     };
   }, [userId, doctorUserId, doctorProfileId, queryClient, chatQueryKey]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, displayLimit]);
 
   const handleSendMessage = async (): Promise<void> => {
     if (!inputMessage.trim() || !userId || !doctorUserId) return;
-
     setIsSending(true);
     const messageContent = inputMessage.trim();
     setInputMessage('');
-
     const tempId = ID.unique();
     const optimisticMessage: ChatMessage = {
       $id: tempId,
@@ -197,9 +232,8 @@ const DoctorChatPage: React.FC = () => {
       $permissions: [],
       $sequence: 0, // Added to satisfy ChatMessage type
     };
-
     queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => [...oldData, optimisticMessage]);
-
+    lastActivityRef.current = Date.now();
     try {
       const realMessage = await createDoctorChatMessage(
         userId,
@@ -209,7 +243,6 @@ const DoctorChatPage: React.FC = () => {
         'user',
         messageContent
       );
-
       queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) =>
         oldData.map((msg) => (msg.$id === tempId ? (realMessage as ChatMessage) : msg))
       );
@@ -228,7 +261,6 @@ const DoctorChatPage: React.FC = () => {
 
   const handleConfirmDelete = async (): Promise<void> => {
     if (!itemToDelete || !userId || (!doctorProfileId && !doctorUserId)) return;
-
     setIsDeleting(true);
     try {
       if (itemToDelete === 'all') {
@@ -254,6 +286,29 @@ const DoctorChatPage: React.FC = () => {
       void handleSendMessage();
     }
   };
+
+  const loadOlderMessages = async (): Promise<void> => {
+    if (!userId || !doctorUserId) return;
+    setLoadingOlder(true);
+    try {
+      const all = (await getDoctorChatHistory(userId, doctorUserId)) as ChatMessage[] | undefined;
+      const existing = queryClient.getQueryData<ChatMessage[]>(chatQueryKey) ?? [];
+      const merged = (() => {
+        const map = new Map<string, ChatMessage>();
+        (all ?? []).forEach(m => map.set(m.$id, m));
+        existing.forEach(m => map.set(m.$id, m));
+        return Array.from(map.values()).sort((a,b)=> new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      })();
+      queryClient.setQueryData(chatQueryKey, merged);
+      setDisplayLimit(merged.length);
+    } catch (err) {
+      console.error('Failed loading older messages', err);
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
+  const displayedMessages = messages.length > displayLimit ? messages.slice(-displayLimit) : messages;
 
   const isLoading = isLoadingDoctor || isLoadingMessages;
 
@@ -287,8 +342,15 @@ const DoctorChatPage: React.FC = () => {
             )}
           </header>
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length > 0 ? (
-              messages.map((msg) => (
+            {messages.length > displayLimit && (
+              <div className="flex justify-center">
+                <Button onClick={() => void loadOlderMessages()} disabled={loadingOlder}>
+                  {loadingOlder ? <Loader2 className="h-4 w-4 animate-spin" /> : `Load earlier messages (${messages.length - displayLimit})`}
+                </Button>
+              </div>
+            )}
+            {displayedMessages.length > 0 ? (
+              displayedMessages.map((msg) => (
                 <MemoizedMessage
                   key={msg.$id}
                   msg={msg}
@@ -308,7 +370,11 @@ const DoctorChatPage: React.FC = () => {
           <footer className="p-4 border-t dark:border-gray-700 flex items-center space-x-4">
             <Textarea
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                lastActivityRef.current = Date.now();
+                setIsUserActive(true);
+              }}
               placeholder="Type your message..."
               className="flex-1 resize-none bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500"
               onKeyDown={handleKeyDown}
