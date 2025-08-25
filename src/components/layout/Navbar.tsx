@@ -15,7 +15,8 @@ import {
   Settings, // Example icon for profile
   FileText, // Example icon for documents
   Gamepad2,
-  ListCheck, // Games icon
+  ListCheck, 
+  Salad,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast'; // Corrected import path assuming hooks dir
@@ -52,9 +53,9 @@ const navItems: NavItem[] = [
   { path: '/chat', label: 'Chat', requiresAuth: true },
   { path: '/appointment', label: 'Appointments', requiresAuth: true },
   { path: '/forum', label: 'Forum', requiresAuth: true },
-  { path: '/meals', label: 'Meals & Exercises', requiresAuth: true },
+  { path: '/bloodwork', label: 'Bloodwork', requiresAuth: true },
   { path: '/products', label: 'Products', requiresAuth: true },
-  
+  { path: '/meals', label: 'Meals & Exercises', requiresAuth: true, isMobileOnly: true },
   { path: '/profile', label: 'Profile', requiresAuth: true, isMobileOnly: true }, // Show Profile in mobile nav too
   { path: '/medicaldocs', label: 'Documents', requiresAuth: true, isMobileOnly: true }, // Show Docs in mobile nav too
   { path: '/schecker', label: 'Symptom Checker', requiresAuth: true, isMobileOnly: true },
@@ -223,6 +224,10 @@ const Navbar: React.FC = () => {
                   <DropdownMenuItem onClick={() => navigate('/profile')}>
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Profile Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/meals')}>
+                    <Salad className="mr-2 h-4 w-4" />
+                    <span>Meals & Exercises</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/medicaldocs')}>
                     <FileText className="mr-2 h-4 w-4" />

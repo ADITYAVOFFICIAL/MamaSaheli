@@ -30,6 +30,7 @@ import {
   AlertTriangle,
   PlusCircle,
   Hospital,
+  UserCheck, // Added icon for the doctor
 } from 'lucide-react';
 
 // --- Date & Appwrite ---
@@ -215,7 +216,7 @@ const AppointmentPage: React.FC = () => {
               Schedule & Manage Appointments
             </h1>
             <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
-              Book a new check-up, lab test, or class. View and manage your existing schedule below.
+              Book a new check-up, lab test, or class. View and manage your existing schedule.
             </p>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -247,6 +248,16 @@ const AppointmentPage: React.FC = () => {
                        <AlertTitle>No Hospital Set</AlertTitle>
                        <AlertDescription className="text-xs">
                          Please set your primary hospital in your <Link to="/profile" className="underline font-semibold">profile</Link> to continue.
+                       </AlertDescription>
+                     </Alert>
+                   )}
+                   {/* Conditionally render the Assigned Doctor alert */}
+                   {userProfile?.assignedDoctorName && (
+                     <Alert variant="default" className="bg-green-50 border-green-200 text-green-800 mt-4">
+                       <UserCheck className="h-4 w-4 text-green-600" />
+                       <AlertTitle className="font-semibold">Assigned Doctor</AlertTitle>
+                       <AlertDescription className="text-xs">
+                         Your primary contact is: <strong>Dr. {userProfile.assignedDoctorName}</strong>.
                        </AlertDescription>
                      </Alert>
                    )}

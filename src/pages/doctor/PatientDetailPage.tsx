@@ -529,10 +529,10 @@ const ReportDetails = ({ result, onUpdate }) => {
             ) : (
                 <div className="text-center text-muted-foreground italic p-8">No structured data was extracted from this report.</div>
             )}
-            <details>
+            {/* <details>
                 <summary className="text-xs text-muted-foreground cursor-pointer hover:text-primary">Show raw AI results JSON</summary>
                 <pre className="mt-2 text-xs bg-secondary/30 p-2 rounded border overflow-x-auto max-h-40 whitespace-pre-wrap">{raw || 'No raw data.'}</pre>
-            </details>
+            </details> */}
         </div>
     );
 };
