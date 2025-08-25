@@ -120,7 +120,7 @@ if (missingConfigs.length > 0) {
 }
 
 // --- Appwrite Client Initialization ---
-const client = new Client();
+export const client = new Client();
 client.setEndpoint(endpoint).setProject(projectId);
 
 // --- Service Exports ---

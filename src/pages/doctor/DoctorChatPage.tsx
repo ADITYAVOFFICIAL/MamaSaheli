@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import {
+  client,
   getUserProfile,
   UserProfile,
   createDoctorChatMessage,
@@ -24,13 +25,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ID } from 'appwrite';
+import type { Models } from 'appwrite';
 
-interface ChatMessage {
-  $id: string;
+interface ChatMessage extends Models.Document {
   content: string;
   senderId: string;
   role: 'user' | 'doctor';
   timestamp: string;
+  userId: string;
+  doctorId: string;
 }
 
 interface MessageProps {
@@ -70,83 +75,148 @@ const MemoizedMessage: React.FC<MessageProps> = memo(({ msg, currentUserId, onDe
 
 const DoctorChatPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
-  const [doctorProfile, setDoctorProfile] = useState<UserProfile | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const queryClient = useQueryClient();
   const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | 'all' | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollToBottom = (): void => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const userId = user?.$id;
 
-  const fetchChatData = useCallback(async (): Promise<void> => {
-    if (!user?.$id) return;
-    setIsLoading(true);
-    try {
-      const userProfile = await getUserProfile(user.$id);
-      if (userProfile?.assignedDoctorId) {
-        const doctor = await getUserProfile(userProfile.assignedDoctorId);
-        setDoctorProfile(doctor);
-        const history = await getDoctorChatHistory(user.$id, userProfile.assignedDoctorId);
-        const chatMessages: ChatMessage[] = history.map((doc: any) => ({
-          $id: doc.$id,
-          content: doc.content,
-          senderId: doc.senderId,
-          role: doc.role,
-          timestamp: doc.timestamp,
-        }));
-        setMessages(chatMessages);
+  const { data: doctorProfile, isLoading: isLoadingDoctor } = useQuery<UserProfile | null, Error>({
+    queryKey: ['assignedDoctorProfile', userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const userProfile = await getUserProfile(userId);
+      if (!userProfile?.assignedDoctorId) return null;
+      return await getUserProfile(userProfile.assignedDoctorId);
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const doctorProfileId = doctorProfile?.$id ?? null;
+  const doctorUserId = doctorProfile?.userId ?? doctorProfile?.$id ?? null;
+  const chatQueryKey = useMemo(() => ['doctorChat', userId, doctorUserId], [userId, doctorUserId]);
+
+  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ChatMessage[], Error>({
+    queryKey: chatQueryKey,
+    queryFn: async () => {
+      if (!userId || !doctorUserId) return [];
+      const history = await getDoctorChatHistory(userId, doctorUserId);
+      return (history as ChatMessage[]) ?? [];
+    },
+    enabled: !!userId && !!doctorUserId,
+  });
+
+  useEffect(() => {
+    if (!userId || !doctorUserId) return;
+
+    const databaseId = import.meta.env.VITE_APPWRITE_BLOG_DATABASE_ID;
+    const collectionId = import.meta.env.VITE_APPWRITE_DRCHAT_KEY;
+    const channel = `databases.${databaseId}.collections.${collectionId}.documents`;
+
+    const unsubscribe = client.subscribe(channel, (response: any) => {
+      const payload = response.payload ?? {};
+      const events: string[] = (response.events ?? response.events) || [];
+
+      const payloadUserId = payload.userId ?? payload.senderId ?? payload.sender ?? null;
+      const payloadDoctorId = payload.doctorId ?? payload.toDoctorId ?? payload.doctor ?? null;
+
+      const isRelevant =
+        (payloadUserId === userId && (payloadDoctorId === doctorUserId || payloadDoctorId === doctorProfileId)) ||
+        (payloadUserId === doctorUserId && (payloadDoctorId === userId || payloadDoctorId === userId));
+
+      if (!isRelevant) return;
+
+      const event = (events[0] ?? '').toLowerCase();
+
+      if (event.includes('create') || event.includes('update') || event.includes('upsert')) {
+        queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => {
+          const exists = oldData.some((m) => m.$id === payload.$id);
+          if (exists) {
+            return oldData.map((m) => (m.$id === payload.$id ? (payload as ChatMessage) : m));
+          }
+          return [...oldData, (payload as ChatMessage)];
+        });
+        return;
       }
-    } catch (error) {
-      console.error("Failed to fetch chat data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
+
+      if (event.includes('delete')) {
+        queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) =>
+          oldData.filter((msg) => msg.$id !== payload.$id)
+        );
+        return;
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      if (unsubscribe && typeof (unsubscribe as any).close === 'function') {
+        try {
+          (unsubscribe as any).close();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [userId, doctorUserId, doctorProfileId, queryClient, chatQueryKey]);
 
   useEffect(() => {
-    void fetchChatData();
-  }, [fetchChatData]);
-
-  useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSendMessage = async (): Promise<void> => {
-    if (!inputMessage.trim() || !user?.$id || !doctorProfile?.$id || isSending) return;
+    if (!inputMessage.trim() || !userId || !doctorUserId) return;
 
     setIsSending(true);
-    const tempId = `temp_${Date.now()}`;
-    const newMessage: ChatMessage = {
-      $id: tempId,
-      content: inputMessage,
-      senderId: user.$id,
-      role: 'user',
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    const messageContent = inputMessage.trim();
     setInputMessage('');
 
+    const tempId = ID.unique();
+    const optimisticMessage: ChatMessage = {
+      $id: tempId,
+      content: messageContent,
+      senderId: userId,
+      role: 'user',
+      timestamp: new Date().toISOString(),
+      userId: userId,
+      doctorId: doctorUserId,
+      $collectionId: '',
+      $databaseId: '',
+      $createdAt: '',
+      $updatedAt: '',
+      $permissions: [],
+      $sequence: 0, // Added to satisfy ChatMessage type
+    };
+
+    queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => [...oldData, optimisticMessage]);
+
     try {
-      const createdMessage = await createDoctorChatMessage(
-        user.$id,
-        doctorProfile.userId,
-        `${user.$id}_${doctorProfile.userId}`,
-        user.$id,
+      const realMessage = await createDoctorChatMessage(
+        userId,
+        doctorUserId,
+        `${userId}_${doctorUserId}`,
+        userId,
         'user',
-        newMessage.content
+        messageContent
       );
-      setMessages((prev) =>
-        prev.map((msg) => (msg.$id === tempId ? { ...createdMessage, $id: createdMessage.$id } : msg))
+
+      queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) =>
+        oldData.map((msg) => (msg.$id === tempId ? (realMessage as ChatMessage) : msg))
       );
     } catch (error) {
-      console.error("Failed to send message:", error);
-      setMessages((prev) => prev.filter((msg) => msg.$id !== tempId));
+      console.error('Failed to send message:', error);
+      queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => oldData.filter((msg) => msg.$id !== tempId));
+      setInputMessage(messageContent);
     } finally {
       setIsSending(false);
     }
@@ -157,22 +227,21 @@ const DoctorChatPage: React.FC = () => {
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
-    if (!itemToDelete || !user?.$id || !doctorProfile?.$id) return;
+    if (!itemToDelete || !userId || (!doctorProfileId && !doctorUserId)) return;
 
     setIsDeleting(true);
-    const originalMessages = [...messages];
-
     try {
       if (itemToDelete === 'all') {
-        setMessages([]);
-        await deleteDoctorChatHistory(user.$id, doctorProfile.$id);
+        await deleteDoctorChatHistory(userId, doctorProfileId ?? doctorUserId ?? '');
+        queryClient.setQueryData(chatQueryKey, () => []);
       } else {
-        setMessages((prev) => prev.filter((msg) => msg.$id !== itemToDelete));
         await deleteDoctorChatMessage(itemToDelete);
+        queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) =>
+          oldData.filter((msg) => msg.$id !== itemToDelete)
+        );
       }
     } catch (error) {
-      console.error("Failed to delete:", error);
-      setMessages(originalMessages);
+      console.error('Failed to delete:', error);
     } finally {
       setIsDeleting(false);
       setItemToDelete(null);
@@ -185,6 +254,8 @@ const DoctorChatPage: React.FC = () => {
       void handleSendMessage();
     }
   };
+
+  const isLoading = isLoadingDoctor || isLoadingMessages;
 
   if (isLoading) {
     return (

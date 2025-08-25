@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send, AlertTriangle, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import {
+  client,
   getDoctorChatHistory,
   createDoctorChatMessage,
   deleteDoctorChatMessage,
@@ -110,16 +111,41 @@ const DoctorChatModal: React.FC<DoctorChatModalProps> = ({ isOpen, onClose, pati
         return getDoctorChatHistory(patientId, doctorId) as Promise<ChatMessage[]>;
     },
     enabled: !!patientId && !!doctorId && isOpen,
-    refetchInterval: 5000,
   });
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  useEffect(() => {
+    if (!isOpen || !patientId || !doctorId) return;
+
+    const databaseId = import.meta.env.VITE_APPWRITE_BLOG_DATABASE_ID;
+    const collectionId = import.meta.env.VITE_APPWRITE_DRCHAT_KEY;
+    const channel = `databases.${databaseId}.collections.${collectionId}.documents`;
+
+    const unsubscribe = client.subscribe(channel, (response) => {
+      const event = response.events[0];
+      const payload = response.payload as ChatMessage;
+
+      const isRelevantMessage = payload.userId === patientId && payload.doctorId === doctorId;
+      if (!isRelevantMessage) return;
+
+      if (event.includes('create')) {
+        queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => [...oldData, payload]);
+      }
+
+      if (event.includes('delete')) {
+        queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) =>
+          oldData.filter((msg) => msg.$id !== payload.$id)
+        );
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isOpen, patientId, doctorId, queryClient, chatQueryKey]);
 
   useEffect(() => {
     if (isOpen) {
-        setTimeout(scrollToBottom, 100);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     }
   }, [messages, isOpen]);
 
@@ -127,6 +153,7 @@ const DoctorChatModal: React.FC<DoctorChatModalProps> = ({ isOpen, onClose, pati
     if (!newMessage.trim() || !patientId || !doctorId) return;
 
     setIsSending(true);
+    setNewMessage('');
     try {
       const sessionId = [patientId, doctorId].sort().join('_');
       await createDoctorChatMessage(
@@ -137,9 +164,8 @@ const DoctorChatModal: React.FC<DoctorChatModalProps> = ({ isOpen, onClose, pati
         'doctor',
         newMessage.trim()
       );
-      setNewMessage('');
-      await queryClient.invalidateQueries({ queryKey: chatQueryKey });
     } catch (err) {
+      setNewMessage(newMessage);
       toast({
         title: "Message Failed",
         description: "Could not send your message. Please try again.",
@@ -166,7 +192,6 @@ const DoctorChatModal: React.FC<DoctorChatModalProps> = ({ isOpen, onClose, pati
         await deleteDoctorChatMessage(itemToDelete);
         toast({ title: "Message Deleted", description: "The message has been removed." });
       }
-      await queryClient.invalidateQueries({ queryKey: chatQueryKey });
     } catch (err) {
       toast({
         title: "Deletion Failed",
