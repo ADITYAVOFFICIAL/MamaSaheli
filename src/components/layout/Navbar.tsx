@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getUserProfile, getFilePreview, profileBucketId } from '@/lib/appwrite';
 import { cn } from '@/lib/utils'; // Import cn utility for conditional classes
-import { motion, AnimatePresence } from 'framer-motion'; // For mobile menu animation
+import { motion, AnimatePresence, easeInOut } from 'framer-motion'; // For mobile menu animation
 import icon256 from '/public/icons/icon-256x256.png';
 
 // Define Navigation Item Structure
@@ -154,8 +154,8 @@ const Navbar: React.FC = () => {
    // Mobile menu animation variants
    const mobileMenuVariants = {
     hidden: { opacity: 0, y: -20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: 'easeOut' } },
-    exit: { opacity: 0, y: -20, transition: { duration: 0.15, ease: 'easeIn' } },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: easeInOut } },
+    exit: { opacity: 0, y: -20, transition: { duration: 0.15, ease: easeInOut } },
   };
 
 
@@ -296,37 +296,41 @@ const Navbar: React.FC = () => {
             exit="exit"
           >
             <div className="space-y-1 px-2 pb-3 pt-2 sm:px-3">
-              {/* Always show Home link */}
-               <NavLink
-                 key="home"
-                 to="/"
-                 className={({ isActive }) => cn(
-                    "block rounded-md px-3 py-2 text-base font-medium",
-                    isActive
-                      ? "bg-mamasaheli-light text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-                  )}
-                 onClick={closeMenu}
-               >
-                 Home
-               </NavLink>
 
               {/* Map over filtered mobile items */}
-              {filteredMobileNavItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => cn(
-                    "block rounded-md px-3 py-2 text-base font-medium",
-                    isActive
-                      ? "bg-mamasaheli-light text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
-                  )}
-                  onClick={closeMenu} // Close menu on navigation
-                >
-                  {item.label}
-                </NavLink>
-              ))}
+                {/* Map over filtered mobile items, hide Home and NFT Milestones, highlight Emergency in red */}
+                {filteredMobileNavItems
+                  .filter(item => item.label !== 'Home' && item.label !== 'NFT Milestones')
+                  .map((item) => (
+                    item.label === 'Emergency' ? (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        className={({ isActive }) => cn(
+                          "block rounded-md px-3 py-2 text-base font-semibold",
+                          "bg-red-600 text-red-100 hover:bg-red-700 hover:text-red-200 dark:bg-red-800 dark:text-red-200 dark:hover:bg-red-900 dark:hover:text-red-100",
+                          isActive && "ring-2 ring-red-400"
+                        )}
+                        onClick={closeMenu}
+                      >
+                        {item.label}
+                      </NavLink>
+                    ) : (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        className={({ isActive }) => cn(
+                          "block rounded-md px-3 py-2 text-base font-medium",
+                          isActive
+                            ? "bg-mamasaheli-light text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white"
+                            : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                        )}
+                        onClick={closeMenu}
+                      >
+                        {item.label}
+                      </NavLink>
+                    )
+                  ))}
             </div>
              {/* Mobile Logout Button */}
             {isAuthenticated && (

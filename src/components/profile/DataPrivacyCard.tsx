@@ -150,7 +150,7 @@ const generatePdfFromData = (data: UserData, user: any) => {
 
         const tableBody = records.map(record =>
             tableHeaders.map(header => {
-                let value = record[header];
+                const value = record[header];
                 if (value === null || value === undefined) return '';
                 if (header.toLowerCase().includes('date') || header.toLowerCase().includes('at')) {
                     return safeFormatDate(value);

@@ -392,7 +392,7 @@ const BloodworkCard: React.FC<{ userId: string }> = ({ userId }) => {
                     </Tabs>
                 </CardContent>
             </Card>
-            <ReportModal selectedDoc={selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)} getSafeFilePreviewUrl={getSafeFilePreviewUrl} handleUpdateResults={handleUpdateResults} isDoctorView={true} />
+            <ReportModal selectedDoc={selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)} getSafeFilePreviewUrl={getSafeFilePreviewUrl} handleUpdateResults={handleUpdateResults} />
         </>
     );
 };
