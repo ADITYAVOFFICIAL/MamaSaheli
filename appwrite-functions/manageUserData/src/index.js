@@ -74,17 +74,22 @@ async function deleteAllUserFiles(storage, bucketId, userId, log, error) {
             }
             files = await storage.listFiles(bucketId, queries);
             
-            if (files.files.length > 0) {
-                const userFiles = files.files.filter(file =>
-                    file.permissions.some(p => p.includes(`user:${userId}`))
-                );
-                await Promise.all(userFiles.map(file => 
-                    storage.deleteFile(bucketId, file.$id)
-                ));
-                cursor = files.files[files.files.length - 1].$id;
-            } else {
-                cursor = null;
-            }
+           if (files.files.length > 0) {
+    const userFiles = files.files.filter(file => 
+        file.permissions.some(p => p.includes(`user:${userId}`))
+    );
+
+    if (userFiles.length > 0) {
+        await Promise.all(userFiles.map(file => 
+            storage.deleteFile(bucketId, file.$id)
+        ));
+    }
+    
+    // Set cursor based on the last file fetched in the batch, not the last user file.
+    cursor = files.files[files.files.length - 1].$id;
+} else {
+    cursor = null;
+}
         } while (cursor);
         log(`Cleared files for user ${userId} from ${bucketId}`);
     } catch (e) {
