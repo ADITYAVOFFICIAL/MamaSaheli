@@ -1000,7 +1000,6 @@ function ProfilePage() {
                                 
                             </Card>
                              <div className="space-y-8">
-                                 <ChangePasswordCard />
                                  <DataPrivacyCard /></div>
                         </div>
 
