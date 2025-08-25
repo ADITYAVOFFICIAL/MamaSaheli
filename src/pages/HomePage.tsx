@@ -24,7 +24,7 @@ import {
   Loader2,
   AlertCircle,
   Tag,
-  BadgeCheck,
+  TestTube2,
 } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import Hero from '@/components/home/Hero';
@@ -291,19 +291,20 @@ const HomePage = () => {
               </Link>
             </div>
 
-            {/* Monad Milestones */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md transition-all hover:shadow-lg border-t-4 border-purple-500 dark:border-purple-600">
-              <div className="flex items-center justify-center h-12 w-12 rounded-md bg-purple-500 dark:bg-purple-600 text-white mb-4">
-                <BadgeCheck className="h-6 w-6" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Monad Milestones</h3>
-              <p className="mt-2 text-gray-600 dark:text-gray-400 text-sm">
-              Celebrate your journey by minting NFT badges for key milestones on the Monad Testnet.
-              </p>
-              <Link to="/milestones" onClick={() => window.scrollTo(0, 0)} className="mt-4 inline-flex items-center text-sm font-medium text-purple-500 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300">
-                View milestones <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </div>
+            {/* Bloodwork Analysis */}
+<div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md transition-all hover:shadow-lg border-t-4 border-blue-500 dark:border-blue-600">
+  <div className="flex items-center justify-center h-12 w-12 rounded-md bg-blue-500 dark:bg-blue-600 text-white mb-4">
+    {/* You may need to import TestTube2 from lucide-react */}
+    <TestTube2 className="h-6 w-6" />
+  </div>
+  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Bloodwork Analysis</h3>
+  <p className="mt-2 text-gray-600 dark:text-gray-400 text-sm">
+    Upload your lab reports and let our AI extract and track key health markers over time.
+  </p>
+  <Link to="/bloodwork" onClick={() => window.scrollTo(0, 0)} className="mt-4 inline-flex items-center text-sm font-medium text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+    Analyze Reports <ArrowRight className="ml-1 h-4 w-4" />
+  </Link>
+</div>
 
           </div>
         </div>

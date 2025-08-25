@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
@@ -12,11 +12,14 @@ import {
     getBloodPressureReadings,
     getBloodSugarReadings,
     getWeightReadings,
+    getUserBloodworkResults,
+    updateBloodworkResult,
     UserProfile,
     Appointment,
     MedicalDocument,
+    BloodworkResult,
 } from '@/lib/appwrite';
-import { Loader2, AlertTriangle, ArrowLeft, User, Mail, CalendarDays, HeartPulse, FileText, Download, Activity, Weight, Droplets, BriefcaseMedical } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, User, Mail, CalendarDays, HeartPulse, FileText, Download, Activity, Weight, Droplets, BriefcaseMedical, TestTube2, FileJson, FileType } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +28,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/authStore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea } from 'recharts';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const REQUIRED_LABEL = 'doctor';
 
@@ -192,6 +197,188 @@ const HealthReadingsCard: React.FC<{ userId: string }> = ({ userId }) => {
     );
 };
 
+const ReportDetails = ({ result, onUpdate, isDoctorView = false }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editRows, setEditRows] = useState([]);
+    const parsedData = useMemo(() => {
+        const raw = result?.results || '';
+        let resultsArr = [];
+        let summaryText = '';
+        try {
+            const parsed = raw ? JSON.parse(raw) : {};
+            resultsArr = Array.isArray(parsed) ? parsed : (parsed.results && Array.isArray(parsed.results) ? parsed.results : []);
+            summaryText = parsed.summary || '';
+        } catch (error) {
+            return { error: 'Error parsing results.', raw };
+        }
+        const processFlag = (value, referenceRange) => {
+            if (!value || !referenceRange) return 'N/A';
+            const numValue = parseFloat(String(value).replace(/,/g, ''));
+            const match = String(referenceRange).match(/([\d.]+)\s*-\s*([\d.]+)/);
+            if (!isNaN(numValue) && match) {
+                const low = parseFloat(match[1]);
+                const high = parseFloat(match[2]);
+                if (numValue < low) return 'Low';
+                if (numValue > high) return 'High';
+                return 'Normal';
+            }
+            return 'N/A';
+        };
+        resultsArr = resultsArr.map(item => ({...item, flag: item.flag || processFlag(item.value, item.referenceRange)}));
+        if (!summaryText && resultsArr.length > 0) {
+            const abnormal = resultsArr.filter(r => r.flag === 'Low' || r.flag === 'High');
+            if (abnormal.length > 0) {
+                summaryText = abnormal.map(r => `${r.name} is ${r.flag.toLowerCase()}`).join(', ') + '.';
+            }
+        }
+        return { resultsArr, summaryText, raw };
+    }, [result]);
+
+    useEffect(() => {
+        if (isEditing) {
+            setEditRows(parsedData.resultsArr.map(r => ({ ...r })));
+        }
+    }, [isEditing, parsedData.resultsArr]);
+
+    const handleEditChange = (idx, field, value) => {
+        setEditRows(rows => rows.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+    };
+
+    const handleSave = () => {
+        if (onUpdate) onUpdate(editRows);
+        setIsEditing(false);
+    };
+
+    if (parsedData.error) return <div className="text-center text-red-500 italic p-4">{parsedData.error}</div>;
+    const { resultsArr, summaryText, raw } = parsedData;
+
+    return (
+        <div className="space-y-4 p-1">
+            {summaryText && (
+                <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900/50">
+                    <CardHeader><CardTitle className="text-base text-blue-900 dark:text-blue-200">AI Summary</CardTitle></CardHeader>
+                    <CardContent><p className="text-sm text-blue-800 dark:text-blue-300">{summaryText}</p></CardContent>
+                </Card>
+            )}
+            {resultsArr.length > 0 ? (
+                <div className="overflow-x-auto border rounded-lg">
+                    <table className="min-w-full text-sm">
+                        <thead className="bg-secondary/50">
+                            <tr>
+                                <th className="px-3 py-2 text-left font-medium">Name</th>
+                                <th className="px-3 py-2 text-left font-medium">Value</th>
+                                <th className="px-3 py-2 text-left font-medium">Unit</th>
+                                <th className="px-3 py-2 text-left font-medium">Reference Range</th>
+                                <th className="px-3 py-2 text-left font-medium">Flag</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(isEditing ? editRows : resultsArr).map((item, idx) => (
+                                <tr key={idx} className="border-t">
+                                    <td className="px-3 py-2 font-semibold">{item.name}</td>
+                                    <td className="px-3 py-2">{isEditing ? <input type="text" value={item.value} onChange={e => handleEditChange(idx, 'value', e.target.value)} className="border rounded px-1 w-20" /> : item.value}</td>
+                                    <td className="px-3 py-2">{isEditing ? <input type="text" value={item.unit || ''} onChange={e => handleEditChange(idx, 'unit', e.target.value)} className="border rounded px-1 w-16" /> : item.unit}</td>
+                                    <td className="px-3 py-2 text-muted-foreground">{isEditing ? <input type="text" value={item.referenceRange || ''} onChange={e => handleEditChange(idx, 'referenceRange', e.target.value)} className="border rounded px-1 w-24" /> : item.referenceRange}</td>
+                                    <td className="px-3 py-2"><span className={`px-2 py-0.5 text-xs font-bold rounded-full ${item.flag === 'High' ? 'bg-red-100 text-red-800' : item.flag === 'Low' ? 'bg-yellow-100 text-yellow-800' : item.flag === 'Normal' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{item.flag}</span></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {isDoctorView && (
+                        <div className="flex gap-2 p-2">
+                            {isEditing ? (
+                                <><Button size="sm" variant="default" onClick={handleSave}>Save</Button><Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button></>
+                            ) : (
+                                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>Edit Results</Button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            ) : <div className="text-center text-muted-foreground italic p-8">No structured data was extracted.</div>}
+            <details><summary className="text-xs text-muted-foreground cursor-pointer hover:text-primary">Show raw JSON</summary><pre className="mt-2 text-xs bg-secondary/30 p-2 rounded border overflow-x-auto max-h-40 whitespace-pre-wrap">{raw || 'No raw data.'}</pre></details>
+        </div>
+    );
+};
+
+const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl, handleUpdateResults, isDoctorView }) => {
+    if (!selectedDoc) return null;
+    return (
+        <Dialog open={!!selectedDoc} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-0">
+                <DialogHeader className="p-4 border-b flex-shrink-0"><DialogTitle className="truncate">{selectedDoc.testName}</DialogTitle><DialogDescription>{format(new Date(selectedDoc.recordedAt), 'MMMM d, yyyy')}</DialogDescription><DialogClose className="absolute right-4 top-4" /></DialogHeader>
+                <div className="lg:hidden flex-grow min-h-0">
+                    <Tabs defaultValue="results" className="flex flex-col h-full">
+                        <TabsList className="grid w-full grid-cols-2 flex-shrink-0"><TabsTrigger value="results"><FileJson className="w-4 h-4 mr-2"/>AI Results</TabsTrigger><TabsTrigger value="document"><FileType className="w-4 h-4 mr-2"/>Document</TabsTrigger></TabsList>
+                        <TabsContent value="results" className="flex-grow overflow-y-auto p-4"><ReportDetails result={selectedDoc} onUpdate={handleUpdateResults} isDoctorView={isDoctorView} /></TabsContent>
+                        <TabsContent value="document" className="flex-grow"><iframe src={getSafeFilePreviewUrl(selectedDoc.fileId)} className="w-full h-full border-0" title={selectedDoc.fileName} /></TabsContent>
+                    </Tabs>
+                </div>
+                <div className="hidden lg:grid lg:grid-cols-2 gap-6 p-4 flex-grow min-h-0">
+                    <div className="border rounded-lg overflow-hidden h-full flex flex-col"><iframe src={getSafeFilePreviewUrl(selectedDoc.fileId)} className="w-full h-full" title={selectedDoc.fileName} /></div>
+                    <ScrollArea className="h-full"><ReportDetails result={selectedDoc} onUpdate={handleUpdateResults} isDoctorView={isDoctorView} /></ScrollArea>
+                </div>
+                <div className="p-4 border-t flex justify-end flex-shrink-0">
+                    <Button asChild variant="outline"><a href={getSafeFilePreviewUrl(selectedDoc.fileId)} download={selectedDoc.fileName} target="_blank" rel="noopener noreferrer"><Download className="mr-2 h-4 w-4" /> Download File</a></Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const BloodworkCard: React.FC<{ userId: string }> = ({ userId }) => {
+    const { toast } = useToast();
+    const [selectedDoc, setSelectedDoc] = useState<BloodworkResult | null>(null);
+    const { data: bloodworkDocs, isLoading, isError, error, refetch } = useQuery<BloodworkResult[], Error>({
+        queryKey: ['patientBloodwork', userId],
+        queryFn: () => getUserBloodworkResults(userId),
+        enabled: !!userId,
+    });
+
+    const handleUpdateResults = async (newResultsArr) => {
+        if (!selectedDoc) return;
+        try {
+            await updateBloodworkResult(selectedDoc.$id, newResultsArr);
+            toast({ title: "Update Successful", description: "Bloodwork values updated." });
+            refetch();
+            setSelectedDoc(prev => prev ? { ...prev, results: JSON.stringify(newResultsArr) } : null);
+        } catch (err) {
+            toast({ title: "Update Failed", description: "Could not update the results.", variant: "destructive" });
+        }
+    };
+
+    const getSafeFilePreviewUrl = (fileId) => {
+        try {
+            return getFilePreview(fileId, medicalBucketId).toString();
+        } catch { return ''; }
+    };
+
+    return (
+        <>
+            <Card className="shadow border dark:border-gray-700">
+                <CardHeader><CardTitle className="text-lg font-semibold flex items-center gap-2"><TestTube2 className="h-5 w-5 text-purple-600"/>Bloodwork Reports</CardTitle></CardHeader>
+                <CardContent>
+                    {isLoading ? <SectionLoadingSkeleton /> :
+                     isError ? <p className="text-sm text-red-600">{error?.message}</p> :
+                     !bloodworkDocs || bloodworkDocs.length === 0 ? <p className="text-sm text-gray-500">No bloodwork reports found.</p> :
+                     <ul className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                         {bloodworkDocs.map(doc => (
+                             <li key={doc.$id} className="flex items-center justify-between space-x-3 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/50">
+                                 <div className="overflow-hidden">
+                                     <p className="text-sm font-medium truncate" title={doc.testName}>{doc.testName}</p>
+                                     <p className="text-xs text-gray-500">Recorded: {format(parseISO(doc.recordedAt), 'MMM d, yyyy')}</p>
+                                 </div>
+                                 <Button variant="outline" size="sm" onClick={() => setSelectedDoc(doc)} className="flex-shrink-0">View Details</Button>
+                             </li>
+                         ))}
+                     </ul>
+                    }
+                </CardContent>
+            </Card>
+            <ReportModal selectedDoc={selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)} getSafeFilePreviewUrl={getSafeFilePreviewUrl} handleUpdateResults={handleUpdateResults} isDoctorView={true} />
+        </>
+    );
+};
+
 const PatientDetailPage: React.FC = () => {
     const { userId } = useParams<{ userId: string }>();
     const { toast } = useToast();
@@ -331,6 +518,7 @@ const PatientDetailPage: React.FC = () => {
 
                     <div className="lg:col-span-2 space-y-6">
                         <HealthReadingsCard userId={userId} />
+                        <BloodworkCard userId={userId} />
                         <Card className="shadow border dark:border-gray-700">
                             <CardHeader><CardTitle className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="h-5 w-5 text-mamasaheli-secondary"/>Appointments</CardTitle></CardHeader>
                             <CardContent>
