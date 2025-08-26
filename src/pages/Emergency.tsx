@@ -245,112 +245,96 @@ const Emergency = () => {
 
   // --- Google Places Search ---
   const findNearbyHospitalsByText = useCallback(async () => {
-  if (!isMounted.current || !currentLocation || status !== LoadingStatus.SearchingHospitals) {
-    return;
-  }
-  // Use Places API (New) Nearby Search via HTTP POST
-  const endpoint = "https://places.googleapis.com/v1/places:searchNearby";
-  const requestBody = {
-    includedTypes: ["hospital", "health", "doctor", "clinic"],
-    maxResultCount: MAX_SEARCH_RESULTS,
-    locationRestriction: {
-      circle: {
-        center: {
-          latitude: currentLocation.lat,
-          longitude: currentLocation.lng
-        },
-        radius: SEARCH_RADIUS_METERS
-      }
-    }
-  };
-  // Field mask for required fields
-  const fieldMask = [
-    "places.id",
-    "places.displayName",
-    "places.formattedAddress",
-    "places.location",
-    "places.rating",
-    "places.userRatingCount",
-    "places.businessStatus",
-    "places.websiteUri",
-    "places.nationalPhoneNumber",
-    "places.types"
-  ].join(",");
+     if (!isMounted.current || !currentLocation || status !== LoadingStatus.SearchingHospitals || !mapsApiLoaded.current) {
+         return;
+     }
+    // console.log(`Searching for nearby places...`);
 
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": googleMapsApiKey,
-        "X-Goog-FieldMask": fieldMask
-      },
-      body: JSON.stringify(requestBody)
-    });
-    if (!isMounted.current) return;
-    if (!response.ok) {
-      setErrorMessage("Failed to fetch hospital data. Check API key and network.");
-      setStatus(LoadingStatus.SearchError);
-      setHospitals([]);
+    if (!window.google?.maps?.places?.Place?.searchByText) {
+      setErrorMessage("Map service components not ready. Ensure 'Places API (New)' is enabled and refresh.");
+      setStatus(LoadingStatus.MapsError);
       return;
     }
-    const data = await response.json();
-    const places = data.places || [];
-    if (places.length > 0) {
-      // Filter for valid hospital types
-      const validResults = places.filter(place =>
-        place.id && place.location &&
-        place.types?.some(type => ["hospital", "health", "doctor", "clinic"].includes(type.toLowerCase()))
-      );
-      if (validResults.length > 0) {
-        const sortedResults = validResults
-          .map(place => ({
-            place,
-            distanceKm: calculateDistance(currentLocation, {
-              lat: place.location.latitude,
-              lng: place.location.longitude
-            })
-          }))
-          .filter(item => item.distanceKm !== null)
-          .sort((a, b) => a.distanceKm! - b.distanceKm!)
-          .map(item => item.place);
-        setHospitals(sortedResults);
-        setStatus(LoadingStatus.Success);
-        setErrorMessage(null);
-      } else {
-        setErrorMessage("No relevant hospitals with location data found nearby matching the criteria.");
-        setStatus(LoadingStatus.NoResults);
+
+    const locationCenter: google.maps.LatLngLiteral = { lat: currentLocation.lat, lng: currentLocation.lng };
+    const request: google.maps.places.SearchByTextRequest = {
+      textQuery: HOSPITAL_SEARCH_KEYWORD,
+      fields: [
+        'id', 'displayName', 'formattedAddress', 'location', 'rating',
+        'userRatingCount', 'regularOpeningHours', 'businessStatus', // regularOpeningHours needed for isOpen()
+        'websiteURI', 'nationalPhoneNumber', 'types',
+      ],
+      locationBias: { center: locationCenter, radius: SEARCH_RADIUS_METERS },
+      maxResultCount: MAX_SEARCH_RESULTS,
+    };
+
+    try {
+        // console.log("Sending searchByText request:", request);
+        const { places } = await window.google.maps.places.Place.searchByText(request);
+        if (!isMounted.current) return;
+
+        if (places && places.length > 0) {
+            const validResults = places.filter(place =>
+                place.id && place.location &&
+                place.types?.some(type => ['hospital', 'health', 'doctor', 'clinic'].includes(type.toLowerCase()))
+            );
+
+            if (validResults.length > 0) {
+                const sortedResults = validResults
+                    .map(place => ({
+                        place,
+                        distanceKm: calculateDistance(currentLocation, { lat: place.location!.lat(), lng: place.location!.lng() })
+                    }))
+                    .filter(item => item.distanceKm !== null)
+                    .sort((a, b) => a.distanceKm! - b.distanceKm!)
+                    .map(item => item.place);
+
+                if (sortedResults.length > 0) {
+                    setHospitals(sortedResults);
+                    setStatus(LoadingStatus.Success);
+                    setErrorMessage(null);
+                } else {
+                    setErrorMessage("Could not calculate distances for found hospitals.");
+                    setStatus(LoadingStatus.NoResults);
+                    setHospitals([]);
+                }
+            } else {
+                 setErrorMessage("No relevant hospitals with location data found nearby matching the criteria.");
+                 setStatus(LoadingStatus.NoResults);
+                 setHospitals([]);
+            }
+        } else {
+            setErrorMessage("No places found nearby matching the search query.");
+            setStatus(LoadingStatus.NoResults);
+            setHospitals([]);
+        }
+    } catch (error: any) {
+        if (!isMounted.current) return;
+        // console.error("Error during Place.searchByText:", error);
+        let userMessage = `Failed to find hospitals. Please try again later.`;
+        let specificStatus = LoadingStatus.SearchError;
+        const errorMessageString = error?.message?.toLowerCase() || '';
+        // ... (error message parsing as before) ...
+        if (errorMessageString.includes('api_key_invalid') || errorMessageString.includes('permission denied') || errorMessageString.includes('apinotactivatedmaperror') || errorMessageString.includes('keyexpiredmaperror') || errorMessageString.includes('keyinvalidmaperror')) {
+             userMessage = "Map service error: API Key invalid, restricted, expired, or 'Places API (New)' not enabled. Check configuration.";
+             specificStatus = LoadingStatus.MapsError;
+        } else if (errorMessageString.includes('zero_results')) {
+             userMessage = "No places found nearby matching the search query.";
+             specificStatus = LoadingStatus.NoResults;
+        } else if (errorMessageString.includes('invalid_request')) {
+             userMessage = "Map service request was invalid. Check parameters.";
+             specificStatus = LoadingStatus.SearchError;
+        } else if (errorMessageString.includes('network error') || errorMessageString.includes('fetch')) {
+             userMessage = "Network error searching for hospitals. Check connection.";
+             specificStatus = LoadingStatus.SearchError;
+        }
+
+        setErrorMessage(userMessage);
+        setStatus(specificStatus);
         setHospitals([]);
-      }
-    } else {
-      setErrorMessage("No places found nearby matching the search query.");
-      setStatus(LoadingStatus.NoResults);
-      setHospitals([]);
     }
-  } catch (error: any) {
-    if (!isMounted.current) return;
-    let userMessage = `Failed to find hospitals. Please try again later.`;
-    let specificStatus = LoadingStatus.SearchError;
-    const errorMessageString = error?.message?.toLowerCase() || '';
-    if (errorMessageString.includes('api_key_invalid') || errorMessageString.includes('permission denied') || errorMessageString.includes('apinotactivatedmaperror') || errorMessageString.includes('keyexpiredmaperror') || errorMessageString.includes('keyinvalidmaperror')) {
-      userMessage = "Map service error: API Key invalid, restricted, expired, or 'Places API (New)' not enabled. Check configuration.";
-      specificStatus = LoadingStatus.MapsError;
-    } else if (errorMessageString.includes('zero_results')) {
-      userMessage = "No places found nearby matching the search query.";
-      specificStatus = LoadingStatus.NoResults;
-    } else if (errorMessageString.includes('invalid_request')) {
-      userMessage = "Map service request was invalid. Check parameters.";
-      specificStatus = LoadingStatus.SearchError;
-    } else if (errorMessageString.includes('network error') || errorMessageString.includes('fetch')) {
-      userMessage = "Network error searching for hospitals. Check connection.";
-      specificStatus = LoadingStatus.SearchError;
-    }
-    setErrorMessage(userMessage);
-    setStatus(specificStatus);
-    setHospitals([]);
-  }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [currentLocation, status, googleMapsApiKey]); // Depends on location, status, and API key
+  }, [currentLocation, status]); // Depends on location and status
 
   // --- Effect to trigger search ---
   useEffect(() => {
@@ -722,7 +706,7 @@ const Emergency = () => {
           <CardHeader className="bg-gray-50 p-5 border-b">
             <CardTitle className="flex items-center text-xl font-semibold text-gray-800"><MapPinned className="mr-3 h-6 w-6 text-mamasaheli-primary" />Nearby Hospitals (Nearest First)</CardTitle>
             <CardDescription className="mt-1 text-sm text-gray-600">
-<b>Always call 102 in a true emergency.</b>
+                 <b>Always call 102 in a true emergency.</b>
             </CardDescription>
             {/* API Key/Error Alerts */}
             {status === LoadingStatus.MapsError && errorMessage?.includes("Google Cloud Console") && (
