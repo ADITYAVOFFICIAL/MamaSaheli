@@ -71,13 +71,13 @@ const navItems: NavItem[] = [
 ];
 
 const doctorNavItems: NavItem[] = [
-    { path: '/doctor', label: 'Dashboard', icon: LayoutDashboard, requiresAuth: true },
-    { path: '/profile', label: 'Profile', icon: Settings, requiresAuth: true },
-    { path: '/medicaldocs', label: 'Documents', icon: FileText, requiresAuth: true },
-    { path: '/games', label: 'Games', icon: Gamepad2, requiresAuth: true },
-    { path: '/emergency', label: 'Emergency', icon: AlertTriangle, requiresAuth: false },
-    { path: '/resources', label: 'Knowledge', icon: BookOpen, requiresAuth: true },
-    { path: '/forum', label: 'Forum', icon: Users, requiresAuth: true },
+  { path: '/doctor', label: 'Dashboard', icon: LayoutDashboard, requiresAuth: true },
+  { path: '/profile', label: 'Profile', icon: Settings, requiresAuth: true },
+  { path: '/medicaldocs', label: 'Documents', icon: FileText, requiresAuth: true },
+  { path: '/games', label: 'Games', icon: Gamepad2, requiresAuth: true },
+  { path: '/emergency', label: 'Emergency', icon: AlertTriangle, requiresAuth: false },
+  { path: '/resources', label: 'Knowledge', icon: BookOpen, requiresAuth: true },
+  { path: '/forum', label: 'Forum', icon: Users, requiresAuth: true },
 ];
 
 const Navbar: React.FC = () => {
@@ -110,7 +110,6 @@ useEffect(() => {
   } else {
     document.body.classList.remove('overflow-hidden');
   }
-  // Clean up on unmount
   return () => {
     document.body.classList.remove('overflow-hidden');
   };
@@ -239,6 +238,7 @@ useEffect(() => {
                   <DropdownMenuItem onClick={() => navigate(isDoctor ? '/doctor' : '/dashboard')}><LayoutDashboard className="mr-2 h-4 w-4" /><span>Dashboard</span></DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/profile')}><Settings className="mr-2 h-4 w-4" /><span>Profile Settings</span></DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/medicaldocs')}><FileText className="mr-2 h-4 w-4" /><span>Medical Documents</span></DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/contact')}><MessageSquare className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
                   {!isDoctor && <DropdownMenuItem onClick={() => navigate('/meals')}><Salad className="mr-2 h-4 w-4" /><span>Meals & Exercises</span></DropdownMenuItem>}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:bg-red-100 focus:text-red-700 dark:focus:bg-red-900/50 dark:focus:text-red-400">

@@ -64,8 +64,8 @@ const Footer = () => {
             <h3 className="text-sm font-semibold text-gray-800 tracking-wider uppercase">Support</h3>
             <ul className="mt-4 space-y-2">
               <li>
-                <Link to="/appointment" className="text-sm text-gray-600 hover:text-mamasaheli-primary">
-                  Book Appointment
+                <Link to="/contact" className="text-sm text-gray-600 hover:text-mamasaheli-primary">
+                  Contact Us
                 </Link>
               </li>
               <li>

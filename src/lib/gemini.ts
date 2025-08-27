@@ -20,7 +20,8 @@ import {
     BloodPressureReading,
     BloodSugarReading,
     WeightReading,
-    Appointment
+    Appointment,
+    BloodworkResult
 } from "./appwrite"; // Adjust path if needed
 
 // --- Type Definitions Specific to Interaction (These remain the same) ---
@@ -35,6 +36,7 @@ export interface AdditionalChatContext {
     latestBp: BloodPressureReading | null;
     latestSugar: BloodSugarReading | null;
     latestWeight: WeightReading | null;
+    latestBloodwork: BloodworkResult | null;
     upcomingAppointments: (Appointment & { dateTime?: Date | null })[];
     previousConcerns: string[];
 }
@@ -106,7 +108,30 @@ const formatReadingForContext = (reading: BloodPressureReading | BloodSugarReadi
     }
     return `${readingStr} (Logged on ${dateStr}. For context only, do not interpret medically.)`;
 };
+const formatBloodworkForContext = (report: BloodworkResult | null): string => {
+    if (!report) return `No recent bloodwork report available.`;
 
+    let summary = `Latest Bloodwork Report ("${report.testName}" on ${formatDateSafe(report.recordedAt)}):\n`;
+    try {
+        // The 'results' field is a JSON string, so it needs to be parsed.
+        type BloodworkMarker = { name: string; value: string; unit: string; flag?: string };
+        const resultsData: BloodworkMarker[] = JSON.parse(report.summary || '[]');
+        const abnormalResults = resultsData.filter(
+            (r: BloodworkMarker) => r.flag && (r.flag.toLowerCase() === 'high' || r.flag.toLowerCase() === 'low')
+        );
+
+        if (abnormalResults.length > 0) {
+            summary += "  - Key findings with abnormal flags: ";
+            summary += abnormalResults.map((r: BloodworkMarker) => `${r.name} (${r.value} ${r.unit}) was ${r.flag}`).join(', ');
+            summary += ".\n";
+        } else {
+            summary += "  - All markers checked were within the normal range.\n";
+        }
+    } catch (e) {
+        summary += "  - Could not parse detailed results.\n";
+    }
+    return summary;
+};
 const formatAppointmentsForContext = (appointments: (Appointment & { dateTime?: Date | null })[]): string => {
     if (!appointments || appointments.length === 0) return 'No upcoming appointments logged.';
     return `Upcoming Appointments:\n${appointments.map(app => {
@@ -147,7 +172,7 @@ export const createSystemPrompt = (
     contextString += `${formatReadingForContext(additionalContext.latestBp, 'BP')}\n`;
     contextString += `${formatReadingForContext(additionalContext.latestSugar, 'Sugar')}\n`;
     contextString += `${formatReadingForContext(additionalContext.latestWeight, 'Weight')}\n`;
-
+    contextString += `${formatBloodworkForContext(additionalContext.latestBloodwork)}\n`;
     contextString += "\n[Upcoming Schedule Context]\n";
     contextString += `${formatAppointmentsForContext(additionalContext.upcomingAppointments)}\n`;
 
@@ -166,7 +191,8 @@ You are MamaSaheli, a friendly, empathetic, and supportive AI companion for expe
     *   **Medical Images (Ultrasounds, Rashes, etc.):** If the user provides a photo of a body part, rash, or an ultrasound scan, you MUST refuse to analyze or interpret it. State clearly and politely: "I am an AI assistant and cannot provide a medical opinion or diagnosis based on an image. Please share this with your healthcare provider for an accurate assessment."
     *   **General Images (Food, Products, Places):** If the user provides a general, non-medical image, describe what you see and answer their question about it in a helpful, non-medical way (e.g., discussing nutrition of a food item, features of a product).
 4.  **MANDATORY DISCLAIMER:** For any response that touches upon health, symptoms, nutrition, or well-being, you MUST conclude with a clear, friendly disclaimer, such as: "Please remember, this information is for educational purposes and is not a substitute for professional medical advice. Always consult with your doctor or a qualified healthcare provider."
-5.  **USE CONTEXT WISELY:** Use the provided user context to personalize your responses and make them relevant. Do not simply repeat the context back to the user. Acknowledge their situation (e.g., "In the third trimester, it's common to feel...").`;
+5.  **USE CONTEXT WISELY:** Use the provided user context to personalize your responses and make them relevant. Do not simply repeat the context back to the user. Acknowledge their situation (e.g., "In the third trimester, it's common to feel...").
+6.  **SOURCE & CITATION REQUIREMENT:** Construct your answer based only on information gathered from reliable sources. For every factual statement, provide an exact source and inline citation (e.g., [1], [2], etc.) so the user can trace every fact back to its origin.`;
 
     return `${personaInstructions}\n\n${contextString}\n\n${safetyRules}`;
 };

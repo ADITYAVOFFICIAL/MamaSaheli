@@ -6,6 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { UserProfile } from '@/lib/appwrite'; // <-- Add this import
 
 interface PreChatFormProps {
   isContextLoading: boolean;
@@ -21,10 +22,7 @@ interface PreChatFormProps {
   specificConcerns: string;
   setSpecificConcerns: (v: string) => void;
   feelingOptions: string[];
-  userProfile: {
-    weeksPregnant?: number;
-    [key: string]: unknown;
-  };
+  userProfile: UserProfile | null;
   handleStartChat: () => void;
   error: string | null;
 }

@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate } from 'react-router-dom';
 import { format, isAfter, parseISO } from 'date-fns';
@@ -49,7 +50,9 @@ import {
   saveChatMessage, getUserChatHistoryForSession, ChatHistoryMessage, // Assume ChatHistoryMessage has role: 'user' | 'model' | 'system' or similar
   addBookmark, // Removed CreateBookmarkData if not explicitly used
   deleteChatSessionHistory,
-  getChatSessionsList, // Assume this returns ChatSessionInfo[] or similar
+  getChatSessionsList,
+  getUserBloodworkResults, // <-- ADD THIS
+  BloodworkResult, 
 } from '@/lib/appwrite'; // Ensure paths are correct
 
 // --- Gemini Imports ---
@@ -294,6 +297,20 @@ const ChatPage: React.FC = () => {
   const [pregnancyTrimester, setPregnancyTrimester] = useState<1 | 2 | 3 | null>(null); // Derived from weeksPregnant
   const [chatStartWeeksPregnant, setChatStartWeeksPregnant] = useState<number | undefined>(undefined); // Weeks pregnant at the start of the current session
 
+    // --- Latest Bloodwork Report (via React Query) ---
+    const { data: latestBloodworkReport } = useQuery<BloodworkResult | null, Error>({
+      queryKey: ['latestBloodwork', user?.$id],
+      queryFn: async () => {
+        if (!user?.$id) return null;
+        // Fetches all reports, sorted by date descending by default in appwrite.ts
+        const reports = await getUserBloodworkResults(user.$id);
+        // The first item is the most recent one
+        return reports.length > 0 ? reports[0] : null;
+      },
+      enabled: !!user?.$id && !isContextLoading, // Run after profile context is loaded
+      staleTime: 1000 * 60 * 15, // Cache for 15 minutes
+    });
+
   // --- Feature State ---
   const [isRecording, setIsRecording] = useState<boolean>(false); // Voice input active
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false); // PDF export in progress
@@ -478,6 +495,7 @@ const ChatPage: React.FC = () => {
         latestBp: latestBp,
         latestSugar: latestSugar,
         latestWeight: latestWeight,
+        latestBloodwork: latestBloodworkReport ?? null,
         upcomingAppointments: upcomingAppointments,
         previousConcerns: [] // No previous concerns for a new chat session
       };
@@ -530,8 +548,8 @@ const ChatPage: React.FC = () => {
       feeling, age, weeksPregnant, preExistingConditions, specificConcerns, // Form inputs
       user?.$id, userProfile, // User context
       latestBp, latestSugar, latestWeight, upcomingAppointments, // Health context
-      toast, navigate // Utilities
-      // State setters (setIsStartingChat, setError, etc.) are implicitly dependencies
+      toast, navigate,
+      latestBloodworkReport
   ]);
 
 
@@ -771,10 +789,13 @@ const ChatPage: React.FC = () => {
         // Feeling/concerns are session-specific, extract from history instead
       };
       const currentContext: AdditionalChatContext = {
-        latestBp: latestBp, latestSugar: latestSugar, latestWeight: latestWeight,
-        upcomingAppointments: upcomingAppointments,
-        previousConcerns: extractCommonConcerns(appwriteHistory) // Extract from loaded history
-      };
+  latestBp: latestBp,
+  latestSugar: latestSugar,
+  latestWeight: latestWeight,
+  latestBloodwork: latestBloodworkReport ?? null, // <-- Add this line
+  upcomingAppointments: upcomingAppointments,
+  previousConcerns: extractCommonConcerns(appwriteHistory)
+};
 
       const systemPromptText = geminiService.createSystemPrompt(currentPrefs, currentProfile, currentContext);
   const systemMessage: AppChatMessage = { role: 'system', content: systemPromptText };
@@ -837,8 +858,7 @@ const ChatPage: React.FC = () => {
   }, [
       user?.$id, isLoading, isStartingChat, currentSessionId, // Control state
       toast, // Utilities
-      userProfile, latestBp, latestSugar, latestWeight, upcomingAppointments, isContextLoading, fetchInitialContext // Context data and fetcher
-      // State setters implicitly included
+      userProfile, latestBp, latestSugar, latestWeight, upcomingAppointments, isContextLoading, fetchInitialContext, latestBloodworkReport
   ]);
 
 

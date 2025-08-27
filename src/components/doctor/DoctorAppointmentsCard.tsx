@@ -64,17 +64,20 @@ const DoctorAppointmentsCard: React.FC = () => {
     };
 
     const upcomingAppointments = useMemo(() => {
-        if (!appointmentsData) return [];
+    if (!appointmentsData) return [];
 
-        return appointmentsData
-            .filter(appointment => {
-                const [hours, minutes] = appointment.time.split(':').map(Number);
-                const appointmentDateTime = parseISO(appointment.date);
-                appointmentDateTime.setHours(hours, minutes);
-                return !isPast(appointmentDateTime);
-            })
-            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-    }, [appointmentsData]);
+    return appointmentsData
+        .filter(appointment => {
+            // Combine date and time into a single Date object
+            const appointmentDateTime = new Date(`${appointment.date}T${appointment.time}`);
+            return appointmentDateTime > new Date();
+        })
+        .sort((a, b) => {
+            const aDateTime = new Date(`${a.date}T${a.time}`);
+            const bDateTime = new Date(`${b.date}T${b.time}`);
+            return aDateTime.getTime() - bDateTime.getTime();
+        });
+}, [appointmentsData]);
 
     const renderContent = () => {
         if (isLoading) {
