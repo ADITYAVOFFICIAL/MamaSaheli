@@ -112,12 +112,12 @@ const ContactPage: React.FC = () => {
                        <input type="hidden" name="website" value="MamaSaheli" />
                       <div className="space-y-2">
                         <Label htmlFor="name" className="font-medium flex items-center"><User className="mr-2 h-4 w-4 text-gray-400" /> Full Name *</Label>
-                        <Input id="name" type="text" name="name" placeholder="Sakshi Sharma" required disabled={state.submitting} className="h-11" />
+                        <Input id="name" type="text" name="name" placeholder="Your Name" required disabled={state.submitting} className="h-11" />
                         <ValidationError prefix="Name" field="name" errors={state.errors} className="text-red-500 text-xs mt-1" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="email" className="font-medium flex items-center"><AtSign className="mr-2 h-4 w-4 text-gray-400" /> Email Address *</Label>
-                        <Input id="email" type="email" name="email" placeholder="sakshi@example.com" required disabled={state.submitting} className="h-11" />
+                        <Input id="email" type="email" name="email" placeholder="email@example.com" required disabled={state.submitting} className="h-11" />
                         <ValidationError prefix="Email" field="email" errors={state.errors} className="text-red-500 text-xs mt-1" />
                       </div>
                     </div>
@@ -184,22 +184,14 @@ const ContactPage: React.FC = () => {
                     <div className="mt-1"><AtSign className="h-5 w-5 text-mamasaheli-secondary dark:text-blue-400" /></div>
                     <div>
                       <h4 className="font-medium">Email Us</h4>
-                      <a href="mailto:support@mamasaheli.ai" className="text-sm text-mamasaheli-primary hover:underline dark:text-mamasaheli-accent break-all">support@mamasaheli.ai</a>
+                      <a href="mailto:av4923@srmist.edu.in" className="text-sm text-mamasaheli-primary hover:underline dark:text-mamasaheli-accent break-all">av4923@srmist.edu.in</a>
                     </div>
                   </div>
-                   <div className="flex items-start space-x-4">
-                     <div className="mt-1"><Phone className="h-5 w-5 text-mamasaheli-secondary dark:text-blue-400" /></div>
-                     <div>
-                       <h4 className="font-medium">Call Us</h4>
-                       <a href="tel:SAMPLE" className="text-sm text-mamasaheli-primary hover:underline dark:text-mamasaheli-accent">SAMPLE NUMBER</a>
-                       <p className="text-xs text-muted-foreground mt-0.5">Mon-Fri, 9 AM - 5 PM (IST)</p>
-                     </div>
-                   </div>
                    <div className="flex items-start space-x-4">
                      <div className="mt-1"><MapPin className="h-5 w-5 text-mamasaheli-secondary dark:text-blue-400" /></div>
                      <div>
                        <h4 className="font-medium">Our Office</h4>
-                       <p className="text-sm text-muted-foreground">INDIA</p>
+                       <p className="text-sm text-muted-foreground">SRM Institute of Science and Technology, Kattankulathur</p>
                      </div>
                    </div>
                 </CardContent>
