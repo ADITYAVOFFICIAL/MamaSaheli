@@ -537,7 +537,7 @@ const ChatPage: React.FC = () => {
 
   // --- Send Message Handler (Streaming) ---
   const handleSendMessage = useCallback(async (messageToSendOverride?: string) => {
-    const messageText = (messageToSendOverride || inputMessage).trim();
+    const messageText = (typeof messageToSendOverride === 'string' ? messageToSendOverride : inputMessage).trim();
     // Check if there's text or an image to send
     if (!messageText && !pendingImageFile) {
         toast({ title: "Nothing to send", description:"Type a message or attach an image.", variant: "default" }); return;
