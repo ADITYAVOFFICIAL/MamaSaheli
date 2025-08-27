@@ -3,41 +3,19 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
 import {
-  Menu,
-  X,
-  User,
-  Heart,
-  LogOut,
-  LayoutDashboard,
-  Settings,
-  FileText,
-  Gamepad2,
-  ListCheck,
-  Salad,
-  MessageSquare,
-  Calendar,
-  Users,
-  TestTube2,
-  Package,
-  HeartPulse,
-  AlertTriangle,
-  BookOpen,
-  LogIn,
-  UserPlus
+  Menu, X, User, LogOut, LayoutDashboard, Settings, FileText, Gamepad2, ListCheck,
+  Salad, MessageSquare, Calendar, Users, TestTube2, Package, HeartPulse,
+  AlertTriangle, BookOpen, LogIn, UserPlus
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getUserProfile, getFilePreview, profileBucketId } from '@/lib/appwrite';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence, easeInOut } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import icon256 from '/icons/icon-256x256.png';
 
 interface NavItem {
@@ -91,46 +69,56 @@ const Navbar: React.FC = () => {
 
   const activeDesktopNavItems = useMemo(() => {
     const items = isDoctor ? doctorNavItems : navItems;
-    return items.filter(item =>
-      !item.isMobileOnly &&
-      (isAuthenticated ? item.requiresAuth || !item.hideWhenAuth : !item.requiresAuth)
-    );
+    return items.filter(item => !item.isMobileOnly && (isAuthenticated ? item.requiresAuth || !item.hideWhenAuth : !item.requiresAuth));
   }, [isAuthenticated, isDoctor]);
 
   const activeMobileNavItems = useMemo(() => {
     const items = isDoctor ? doctorNavItems : navItems;
-    return items.filter(item =>
-      !item.isDesktopOnly &&
-      (isAuthenticated ? item.requiresAuth || !item.hideWhenAuth : !item.requiresAuth)
-    );
+    return items.filter(item => !item.isDesktopOnly && (isAuthenticated ? item.requiresAuth || !item.hideWhenAuth : !item.requiresAuth));
   }, [isAuthenticated, isDoctor]);
-useEffect(() => {
-  if (isOpen) {
-    document.body.classList.add('overflow-hidden');
-  } else {
-    document.body.classList.remove('overflow-hidden');
-  }
-  return () => {
-    document.body.classList.remove('overflow-hidden');
-  };
-}, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     let isMounted = true;
+    const PROFILE_PHOTO_CACHE_KEY = `profilePhotoUrl_${user?.$id}`;
+
     const fetchProfilePhoto = async () => {
       if (!user?.$id || !profileBucketId) {
         setProfilePhotoUrl(null);
+        sessionStorage.removeItem(PROFILE_PHOTO_CACHE_KEY);
+        return;
+      }
+      
+      const cachedPhotoUrl = sessionStorage.getItem(PROFILE_PHOTO_CACHE_KEY);
+      if (cachedPhotoUrl) {
+        setProfilePhotoUrl(cachedPhotoUrl);
         return;
       }
       try {
         const profile = await getUserProfile(user.$id);
         if (isMounted && profile?.profilePhotoId) {
-          const photoUrl = getFilePreview(profile.profilePhotoId, profileBucketId);
-          setProfilePhotoUrl(photoUrl?.toString() ?? null);
+          const photoUrl = getFilePreview(profile.profilePhotoId, profileBucketId)?.toString() ?? null;
+          setProfilePhotoUrl(photoUrl);
+          if (photoUrl) sessionStorage.setItem(PROFILE_PHOTO_CACHE_KEY, photoUrl);
         } else if (isMounted) {
           setProfilePhotoUrl(null);
+          sessionStorage.removeItem(PROFILE_PHOTO_CACHE_KEY);
         }
       } catch (error) {
-        if (isMounted) setProfilePhotoUrl(null);
+        if (isMounted) {
+          setProfilePhotoUrl(null);
+          sessionStorage.removeItem(PROFILE_PHOTO_CACHE_KEY);
+        }
       }
     };
 
@@ -138,6 +126,7 @@ useEffect(() => {
       fetchProfilePhoto();
     } else {
       setProfilePhotoUrl(null);
+      if (user?.$id) sessionStorage.removeItem(PROFILE_PHOTO_CACHE_KEY);
     }
 
     return () => { isMounted = false };
@@ -148,37 +137,30 @@ useEffect(() => {
       await logout();
       setProfilePhotoUrl(null);
       setIsOpen(false);
-      toast({
-        title: "Logged out successfully",
-        description: "See you again soon!",
-      });
+      toast({ title: "Logged out successfully", description: "See you again soon!" });
       navigate('/');
     } catch (error) {
-      toast({
-        title: "Logout failed",
-        description: error instanceof Error ? error.message : "Please try again later.",
-        variant: "destructive",
-      });
+      toast({ title: "Logout failed", description: error instanceof Error ? error.message : "Please try again later.", variant: "destructive" });
     }
   };
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
 
-  const mobileMenuVariants = {
+  const mobileMenuVariants: Variants = {
     hidden: { opacity: 0, height: 0 },
-    visible: { opacity: 1, height: 'auto', transition: { duration: 0.3, ease: easeInOut } },
-    exit: { opacity: 0, height: 0, transition: { duration: 0.2, ease: easeInOut } },
+    visible: { opacity: 1, height: 'auto', transition: { type: "spring", stiffness: 400, damping: 40 } },
+    exit: { opacity: 0, height: 0, transition: { duration: 0.2, ease: "easeOut" } },
   };
 
-  const mobileGridContainerVariants = {
+  const mobileGridContainerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
   };
 
-  const mobileGridItemVariants = {
+  const mobileGridItemVariants: Variants = {
     hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { stiffness: 300, damping: 25 } },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 25 } },
   };
 
   const getNavLinkClass = ({ isActive }: { isActive: boolean }): string =>
@@ -195,7 +177,7 @@ useEffect(() => {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
             <Link to="/" className="flex flex-shrink-0 items-center" aria-label="MamaSaheli Homepage">
-              <img src={icon256} alt="MamaSaheli Logo" className="h-8 w-8" aria-hidden="true" />
+              <img src={icon256} alt="MamaSaheli Logo" className="h-8 w-8" loading="lazy" decoding="async" />
               <span className="ml-2 text-xl font-bold text-mamasaheli-primary dark:text-mamasaheli-light">
                 MamaSaheli
               </span>
@@ -212,11 +194,7 @@ useEffect(() => {
             {isAuthenticated && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="relative flex h-9 w-9 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    aria-label="User menu"
-                  >
+                  <Button variant="ghost" className="relative flex h-9 w-9 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="User menu">
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={profilePhotoUrl ?? undefined} alt={user.name || 'User avatar'} />
                       <AvatarFallback className="bg-mamasaheli-primary text-white dark:bg-mamasaheli-accent dark:text-gray-900">
@@ -229,9 +207,7 @@ useEffect(() => {
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{user.name || 'User'}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {user.email}
-                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -248,24 +224,17 @@ useEffect(() => {
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" onClick={() => navigate('/login')} className="dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white">
-                  Log In
-                </Button>
-                <Button onClick={() => navigate('/signup')}>
-                  Sign Up
-                </Button>
+                <Button variant="ghost" onClick={() => navigate('/login')} className="dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white">Log In</Button>
+                <Button onClick={() => navigate('/signup')}>Sign Up</Button>
               </div>
             )}
           </div>
 
           <div className="-mr-2 flex md:hidden">
             <button
-              onClick={toggleMenu}
-              type="button"
+              onClick={toggleMenu} type="button"
               className="inline-flex items-center justify-center rounded-md bg-gray-100 p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-mamasaheli-primary dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
-              aria-controls="mobile-menu"
-              aria-expanded={isOpen}
-              aria-label={isOpen ? "Close main menu" : "Open main menu"}
+              aria-controls="mobile-menu" aria-expanded={isOpen} aria-label={isOpen ? "Close main menu" : "Open main menu"}
             >
               {isOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
             </button>
@@ -276,60 +245,52 @@ useEffect(() => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            className="md:hidden overflow-hidden"
-            id="mobile-menu"
-            variants={mobileMenuVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
+            className="md:hidden overflow-hidden" id="mobile-menu"
+            variants={mobileMenuVariants} initial="hidden" animate="visible" exit="exit"
           >
             <div
-              className="px-2 pt-2 pb-4 sm:px-3 space-y-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-mamasaheli-primary/30 scrollbar-track-transparent"
-              style={{ WebkitOverflowScrolling: 'touch' }}
+              className="px-2 pt-2 pb-4 sm:px-3 space-y-4 max-h-[calc(100vh-4rem)] overflow-y-auto"
+              style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--primary)/0.3) transparent' }}
             >
-              <NavLink
-                to='/emergency'
-                className="flex items-center justify-center rounded-lg px-3 py-3 text-base font-semibold bg-red-600 text-red-100 hover:bg-red-700 shadow-lg"
-                onClick={closeMenu}
-              >
+              <NavLink to='/emergency' className="flex items-center justify-center rounded-lg px-3 py-3 text-base font-semibold bg-red-600 text-red-100 hover:bg-red-700 shadow-lg" onClick={closeMenu}>
                 <AlertTriangle className="mr-2 h-5 w-5" />
                 Emergency
               </NavLink>
 
-              <motion.div
-                className="grid grid-cols-3 gap-2"
-                variants={mobileGridContainerVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                {activeMobileNavItems
-                  .filter(item => item.path !== '/emergency' && !item.hideWhenAuth)
-                  .map((item) => (
-                    <motion.div key={item.path} variants={mobileGridItemVariants}>
-                      <NavLink
-                        to={item.path}
-                        className={({ isActive }) => cn(
-                          "flex flex-col items-center justify-center text-center p-2 rounded-lg aspect-square transition-colors",
-                          isActive
-                            ? "bg-mamasaheli-light text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white"
-                            : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                        )}
-                        onClick={closeMenu}
-                      >
-                        <item.icon className="h-6 w-6 mb-1" strokeWidth={1.5} />
-                        <span className="text-xs font-medium truncate w-full">{item.label}</span>
-                      </NavLink>
-                    </motion.div>
-                  ))}
+              <motion.div className="grid grid-cols-3 gap-2" variants={mobileGridContainerVariants} initial="hidden" animate="visible">
+                {activeMobileNavItems.filter(item => item.path !== '/emergency' && !item.hideWhenAuth).map((item) => (
+                  <motion.div key={item.path} variants={mobileGridItemVariants}>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => cn(
+                        "flex flex-col items-center justify-center text-center p-2 rounded-lg aspect-square transition-colors",
+                        isActive ? "bg-mamasaheli-light text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white" : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                      )}
+                      onClick={closeMenu}
+                    >
+                      <item.icon className="h-6 w-6 mb-1" strokeWidth={1.5} />
+                      <span className="text-xs font-medium truncate w-full">{item.label}</span>
+                    </NavLink>
+                  </motion.div>
+                ))}
+                <motion.div variants={mobileGridItemVariants}>
+                  <NavLink
+                    to="/contact"
+                    className={({ isActive }) => cn(
+                      "flex flex-col items-center justify-center text-center p-2 rounded-lg aspect-square transition-colors",
+                      isActive ? "bg-mamasaheli-light text-mamasaheli-primary dark:bg-mamasaheli-primary/30 dark:text-white" : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                    )}
+                    onClick={closeMenu}
+                  >
+                    <MessageSquare className="h-6 w-6 mb-1" strokeWidth={1.5} />
+                    <span className="text-xs font-medium truncate w-full">Contact</span>
+                  </NavLink>
+                </motion.div>
               </motion.div>
 
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
                 {isAuthenticated ? (
-                  <Button
-                    onClick={handleLogout}
-                    variant="ghost"
-                    className="flex w-full justify-center rounded-md px-3 py-2 text-base font-medium text-red-600 hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
-                  >
+                  <Button onClick={handleLogout} variant="ghost" className="flex w-full justify-center rounded-md px-3 py-2 text-base font-medium text-red-600 hover:bg-red-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300">
                     <LogOut className="mr-2 h-5 w-5" />
                     Log Out
                   </Button>
