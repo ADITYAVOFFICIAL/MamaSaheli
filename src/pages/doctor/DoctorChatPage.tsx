@@ -161,6 +161,7 @@ const DoctorChatPage: React.FC = () => {
       clearInterval(interval);
     };
   }, []);
+  
 useEffect(() => {
   // Background prefetch when user opens the screen
   if (userId && doctorUserId) {
@@ -182,11 +183,17 @@ useEffect(() => {
     const collectionId = import.meta.env.VITE_APPWRITE_DRCHAT_KEY;
     const channel = `databases.${databaseId}.collections.${collectionId}.documents`;
 
-    const unsubscribe = client.subscribe(channel, (response: any) => {
+    type UnsubscribeFn = (() => void) & { close?: () => void };
+    interface SubscriptionResponse {
+      payload?: Partial<ChatMessage>;
+      events?: string[];
+    }
+
+    const unsubscribe = client.subscribe(channel, (response: SubscriptionResponse) => {
       const payload = response.payload ?? {};
       const events: string[] = response.events ?? [];
       const payloadUserId = payload.userId ?? payload.senderId ?? null;
-      const payloadDoctorId = payload.doctorId ?? payload.toDoctorId ?? null;
+      const payloadDoctorId = payload.doctorId ?? null;
       const isRelevant =
         (payloadUserId === userId && (payloadDoctorId === doctorUserId || payloadDoctorId === doctorProfileId)) ||
         (payloadUserId === doctorUserId && (payloadDoctorId === userId || payloadDoctorId === userId));
@@ -210,12 +217,12 @@ useEffect(() => {
         );
         return;
       }
-    });
+    }) as UnsubscribeFn;
 
     return () => {
       try {
         if (typeof unsubscribe === 'function') unsubscribe();
-        if (unsubscribe && typeof (unsubscribe as any).close === 'function') (unsubscribe as any).close();
+        if (unsubscribe && typeof unsubscribe.close === 'function') unsubscribe.close();
       } catch {
         // ignore
       }
@@ -226,48 +233,28 @@ useEffect(() => {
   }, [messages, displayLimit]);
 
   const handleSendMessage = async (): Promise<void> => {
-    if (!inputMessage.trim() || !userId || !doctorUserId) return;
-    setIsSending(true);
-    const messageContent = inputMessage.trim();
-    setInputMessage('');
-    const tempId = ID.unique();
-    const optimisticMessage: ChatMessage = {
-      $id: tempId,
-      content: messageContent,
-      senderId: userId,
-      role: 'user',
-      timestamp: new Date().toISOString(),
-      userId: userId,
-      doctorId: doctorUserId,
-      $collectionId: '',
-      $databaseId: '',
-      $createdAt: '',
-      $updatedAt: '',
-      $permissions: [],
-      $sequence: 0, // Added to satisfy ChatMessage type
-    };
-    queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => [...oldData, optimisticMessage]);
+  if (!inputMessage.trim() || !userId || !doctorUserId) return;
+  setIsSending(true);
+  const messageContent = inputMessage.trim();
+  setInputMessage('');
+  try {
+    const realMessage = await createDoctorChatMessage(
+      userId,
+      doctorUserId,
+      `${userId}_${doctorUserId}`,
+      userId,
+      'user',
+      messageContent
+    );
+    queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => [...oldData, realMessage as ChatMessage]);
     lastActivityRef.current = Date.now();
-    try {
-      const realMessage = await createDoctorChatMessage(
-        userId,
-        doctorUserId,
-        `${userId}_${doctorUserId}`,
-        userId,
-        'user',
-        messageContent
-      );
-      queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) =>
-        oldData.map((msg) => (msg.$id === tempId ? (realMessage as ChatMessage) : msg))
-      );
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      queryClient.setQueryData(chatQueryKey, (oldData: ChatMessage[] = []) => oldData.filter((msg) => msg.$id !== tempId));
-      setInputMessage(messageContent);
-    } finally {
-      setIsSending(false);
-    }
-  };
+  } catch (error) {
+    console.error('Failed to send message:', error);
+    setInputMessage(messageContent);
+  } finally {
+    setIsSending(false);
+  }
+};
 
   const handleDeleteRequest = (id: string | 'all'): void => {
     setItemToDelete(id);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef, memo,useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -102,7 +102,7 @@ const DoctorChatModal: React.FC<DoctorChatModalProps> = ({ isOpen, onClose, pati
   const patientId = patientProfile?.userId;
   const doctorId = doctorUser?.$id;
 
-  const chatQueryKey = ['doctorChat', doctorId, patientId];
+  const chatQueryKey = useMemo(() => ['doctorChat', doctorId, patientId], [doctorId, patientId]);
 
   const { data: messages = [], isLoading, isError, error } = useQuery<ChatMessage[], Error>({
     queryKey: chatQueryKey,
