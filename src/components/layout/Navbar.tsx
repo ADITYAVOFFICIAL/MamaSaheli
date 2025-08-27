@@ -283,7 +283,10 @@ useEffect(() => {
             animate="visible"
             exit="exit"
           >
-            <div className="px-2 pt-2 pb-4 sm:px-3 space-y-4">
+            <div
+              className="px-2 pt-2 pb-4 sm:px-3 space-y-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-mamasaheli-primary/30 scrollbar-track-transparent"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
               <NavLink
                 to='/emergency'
                 className="flex items-center justify-center rounded-lg px-3 py-3 text-base font-semibold bg-red-600 text-red-100 hover:bg-red-700 shadow-lg"
