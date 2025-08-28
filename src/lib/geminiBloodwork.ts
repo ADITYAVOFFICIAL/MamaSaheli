@@ -32,33 +32,47 @@ export interface BloodworkResultItem {
     flag: 'Low' | 'Normal' | 'High' | 'N/A';
 }
 
-interface ParsedBloodworkResponse {
+export interface ParsedBloodworkResponse {
     results: BloodworkResultItem[];
+    allTestNames: string[];
     summary: string;
 }
 
+const COMMON_BIOMARKERS_TO_EXTRACT = [
+    'Hemoglobin', 'RBC Count', 'Hematocrit', 'MCV', 'MCH', 'MCHC', 'RDW-CV', 'RDW-SD', 
+    'Platelet Count', 'MPV', 'WBC Count', 'Total Leucocyte Count', 'Neutrophils', 'Lymphocytes', 
+    'Monocytes', 'Eosinophils', 'Basophils', 'TSH', 'Free T3', 'Free T4', 
+    'Fasting Blood Sugar', 'Postprandial Blood Sugar', 'HbA1c', 'Glucose Challenge Test', 
+    'Beta-hCG', 'Free Beta-hCG', 'PAPP-A', 'AFP', 'Unconjugated Estriol', 'Inhibin A',
+    'Serum Ferritin', 'Serum Iron', 'TIBC', 'Transferrin Saturation'
+];
+
 const createBloodworkExtractionPrompt = (): string => {
-        return `
-You are an expert AI medical data extraction tool. Your task is to analyze the provided image of a blood test report and extract key information into a structured JSON format. Focus on ALL bloodwork test names (biomarkers) present in the report, even if values are missing.
+    return `
+You are an expert AI medical data extraction tool. Your task is to analyze the provided image of a blood test report and extract key information into a structured JSON format.
+
+<CONTEXT>
+- The report is for a user in India. Be aware of common Indian units like "lakhs/µL" for Platelet Count or "/mm³" or "/cumm" for WBC counts.
+- Pay special attention to biomarkers relevant for pregnancy and general health. Prioritize finding values for the following common tests: ${COMMON_BIOMARKERS_TO_EXTRACT.join(', ')}.
+</CONTEXT>
 
 <INSTRUCTIONS>
-1. **Identify All Biomarkers:** Scan the document for ALL test names (biomarkers) listed in the report, not just common ones. Include every test name you can read, even if no value is present.
-2. **Extract Data:** For each identified biomarker, extract the following details if available:
-    - name: The name of the test/biomarker.
-    - value: The numerical or text result (if present, else empty string).
-    - unit: The unit of measurement (if present, else empty string).
-    - referenceRange: The normal range provided on the report (if present, else empty string).
-    - flag: Calculate the flag as follows:
-        - If both value and referenceRange are present and value is numeric, parse the reference range (e.g., "11.5 - 16.5") and compare:
-            - "Low" if value < lower bound of reference range
-            - "High" if value > upper bound of reference range
-            - "Normal" if value is within reference range
-        - If reference range uses alternate formats (e.g., "0 - 0", "01 - 06"), handle gracefully.
-        - If value or referenceRange is missing, or value is not numeric, set flag to "N/A".
-        - If the value is slightly outside the range (within 5% of the bounds), add a comment in the summary noting this.
-3. **List All Test Names:** In addition to the extracted results, create an array called "allTestNames" containing every test/biomarker name you found in the report (even if not extracted in results).
-4. **Generate Summary:** Create a brief, neutral, one-sentence summary of the report, mentioning any abnormal flags (e.g., "Hemoglobin is slightly low.").
-5. **CRITICAL OUTPUT FORMAT:** Your entire response MUST be a single, valid JSON object matching the schema in <JSON_SCHEMA>. Do not include any text or explanations outside this JSON object.
+1.  **Identify All Biomarkers:** Scan the entire document for every single test name (biomarker) listed. Do not skip any.
+2.  **Extract Data for Each Biomarker:** For each identified biomarker, extract the following details:
+    -   **name:** The clean, full name of the test/biomarker.
+    -   **value:** The numerical or text result. If missing, use an empty string "".
+    -   **unit:** The unit of measurement. If missing, use an empty string "".
+    -   **referenceRange:** The normal range provided on the report. If missing, use an empty string "".
+    -   **flag:** Calculate the flag based on the 'value' and 'referenceRange'.
+        -   First, parse the 'value' into a number. If it's not a valid number, the flag is "N/A".
+        -   Next, parse the 'referenceRange'. It can be in formats like "11.0 - 15.0", "< 92", "> 15", or "Up to 5.0".
+        -   If the range is "X - Y", compare the value to X and Y.
+        -   If the range is "< X" or "<= X", the value is "High" if it's >= X.
+        -   If the range is "> X" or ">= X", the value is "Low" if it's <= X.
+        -   Set the flag to "Low", "High", or "Normal". If a comparison is not possible, set it to "N/A".
+3.  **Create 'allTestNames' List:** Create a separate array called "allTestNames" that contains every single test/biomarker name you found in the report, even if you couldn't extract full details for it.
+4.  **Generate Summary:** Create a brief, neutral, one-sentence summary of the report. Mention any abnormal (Low or High) results concisely (e.g., "Hemoglobin is low and TSH is high."). If all values are normal, state that.
+5.  **CRITICAL OUTPUT FORMAT:** Your entire response MUST be a single, valid JSON object that strictly adheres to the schema in <JSON_SCHEMA>. Do not include any text, markdown, or explanations outside of this JSON object.
 </INSTRUCTIONS>
 
 <JSON_SCHEMA>
@@ -89,7 +103,7 @@ You are an expert AI medical data extraction tool. Your task is to analyze the p
 }
 </JSON_SCHEMA>
 
-Analyze the provided image and return the structured JSON.
+Analyze the provided image and return only the structured JSON.
 `;
 };
 
@@ -101,7 +115,10 @@ export const extractBloodworkDataFromImage = async (file: File): Promise<ParsedB
     const imagePart: Part = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-            const base64Data = (reader.result as string).split(',')[1];
+            if (typeof reader.result !== 'string') {
+                return reject(new Error('Failed to read file as data URL.'));
+            }
+            const base64Data = reader.result.split(',')[1];
             resolve({ inlineData: { mimeType: file.type, data: base64Data } });
         };
         reader.onerror = (error) => reject(error);
@@ -115,17 +132,24 @@ export const extractBloodworkDataFromImage = async (file: File): Promise<ParsedB
     });
 
     const prompt = createBloodworkExtractionPrompt();
-    const result = await model.generateContent([prompt, imagePart]);
-    const responseText = result.response.text();
-
-    if (!responseText) {
-        throw new Error("AI did not return a response for the lab report.");
-    }
-
+    
     try {
+        const result = await model.generateContent([prompt, imagePart]);
+        const responseText = result.response.text();
+
+        if (!responseText) {
+            throw new Error("AI did not return a response for the lab report.");
+        }
+
         return JSON.parse(responseText) as ParsedBloodworkResponse;
     } catch (error) {
-        console.error("Failed to parse AI JSON response:", responseText);
-        throw new Error("AI returned a malformed response. The report might be difficult to read.");
+        if (error instanceof Error) {
+            console.error("Error during AI processing or JSON parsing:", error.message);
+            if (error.message.includes("JSON")) {
+                 throw new Error("AI returned a malformed response. The report might be difficult to read.");
+            }
+             throw new Error(`An AI processing error occurred: ${error.message}`);
+        }
+        throw new Error("An unknown error occurred during AI processing.");
     }
 };

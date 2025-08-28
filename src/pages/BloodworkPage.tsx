@@ -10,8 +10,8 @@ import {
   getFilePreview,
   medicalBucketId,
   BloodworkResult,
-  CreateBloodworkData,
   updateBloodworkResult,
+  CreateBloodworkData,
 } from '@/lib/appwrite';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,16 +27,16 @@ import { Upload, Loader2, FileText, Trash2, Download, BriefcaseMedical, PlusCirc
 
 type BloodworkResultWithResults = BloodworkResult & { results?: string };
 
-const BIOMARKER_ALIASES = {
+const BIOMARKER_ALIASES: Record<string, string[]> = {
     'Hemoglobin': ['hemoglobin', 'hgb', 'haemoglobin', 'hb'],
-    'RBC Count': ['rbc', 'red blood cell', 'r b c count'],
+    'RBC Count': ['rbc', 'red blood cell', 'r b c count', 'erythrocyte count'],
     'Hematocrit': ['hematocrit', 'pcv', 'packed cell volume', 'p.c.v/haematocrit'],
     'MCV': ['mcv', 'mean corpuscular volume'],
     'MCH': ['mch', 'mean corpuscular hemoglobin'],
     'MCHC': ['mchc', 'mean corpuscular hemoglobin concentration'],
     'RDW-CV': ['rdw-cv', 'rdw_cv'],
     'RDW-SD': ['rdw-sd', 'rdw_sd'],
-    'Platelet Count': ['platelet', 'plt'],
+    'Platelet Count': ['platelet', 'plt', 'platelet count', 'thrombocyte count'],
     'MPV': ['mpv', 'mean platelet volume'],
     'WBC Count': ['wbc', 'white blood cell', 'leucocyte', 'tlc', 'total leucocyte count'],
     'Neutrophils': ['neutrophil'],
@@ -44,12 +44,29 @@ const BIOMARKER_ALIASES = {
     'Monocytes': ['monocyte'],
     'Eosinophils': ['eosinophil'],
     'Basophils': ['basophil'],
-    'PCT': ['pct', 'plateletcrit']
+    'PCT': ['pct', 'plateletcrit'],
+    'TSH': ['tsh', 'thyroid stimulating hormone'],
+    'Free T3': ['ft3', 'free t3', 'free triiodothyronine'],
+    'Free T4': ['ft4', 'free t4', 'free thyroxine'],
+    'Fasting Blood Sugar': ['fbs', 'fasting blood sugar', 'glucose fasting'],
+    'Postprandial Blood Sugar': ['ppbs', 'postprandial blood sugar', 'glucose postprandial', 'glucose pp'],
+    'HbA1c': ['hba1c', 'glycated hemoglobin', 'hemoglobin a1c'],
+    'Glucose Challenge Test': ['gct', 'glucose challenge'],
+    'Beta-hCG': ['beta-hcg', 'β-hcg', 'hcg', 'human chorionic gonadotropin'],
+    'Free Beta-hCG': ['free beta-hcg', 'free β-hcg'],
+    'PAPP-A': ['papp-a', 'pregnancy-associated plasma protein a'],
+    'AFP': ['afp', 'alpha-fetoprotein'],
+    'Unconjugated Estriol': ['ue3', 'unconjugated estriol'],
+    'Inhibin A': ['inhibin a', 'dimeric inhibin a'],
+    'Serum Ferritin': ['ferritin', 'serum ferritin'],
+    'Serum Iron': ['serum iron', 'iron'],
+    'TIBC': ['tibc', 'total iron binding capacity'],
+    'Transferrin Saturation': ['transferrin saturation', 'tsat'],
 };
 
-const normalizeString = (s) => (s || "").toLowerCase().replace(/[\s()-.,/]/g, '');
+const normalizeString = (s: string): string => (s || "").toLowerCase().replace(/[\s()-.,/]/g, '');
 
-const getCanonicalBiomarker = (rawName) => {
+const getCanonicalBiomarker = (rawName: string): string | null => {
     if (!rawName) return null;
     const normalizedName = normalizeString(rawName);
     for (const [canonical, aliases] of Object.entries(BIOMARKER_ALIASES)) {
@@ -82,7 +99,7 @@ const ResultsSkeleton = () => (
     </div>
 );
 
-const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) => {
+const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }: { documents: BloodworkResultWithResults[], dataKey: string, name: string, unit: string, normalRange: number[] }) => {
     const chartData = useMemo(() => {
         return documents
             .map(doc => {
@@ -110,15 +127,15 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
                 } catch { return null; }
                 return null;
             })
-            .filter(item => item !== null)
+            .filter((item): item is NonNullable<typeof item> => item !== null)
             .sort((a, b) => a.date.getTime() - b.date.getTime());
     }, [documents, dataKey, unit, normalRange]);
 
     if (chartData.length < 2) {
         return (
-            <div className="flex flex-col items-center justify-center h-[250px] text-center text-sm text-muted-foreground bg-secondary/30 rounded-lg gap-2">
+            <div className="flex flex-col items-center justify-center h-[250px] text-center text-sm text-muted-foreground bg-secondary/30 rounded-lg gap-2 p-4">
                 <span>Not enough data to display a trend for {name}.</span>
-                <span className="text-xs text-muted-foreground">Upload at least two reports with {name} results to see your trend over time.</span>
+                <span className="text-xs">Upload at least two reports with {name} results to see your trend over time.</span>
             </div>
         );
     }
@@ -128,7 +145,7 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
     const yMin = Math.min(...dataValues, refRange[0]);
     const yMax = Math.max(...dataValues, refRange[1]);
     const yPadding = (yMax - yMin) * 0.2 || 5;
-    const yDomain = [Math.max(0, Math.floor(yMin - yPadding)), Math.ceil(yMax + yPadding)];
+    const yDomain: [number, number] = [Math.max(0, Math.floor(yMin - yPadding)), Math.ceil(yMax + yPadding)];
 
     return (
         <ResponsiveContainer width="100%" height={250}>
@@ -147,12 +164,13 @@ const BloodworkTrendChart = ({ documents, dataKey, name, unit, normalRange }) =>
     );
 };
 
-const ReportDetails = ({ result, onUpdate }) => {
+const ReportDetails = ({ result, onUpdate }: { result: BloodworkResultWithResults, onUpdate: (newResults: any[]) => void }) => {
     const [isEditing, setIsEditing] = useState(false);
-    const [editRows, setEditRows] = useState([]);
+    const [editRows, setEditRows] = useState<any[]>([]);
+
     const parsedData = useMemo(() => {
         const raw = result?.results || '';
-        let resultsArr = [];
+        let resultsArr: any[] = [];
         let summaryText = '';
         try {
             const parsed = raw ? JSON.parse(raw) : {};
@@ -165,7 +183,7 @@ const ReportDetails = ({ result, onUpdate }) => {
         } catch (error) {
             return { error: 'Error parsing results.', raw };
         }
-        const processFlag = (value, referenceRange) => {
+        const processFlag = (value: string | number, referenceRange: string) => {
             if (!value || !referenceRange) return 'N/A';
             const numValue = parseFloat(String(value).replace(/,/g, ''));
             const match = String(referenceRange).match(/([\d.]+)\s*-\s*([\d.]+)/);
@@ -197,27 +215,21 @@ const ReportDetails = ({ result, onUpdate }) => {
         }
     }, [isEditing, parsedData.resultsArr]);
 
-    const handleEditChange = (idx, field, value) => {
+    const handleEditChange = (idx: number, field: string, value: string) => {
         setEditRows(rows => rows.map((row, i) => i === idx ? { ...row, [field]: value } : row));
     };
 
     const handleSave = () => {
-        if (onUpdate) onUpdate(editRows);
+        onUpdate(editRows);
         setIsEditing(false);
     };
 
     if (parsedData.error) {
         return <div className="text-center text-red-500 italic p-4">{parsedData.error}</div>;
     }
-    const { resultsArr, summaryText, raw } = parsedData;
+    const { resultsArr } = parsedData;
     return (
         <div className="space-y-4 p-1">
-            {summaryText && (
-                <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900/50">
-                    <CardHeader><CardTitle className="text-base text-blue-900 dark:text-blue-200">AI Summary</CardTitle></CardHeader>
-                    <CardContent><p className="text-sm text-blue-800 dark:text-blue-300">{summaryText}</p></CardContent>
-                </Card>
-            )}
             {resultsArr.length > 0 ? (
                 <div className="overflow-x-auto border rounded-lg">
                     <table className="min-w-full text-sm">
@@ -270,15 +282,11 @@ const ReportDetails = ({ result, onUpdate }) => {
             ) : (
                 <div className="text-center text-muted-foreground italic p-8">No structured data was extracted from this report.</div>
             )}
-            {/* <details>
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-primary">Show raw AI results JSON</summary>
-                <pre className="mt-2 text-xs bg-secondary/30 p-2 rounded border overflow-x-auto max-h-40 whitespace-pre-wrap">{raw || 'No raw data.'}</pre>
-            </details> */}
         </div>
     );
 };
 
-const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl, handleUpdateResults }) => {
+const ReportModal = ({ selectedDoc, onOpenChange, getSafeFilePreviewUrl, handleUpdateResults }: { selectedDoc: BloodworkResultWithResults | null, onOpenChange: (open: boolean) => void, getSafeFilePreviewUrl: (fileId: string) => string, handleUpdateResults: (newResults: any[]) => void }) => {
     if (!selectedDoc) return null;
 
     return (
@@ -331,18 +339,18 @@ const BloodworkPage = () => {
     const { user } = useAuthStore();
     const { toast } = useToast();
 
-    const [file, setFile] = useState(null);
+    const [file, setFile] = useState<File | null>(null);
     const [testName, setTestName] = useState('');
     const [recordedAt, setRecordedAt] = useState('');
-    const [documents, setDocuments] = useState([]);
+    const [documents, setDocuments] = useState<BloodworkResultWithResults[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
-    const [docToDelete, setDocToDelete] = useState(null);
-    const [selectedDoc, setSelectedDoc] = useState(null);
+    const [docToDelete, setDocToDelete] = useState<BloodworkResultWithResults | null>(null);
+    const [selectedDoc, setSelectedDoc] = useState<BloodworkResultWithResults | null>(null);
     const [selectedBiomarker, setSelectedBiomarker] = useState("");
-    const [biomarkerOptions, setBiomarkerOptions] = useState([]);
-    const [biomarkerUnits, setBiomarkerUnits] = useState({});
-    const [biomarkerRanges, setBiomarkerRanges] = useState({});
+    const [biomarkerOptions, setBiomarkerOptions] = useState<string[]>([]);
+    const [biomarkerUnits, setBiomarkerUnits] = useState<Record<string, string>>({});
+    const [biomarkerRanges, setBiomarkerRanges] = useState<Record<string, number[]>>({});
 
     const [manualEntry, setManualEntry] = useState({
         testName: '',
@@ -356,7 +364,7 @@ const BloodworkPage = () => {
         setIsLoading(true);
         try {
             const docs = await getUserBloodworkResults(user.$id);
-            setDocuments(docs);
+            setDocuments(docs as BloodworkResultWithResults[]);
         } catch (error) {
             toast({ title: "Failed to fetch results", description: "Could not load your bloodwork history.", variant: "destructive" });
         } finally {
@@ -377,7 +385,7 @@ const BloodworkPage = () => {
         return { total: documents.length, recentDate: format(recentDate, 'MMM d, yyyy'), commonTestCount };
     }, [documents, isLoading]);
 
-    const handleFileChange = (e) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) setFile(e.target.files[0]);
     };
 
@@ -389,7 +397,7 @@ const BloodworkPage = () => {
         if (fileInput) fileInput.value = '';
     };
 
-    const handleUpload = async (e) => {
+    const handleUpload = async (e: FormEvent) => {
         e.preventDefault();
         if (!file || !testName || !recordedAt || !user?.$id) {
             toast({ title: "Missing Information", description: "Please provide a test name, date, and select a file.", variant: "destructive" });
@@ -397,7 +405,7 @@ const BloodworkPage = () => {
         }
         setIsUploading(true);
         try {
-            const data = { userId: user.$id, testName, recordedAt, file };
+            const data: CreateBloodworkData = { userId: user.$id, testName, recordedAt, file };
             await createBloodworkResult(data);
             toast({ title: "Success", description: "Bloodwork result uploaded successfully. AI is analyzing the report." });
             resetForm();
@@ -422,7 +430,7 @@ const BloodworkPage = () => {
         }
     };
 
-    const getSafeFilePreviewUrl = (fileId) => {
+    const getSafeFilePreviewUrl = (fileId: string) => {
         try {
             if (!medicalBucketId) throw new Error("Bucket ID not configured.");
             return getFilePreview(fileId, medicalBucketId).toString();
@@ -436,9 +444,9 @@ const BloodworkPage = () => {
             return;
         }
 
-        const canonicalBiomarkerMap = {};
-        const unitsMap = {};
-        const rangesMap = {};
+        const canonicalBiomarkerMap: Record<string, number> = {};
+        const unitsMap: Record<string, string> = {};
+        const rangesMap: Record<string, number[]> = {};
 
         documents.forEach(doc => {
             let results;
@@ -481,9 +489,9 @@ const BloodworkPage = () => {
         }
     }, [documents]);
 
-    const handleUpdateResults = async (newResultsArr) => {
+    const handleUpdateResults = async (newResultsArr: any[]) => {
         if (!selectedDoc) return;
-        const recalcFlag = (value, referenceRange) => {
+        const recalcFlag = (value: string | number, referenceRange: string) => {
             if (!value || !referenceRange) return 'N/A';
             const numValue = parseFloat(String(value).replace(/,/g, ''));
             const match = String(referenceRange).match(/([\d.]+)\s*-\s*([\d.]+)/);
@@ -511,7 +519,7 @@ const BloodworkPage = () => {
         }
     };
 
-    const handleManualChange = (idx, field, value) => {
+    const handleManualChange = (idx: number, field: string, value: string) => {
         setManualEntry(entry => ({
             ...entry,
             biomarkers: entry.biomarkers.map((b, i) => i === idx ? { ...b, [field]: value } : b)
@@ -520,10 +528,10 @@ const BloodworkPage = () => {
     const addManualBiomarker = () => {
         setManualEntry(entry => ({ ...entry, biomarkers: [...entry.biomarkers, { name: '', value: '', unit: '', referenceRange: '' }] }));
     };
-    const removeManualBiomarker = (idx) => {
+    const removeManualBiomarker = (idx: number) => {
         setManualEntry(entry => ({ ...entry, biomarkers: entry.biomarkers.filter((_, i) => i !== idx) }));
     };
-    const handleManualSubmit = async (e) => {
+    const handleManualSubmit = async (e: FormEvent) => {
         e.preventDefault();
         if (!user?.$id || !manualEntry.testName || !manualEntry.recordedAt || manualEntry.biomarkers.some(b => !b.name || !b.value)) {
             toast({ title: "Missing Information", description: "Please fill all required fields.", variant: "destructive" });
@@ -531,12 +539,12 @@ const BloodworkPage = () => {
         }
         setIsManualLoading(true);
         try {
-            const data = {
+            const data: CreateBloodworkData = {
                 userId: user.$id,
                 testName: manualEntry.testName,
                 recordedAt: manualEntry.recordedAt,
                 file: null,
-                results: JSON.stringify(manualEntry.biomarkers),
+                summary: JSON.stringify(manualEntry.biomarkers),
             };
             await createBloodworkResult(data);
             toast({ title: "Success", description: "Manual entry added successfully." });
@@ -571,16 +579,17 @@ const BloodworkPage = () => {
                                 Select any biomarker with multiple data points to view its trend over time.
                             </CardDescription>
                             <div className="mt-4">
-                                <label htmlFor="biomarker-select" className="mr-2 font-medium">Biomarker:</label>
+                                <label htmlFor="biomarker-select" className="mr-2 font-medium text-sm">Biomarker:</label>
                                 <select
                                     id="biomarker-select"
                                     value={selectedBiomarker}
                                     onChange={e => setSelectedBiomarker(e.target.value)}
-                                    className="border rounded px-2 py-1"
+                                    className="border rounded px-2 py-1 bg-background"
+                                    disabled={biomarkerOptions.length === 0}
                                 >
-                                    {biomarkerOptions.map(opt => (
+                                    {biomarkerOptions.length > 0 ? biomarkerOptions.map(opt => (
                                         <option key={opt} value={opt}>{opt}</option>
-                                    ))}
+                                    )) : <option>No trendable data</option>}
                                 </select>
                             </div>
                         </CardHeader>
@@ -594,16 +603,16 @@ const BloodworkPage = () => {
                                     normalRange={biomarkerRanges[selectedBiomarker] || [0, 0]}
                                 />
                             ) : (
-                                <div className="text-center text-muted-foreground">Select a biomarker to view its trend.</div>
+                                <div className="text-center text-muted-foreground p-8">Select a biomarker to view its trend, or upload more reports.</div>
                             )}
                         </CardContent>
                     </Card>
                 </section>
 
                 <main className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-start">
-                    <aside className="lg:col-span-2 lg:sticky top-24">
+                    <aside className="lg:col-span-2 lg:sticky top-24 space-y-6">
                         <Card>
-                            <CardHeader><CardTitle className="flex items-center text-xl"><PlusCircle className="mr-2.5 h-6 w-6" /> Add New Result</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="flex items-center text-xl"><PlusCircle className="mr-2.5 h-6 w-6" /> Upload New Report</CardTitle></CardHeader>
                             <form onSubmit={handleUpload}>
                                 <CardContent className="space-y-5">
                                     <div className="space-y-1.5"><Label htmlFor="testName">Test Name *</Label><Input id="testName" value={testName} onChange={e => setTestName(e.target.value)} placeholder="e.g., Iron Panel, CBC" required disabled={isUploading} /></div>
@@ -613,7 +622,7 @@ const BloodworkPage = () => {
                                 </CardContent>
                             </form>
                         </Card>
-                        <Card className="mt-6">
+                        <Card>
                             <CardHeader><CardTitle className="flex items-center text-xl"><PlusCircle className="mr-2.5 h-6 w-6" /> Manual Entry</CardTitle></CardHeader>
                             <form onSubmit={handleManualSubmit}>
                                 <CardContent className="space-y-5">
@@ -622,12 +631,12 @@ const BloodworkPage = () => {
                                     <div className="space-y-2">
                                         <Label>Biomarkers *</Label>
                                         {manualEntry.biomarkers.map((b, idx) => (
-                                            <div key={idx} className="flex gap-2 items-center mb-2">
-                                                <Input placeholder="Name" value={b.name} onChange={e => handleManualChange(idx, 'name', e.target.value)} required disabled={isManualLoading} className="w-32" />
+                                            <div key={idx} className="grid grid-cols-[1fr,auto,auto,auto,auto] gap-2 items-center">
+                                                <Input placeholder="Name" value={b.name} onChange={e => handleManualChange(idx, 'name', e.target.value)} required disabled={isManualLoading} />
                                                 <Input placeholder="Value" value={b.value} onChange={e => handleManualChange(idx, 'value', e.target.value)} required disabled={isManualLoading} className="w-20" />
                                                 <Input placeholder="Unit" value={b.unit} onChange={e => handleManualChange(idx, 'unit', e.target.value)} disabled={isManualLoading} className="w-16" />
-                                                <Input placeholder="Reference Range" value={b.referenceRange} onChange={e => handleManualChange(idx, 'referenceRange', e.target.value)} disabled={isManualLoading} className="w-24" />
-                                                <Button type="button" size="icon" variant="destructive" onClick={() => removeManualBiomarker(idx)} disabled={isManualLoading || manualEntry.biomarkers.length === 1}>-</Button>
+                                                <Input placeholder="Range" value={b.referenceRange} onChange={e => handleManualChange(idx, 'referenceRange', e.target.value)} disabled={isManualLoading} className="w-24" />
+                                                <Button type="button" size="icon" variant="destructive" onClick={() => removeManualBiomarker(idx)} disabled={isManualLoading || manualEntry.biomarkers.length === 1}><Trash2 className="w-4 h-4"/></Button>
                                             </div>
                                         ))}
                                         <Button type="button" size="sm" variant="outline" onClick={addManualBiomarker} disabled={isManualLoading}>Add Biomarker</Button>
@@ -652,7 +661,6 @@ const BloodworkPage = () => {
                                                         <div className="overflow-hidden">
                                                             <p className="font-semibold truncate" title={doc.testName}>{doc.testName}</p>
                                                             <p className="text-sm text-muted-foreground">{format(new Date(doc.recordedAt), 'MMMM d, yyyy')}</p>
-                                                            {doc.summary && <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">AI Summary: {doc.summary}</p>}
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-2 flex-shrink-0 self-end sm:self-center">
