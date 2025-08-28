@@ -28,6 +28,7 @@ import MedCharts from '@/components/dashboard/MedCharts';
 import MedReminder from '@/components/dashboard/MedReminder';
 import EditMedReminderModal from '@/components/dashboard/EditMedReminderModal';
 import AddMedReminderModal from '@/components/dashboard/AddMedReminderModal';
+import PregnancyWeekInfo from '@/components/dashboard/PregnancyWeekInfo';
 
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
@@ -516,7 +517,13 @@ const DashboardPage: React.FC = () => {
                         </p>
                     </div>
 
-
+ <div className="mb-6">
+          {isLoadingProfile ? (
+            <Skeleton className="h-[220px] w-full rounded-xl" />
+          ) : (
+            <PregnancyWeekInfo weeksPregnant={profile?.weeksPregnant} />
+          )}
+        </div>
                     {isLoading && !profile && !dashboardCriticalError && (
                         <div className="flex justify-center items-center h-64">
                             <Loader2 className="h-12 w-12 animate-spin text-mamasaheli-primary" />
