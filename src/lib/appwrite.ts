@@ -151,7 +151,7 @@ export interface ForumTopic extends AppwriteDocument {
     replyCount?: number;
     isLocked?: boolean;
     isPinned?: boolean;
-    // ** NEW: Store aggregated vote counts for efficient display/sorting **
+    isDoctor?: boolean;
     voteScore?: number; // Calculated: upvotes - downvotes
 }
 
@@ -162,7 +162,7 @@ export interface ForumPost extends AppwriteDocument {
     userId: string; // Replier's Appwrite User ID
     userName: string; // Replier's display name (snapshot)
     userAvatarUrl?: string; // Replier's avatar URL (snapshot, optional)
-    // ** NEW: Store aggregated vote counts for efficient display/sorting **
+    isDoctor?: boolean;
     voteScore?: number; // Calculated: upvotes - downvotes
 }
 // *** NEW: Forum Vote Type ***
@@ -251,7 +251,8 @@ export interface UserProfile extends AppwriteDocument {
     assignedDoctorId?: string;
     assignedDoctorName?: string;
     lmpDate?: string; // ISO date string for Last Menstrual Period
-    estimatedDueDate?: string; // ISO date string for Estimated Delivery Date
+    estimatedDueDate?: string; 
+    labels?: string[];
 }
 
 /**
@@ -1359,7 +1360,9 @@ export const createForumTopic = async (
         // console.warn("createForumTopic called without userName, using 'Anonymous'.");
         userName = 'Anonymous';
     }
-
+    let profile: UserProfile | null = null;
+    try { profile = await getUserProfile(userId); } catch { /* ignore error */ }
+    const isDoctor = isUserDoctor(profile);
     try {
         const now = new Date().toISOString();
         const payload: Omit<ForumTopic, keyof AppwriteDocument> = {
@@ -1373,7 +1376,8 @@ export const createForumTopic = async (
             replyCount: 0,
             isLocked: false,
             isPinned: false,
-            voteScore: 0, // *** Initialize vote score ***
+            voteScore: 0, 
+            isDoctor,
         };
 
         const userRole = Role.user(userId);
@@ -1487,7 +1491,9 @@ export const createForumPost = async (
         // console.warn("createForumPost called without userName, using 'Anonymous'.");
         userName = 'Anonymous';
     }
-
+let profile: UserProfile | null = null;
+    try { profile = await getUserProfile(userId); } catch (e) { /* ignore error */ }
+    const isDoctor = isUserDoctor(profile);
     let createdPost: ForumPost | null = null;
     try {
         const payload: Omit<ForumPost, keyof AppwriteDocument> = {
@@ -1496,7 +1502,8 @@ export const createForumPost = async (
             userAvatarUrl: userAvatarUrl?.trim() || undefined,
             topicId: data.topicId,
             content: data.content.trim(),
-            voteScore: 0, // *** Initialize vote score ***
+            voteScore: 0,
+            isDoctor,
         };
 
         const userRole = Role.user(userId);
@@ -2081,7 +2088,7 @@ export const getRecentUserProfiles = async (limit: number = 10): Promise<UserPro
     }
 };
 
-export { ID, Permission, Role, Query };
+export { ID, Permission, Role, Query, forumTopicsCollectionId };
 
 /**
  * Retrieves all bookmarked products for a specific user.
@@ -2332,4 +2339,9 @@ export const deleteDoctorChatMessage = async (messageId: string): Promise<void> 
         handleAppwriteError(error, `deleting doctor chat message ${messageId}`);
         throw error;
     }
+};
+export { databaseId, forumPostsCollectionId };
+
+export const isUserDoctor = (profile: UserProfile | null): boolean => {
+    return Array.isArray(profile?.labels) && profile.labels.includes('doctor');
 };

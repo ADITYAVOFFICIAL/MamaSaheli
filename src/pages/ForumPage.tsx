@@ -1,15 +1,13 @@
-// src/pages/ForumPage.tsx
-import React, { useState, useEffect, useCallback, useMemo, FormEvent, ChangeEvent, useRef } from 'react'; // Added useRef
+import React, { useState, useEffect, useCallback, useMemo, FormEvent, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import {
-    MessageSquare, PlusCircle, List, Tag, Clock, User, Loader2, ArrowLeft, Send, Trash2, Edit, Lock, Unlock, Pin, PinOff, Search, ThumbsUp, ThumbsDown, Filter, Sparkles, X, ShieldAlert
+    MessageSquare, PlusCircle, List, Tag, Clock, User, Loader2, ArrowLeft, Send, Trash2, Edit, Lock, Pin, Search, ThumbsUp, ThumbsDown, Filter, Sparkles, X, ShieldAlert
 } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import ReactMarkdown, { Options as ReactMarkdownOptions } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// --- UI & Layout ---
 import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -25,24 +23,21 @@ import { Badge } from '@/components/ui/badge';
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/authStore';
 
-// --- Appwrite & AI ---
 import {
-    ForumTopic, ForumPost, UserProfile, ForumVote, VoteCounts, UserVoteStatus,
+    client, databaseId, forumPostsCollectionId, forumTopicsCollectionId,
+    ForumTopic, ForumPost, UserProfile, VoteCounts, UserVoteStatus,
     getForumTopics, getForumTopic, getForumPosts,
     createForumTopic, createForumPost,
     deleteForumPost, deleteForumTopicAndPosts,
-    updateForumTopic, updateForumPost,
     getUserProfile,
     castForumVote, getUserVoteStatus, getTargetVoteCounts
-} from '@/lib/appwrite'; // Assuming appwrite types/functions are correctly exported
+} from '@/lib/appwrite';
 import { formatContentWithGemini } from '@/lib/geminif';
-import { geminiModService, ModerationDecision, ModerationFlag } from '@/lib/geminiMod';
+import { geminiModService, ModerationDecision } from '@/lib/geminiMod';
 
-// --- Helper Functions ---
 const getInitials = (nameStr: string | undefined | null): string => {
     if (!nameStr) return '?';
     return nameStr.split(' ').map(n => n[0]).filter(Boolean).join('').toUpperCase().substring(0, 2);
@@ -51,38 +46,17 @@ const getInitials = (nameStr: string | undefined | null): string => {
 const formatRelativeTime = (dateString?: string): string => {
     if (!dateString) return 'unknown time';
     try { return formatDistanceToNow(parseISO(dateString), { addSuffix: true }); }
-    catch (e) { /*console.error("Error parsing date for relative time:", dateString, e);*/return 'invalid date'; }
+    catch (e) { return 'invalid date'; }
 };
 
-// --- Constants ---
 const TOPICS_PER_PAGE = 15;
 const POSTS_PER_PAGE = 20;
 const SEARCH_DEBOUNCE_MS = 500;
 const FORUM_CATEGORIES = [
     'All', 'General', 'Pregnancy', 'Childbirth', 'Postpartum', 'Nutrition', 'Exercise', 'Mental Health', 'Baby Care', 'Symptoms', 'Tips & Tricks'
 ];
-// Define backend WebSocket URL (use environment variable if needed)
-// Ensure VITE_PUBLIC_BACKEND_WS_URL is set in your .env.local or .env.development.local
-const BACKEND_WS_URL = import.meta.env.VITE_PUBLIC_BACKEND_WS_URL || 'ws://localhost:3001';
 
-// --- Type Definitions ---
 type AnchorProps = React.ClassAttributes<HTMLAnchorElement> & React.AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown };
-// Type for messages received from backend WebSocket
-interface BackendWebSocketMessage {
-    type: 'new_post' | 'vote_update' | 'error' | 'info';
-    payload: any; // Ideally type this payload more strictly based on type
-}
-// Specific type for vote update payload
-type BackendVoteUpdatePayload = {
-    targetId: string;
-    targetType: 'topic' | 'post';
-    voteCounts: VoteCounts;
-};
-
-
-// ================================================
-// --- Sub-Components (VoteButton, TopicListItem, PostItem) ---
-// ================================================
 
 const VoteButton: React.FC<{
     direction: 'up' | 'down';
@@ -136,15 +110,14 @@ const TopicListItem: React.FC<{
                     isAuthenticated && currentUserId ? getUserVoteStatus(currentUserId, topic.$id) : Promise.resolve('none' as UserVoteStatus)
                 ]);
                 if (isMounted) { setVoteCounts(counts); setVoteStatus(status); }
-            } catch (err) { if (isMounted) { setVoteCounts(prev => ({ ...prev, score: topic.voteScore || 0 })); setVoteStatus('none'); } /*console.error(`Error fetching vote data for topic ${topic.$id}:`, err);*/ }
+            } catch (err) { if (isMounted) { setVoteCounts(prev => ({ ...prev, score: topic.voteScore || 0 })); setVoteStatus('none'); } }
             finally { if (isMounted) setIsLoadingVotes(false); }
         };
         fetchVoteData();
         return () => { isMounted = false };
-    }, [isAuthenticated, currentUserId, topic.$id, topic.voteScore]); // Added topic.voteScore to dependencies
+    }, [isAuthenticated, currentUserId, topic.$id, topic.voteScore]);
 
-     useEffect(() => {
-        // Update local score if the prop changes (from WebSocket update in parent)
+    useEffect(() => {
         setVoteCounts(prev => ({ ...prev, score: topic.voteScore || 0 }));
     }, [topic.voteScore]);
 
@@ -155,9 +128,7 @@ const TopicListItem: React.FC<{
         const newStatus = voteType === 'remove' ? 'none' : voteType; setVoteStatus(newStatus);
         try {
             await onVote(topic.$id, voteType);
-            const [refetchedStatus, refetchedCounts] = await Promise.all([ getUserVoteStatus(currentUserId!, topic.$id), getTargetVoteCounts(topic.$id) ]);
-            setVoteStatus(refetchedStatus); setVoteCounts(refetchedCounts);
-        } catch (error) { setVoteStatus(previousStatus); setVoteCounts(previousCounts); /*console.error("Topic vote failed, reverting UI");*/ }
+        } catch (error) { setVoteStatus(previousStatus); setVoteCounts(previousCounts); }
         finally { setIsVoting(false); }
     };
 
@@ -218,7 +189,7 @@ const PostItem: React.FC<{
                     isAuthenticated && currentUserId ? getUserVoteStatus(currentUserId, post.$id) : Promise.resolve('none' as UserVoteStatus)
                 ]);
                 if (isMounted) { setVoteCounts(counts); setVoteStatus(status); }
-            } catch (err) { if (isMounted) { setVoteCounts(prev => ({ ...prev, score: post.voteScore || 0 })); setVoteStatus('none'); } /*console.error(`Error fetching vote data for post ${post.$id}:`, err);*/ }
+            } catch (err) { if (isMounted) { setVoteCounts(prev => ({ ...prev, score: post.voteScore || 0 })); setVoteStatus('none'); } }
             finally { if (isMounted) setIsLoadingVotes(false); }
         };
         fetchVoteData();
@@ -226,7 +197,6 @@ const PostItem: React.FC<{
     }, [isAuthenticated, currentUserId, post.$id, post.voteScore]);
 
     useEffect(() => {
-        // Update local score if the prop changes (from WebSocket update in parent)
         setVoteCounts(prev => ({ ...prev, score: post.voteScore || 0 }));
     }, [post.voteScore]);
 
@@ -237,9 +207,7 @@ const PostItem: React.FC<{
         const newStatus = voteType === 'remove' ? 'none' : voteType; setVoteStatus(newStatus);
         try {
             await onVote(post.$id, voteType);
-            const [refetchedStatus, refetchedCounts] = await Promise.all([ getUserVoteStatus(currentUserId!, post.$id), getTargetVoteCounts(post.$id) ]);
-            setVoteStatus(refetchedStatus); setVoteCounts(refetchedCounts);
-        } catch (error) { setVoteStatus(previousStatus); setVoteCounts(previousCounts); /*console.error("Post vote failed, reverting UI");*/ }
+        } catch (error) { setVoteStatus(previousStatus); setVoteCounts(previousCounts); }
         finally { setIsVoting(false); }
     };
 
@@ -280,18 +248,12 @@ const PostItem: React.FC<{
     );
 });
 
-
-// ==================================
-// --- Main Forum Page Component ---
-// ==================================
 const ForumPage: React.FC = () => {
     const { topicId } = useParams<{ topicId?: string }>();
     const navigate = useNavigate();
     const location = useLocation();
     const { toast } = useToast();
     const { user, isAuthenticated } = useAuthStore();
-
-    // --- State ---
     const [topics, setTopics] = useState<ForumTopic[]>([]);
     const [topicsLoading, setTopicsLoading] = useState(false);
     const [topicsError, setTopicsError] = useState<string | null>(null);
@@ -326,10 +288,6 @@ const ForumPage: React.FC = () => {
     const [showDeleteTopicDialog, setShowDeleteTopicDialog] = useState(false);
     const [isDeletingTopicConfirmed, setIsDeletingTopicConfirmed] = useState(false);
 
-    // --- Ref for WebSocket Connection ---
-    const wsRef = useRef<WebSocket | null>(null);
-
-    // --- Data Fetching Callbacks (Memoized) ---
     const fetchTopics = useCallback(async (page = 1, reset = false) => {
         setTopicsLoading(true); setTopicsError(null);
         const offset = (page - 1) * TOPICS_PER_PAGE;
@@ -338,7 +296,7 @@ const ForumPage: React.FC = () => {
             const response = await getForumTopics(currentCategory, TOPICS_PER_PAGE, offset, sortBy, searchQuery);
             setTopics(prev => (reset || page === 1) ? response.documents : [...prev, ...response.documents]);
             setTopicsTotal(response.total); setTopicsPage(page);
-        } catch (error: any) { setTopicsError("Failed to load topics."); toast({ title: "Error", description: "Could not fetch forum topics.", variant: "destructive" }); /*console.error("Fetch topics error:", error);*/ }
+        } catch (error: any) { setTopicsError("Failed to load topics."); toast({ title: "Error", description: "Could not fetch forum topics.", variant: "destructive" }); }
         finally { setTopicsLoading(false); }
     }, [searchQuery, filterCategory, sortBy, toast]);
 
@@ -348,7 +306,7 @@ const ForumPage: React.FC = () => {
             const topicData = await getForumTopic(id);
             if (!topicData) throw new Error("Topic not found.");
             setCurrentTopic(topicData);
-        } catch (error: any) { setTopicError(error.message || "Failed to load topic details."); setCurrentTopic(null); toast({ title: "Error", description: "Could not fetch topic details.", variant: "destructive" }); if (error.message === "Topic not found.") { navigate('/forum', { replace: true }); } /*console.error("Fetch topic details error:", error);*/ }
+        } catch (error: any) { setTopicError(error.message || "Failed to load topic details."); setCurrentTopic(null); toast({ title: "Error", description: "Could not fetch topic details.", variant: "destructive" }); if (error.message === "Topic not found.") { navigate('/forum', { replace: true }); } }
         finally { setTopicLoading(false); }
     }, [toast, navigate]);
 
@@ -357,22 +315,18 @@ const ForumPage: React.FC = () => {
         const offset = (page - 1) * POSTS_PER_PAGE;
         try {
             const response = await getForumPosts(id, POSTS_PER_PAGE, offset, postSearchQuery);
-            // Sort posts by creation date ascending (oldest first) for display
             const sortedPosts = response.documents.sort((a, b) =>
                 parseISO(a.$createdAt ?? '1970-01-01').getTime() - parseISO(b.$createdAt ?? '1970-01-01').getTime()
             );
             setPosts(prev => (reset || page === 1) ? sortedPosts : [...prev, ...sortedPosts]);
             setPostsTotal(response.total); setPostsPage(page);
-        } catch (error: any) { setPostsError("Failed to load replies."); toast({ title: "Error", description: "Could not fetch replies.", variant: "destructive" });/*console.error("Fetch posts error:", error);*/ }
+        } catch (error: any) { setPostsError("Failed to load replies."); toast({ title: "Error", description: "Could not fetch replies.", variant: "destructive" }); }
         finally { setPostsLoading(false); }
     }, [postSearchQuery, toast]);
 
-    // --- Debounced Fetch Triggers ---
     const debouncedFetchTopics = useMemo(() => debounce(() => fetchTopics(1, true), SEARCH_DEBOUNCE_MS), [fetchTopics]);
     const debouncedFetchPosts = useMemo(() => debounce(() => { if (topicId) fetchPosts(topicId, 1, true); }, SEARCH_DEBOUNCE_MS), [fetchPosts, topicId]);
 
-    // --- Effects ---
-    // Fetch data based on route
     useEffect(() => {
         if (topicId) {
             setTopics([]); setTopicsTotal(0); setTopicsPage(1); setShowCreateTopicForm(false);
@@ -386,15 +340,57 @@ const ForumPage: React.FC = () => {
         setTopicsError(null); setTopicError(null); setPostsError(null);
     }, [topicId, fetchTopicDetails, fetchPosts, fetchTopics]);
 
-    // Trigger debounced fetches on search/filter changes
     useEffect(() => { if (!topicId) debouncedFetchTopics(); return () => debouncedFetchTopics.cancel(); }, [searchQuery, debouncedFetchTopics, topicId]);
     useEffect(() => { if (!topicId) fetchTopics(1, true); }, [filterCategory, sortBy, topicId, fetchTopics]);
     useEffect(() => { if (topicId) debouncedFetchPosts(); return () => debouncedFetchPosts.cancel(); }, [postSearchQuery, debouncedFetchPosts, topicId]);
 
-    // *** WebSocket Connection Effect ***
-    // Real-time updates for new comments are handled via WebSocket. No page refresh is needed.
+    useEffect(() => {
+        const postChannel = `databases.${databaseId}.collections.${forumPostsCollectionId}.documents`;
+        const topicChannel = `databases.${databaseId}.collections.${forumTopicsCollectionId}.documents`;
 
-    // --- Handlers ---
+        const subscriptions: (() => void)[] = [];
+
+        subscriptions.push(client.subscribe(postChannel, response => {
+            const event = response.events[0];
+            const payload = response.payload as ForumPost;
+
+            if (event.includes('.create')) {
+                if (topicId && payload.topicId === topicId) {
+                    setPosts(prev => [...prev, payload]);
+                    setCurrentTopic(prev => prev ? { ...prev, replyCount: prev.replyCount + 1, lastReplyAt: payload.$createdAt } : null);
+                } else if (!topicId) {
+                    setTopics(prev => prev.map(t => t.$id === payload.topicId ? { ...t, replyCount: t.replyCount + 1, lastReplyAt: payload.$createdAt } : t));
+                }
+            } else if (event.includes('.update')) {
+                if (topicId && payload.topicId === topicId) {
+                    setPosts(prev => prev.map(p => p.$id === payload.$id ? { ...p, voteScore: payload.voteScore } : p));
+                }
+            } else if (event.includes('.delete')) {
+                if (topicId && payload.topicId === topicId) {
+                    setPosts(prev => prev.filter(p => p.$id !== payload.$id));
+                    setCurrentTopic(prev => prev ? { ...prev, replyCount: Math.max(0, prev.replyCount - 1) } : null);
+                }
+            }
+        }));
+
+        subscriptions.push(client.subscribe(topicChannel, response => {
+            const event = response.events[0];
+            const payload = response.payload as ForumTopic;
+
+            if (event.includes('.update')) {
+                if (!topicId) {
+                    setTopics(prev => prev.map(t => t.$id === payload.$id ? { ...t, voteScore: payload.voteScore } : t));
+                } else if (topicId === payload.$id) {
+                    setCurrentTopic(prev => prev ? { ...prev, voteScore: payload.voteScore } : null);
+                }
+            }
+        }));
+
+        return () => {
+            subscriptions.forEach(unsubscribe => unsubscribe());
+        };
+    }, [topicId, databaseId]);
+
     const handleFormatTopicContent = useCallback(async () => {
         if (!newTopicContent?.trim()) return;
         setIsFormattingTopic(true);
@@ -421,19 +417,19 @@ const ForumPage: React.FC = () => {
                 geminiModService.moderateContent(newTopicTitle, { contentType: 'forum_title' }),
                 geminiModService.moderateContent(newTopicContent, { contentType: 'forum_post' })
             ]);
-            const combinedFlags = [...new Set([...titleModeration.flags, ...contentModeration.flags])]; let finalDecision = ModerationDecision.ALLOW; let rejectionReason = "";
+            let finalDecision = ModerationDecision.ALLOW; let rejectionReason = "";
             if (titleModeration.decision === ModerationDecision.DENY || contentModeration.decision === ModerationDecision.DENY) { finalDecision = ModerationDecision.DENY; rejectionReason = titleModeration.decision === ModerationDecision.DENY ? titleModeration.reason || "Title violates guidelines" : contentModeration.reason || "Content violates guidelines"; }
             else if (titleModeration.decision === ModerationDecision.FLAG || contentModeration.decision === ModerationDecision.FLAG) { finalDecision = ModerationDecision.FLAG; rejectionReason = contentModeration.decision === ModerationDecision.FLAG ? contentModeration.reason || "Content flagged" : titleModeration.reason || "Title flagged"; }
             else if (titleModeration.decision === ModerationDecision.ERROR || contentModeration.decision === ModerationDecision.ERROR) { finalDecision = ModerationDecision.ERROR; rejectionReason = "Moderation check failed."; }
             setIsModerating(false);
             if (finalDecision === ModerationDecision.DENY) { toast({ title: "Topic Rejected", description: rejectionReason, variant: "destructive" }); setIsCreatingTopic(false); return; }
             if (finalDecision === ModerationDecision.ERROR) { toast({ title: "Moderation Error", description: rejectionReason + " Please try again.", variant: "destructive" }); setIsCreatingTopic(false); return; }
-            const needsReview = finalDecision === ModerationDecision.FLAG; if (needsReview) { toast({ title: "Topic Under Review", description: rejectionReason || "Submitted but requires moderator review.", variant: "default" }); /*console.warn("Topic content flagged:", rejectionReason, combinedFlags);*/ }
-            let profile: UserProfile | null = null; try { profile = await getUserProfile(user.$id); } catch (err) { /*console.warn("Profile fetch error", err);*/ }
+            if (finalDecision === ModerationDecision.FLAG) { toast({ title: "Topic Under Review", description: rejectionReason || "Submitted but requires moderator review.", variant: "default" }); }
+            let profile: UserProfile | null = null; try { profile = await getUserProfile(user.$id); } catch (err) { /* ignore error, fallback to user object */ }
             const creatorName = profile?.name || user.name || 'Anonymous'; const creatorAvatar = profile?.profilePhotoUrl;
-            const createdTopic = await createForumTopic(user.$id, creatorName, creatorAvatar, { title: newTopicTitle, content: newTopicContent, category: newTopicCategory || undefined, /* needsReview: needsReview */ });
+            const createdTopic = await createForumTopic(user.$id, creatorName, creatorAvatar, { title: newTopicTitle, content: newTopicContent, category: newTopicCategory || undefined });
             toast({ title: "Topic Created Successfully!" }); setShowCreateTopicForm(false); setNewTopicTitle(''); setNewTopicContent(''); setNewTopicCategory(''); navigate(`/forum/${createdTopic.$id}`);
-        } catch (error: any) { /*console.error("Error creating topic:", error);*/ toast({ title: "Creation Failed", description: error.message || "Could not create topic.", variant: "destructive" }); }
+        } catch (error: any) { toast({ title: "Creation Failed", description: error.message || "Could not create topic.", variant: "destructive" }); }
         finally { setIsModerating(false); setIsCreatingTopic(false); }
     };
 
@@ -447,27 +443,21 @@ const ForumPage: React.FC = () => {
             const finalDecision = contentModeration.decision; const rejectionReason = contentModeration.reason; setIsModerating(false);
             if (finalDecision === ModerationDecision.DENY) { toast({ title: "Reply Rejected", description: rejectionReason || "Your reply violates community guidelines.", variant: "destructive" }); setIsReplying(false); return; }
             if (finalDecision === ModerationDecision.ERROR) { toast({ title: "Moderation Error", description: (rejectionReason || "Moderation check failed.") + " Please try again.", variant: "destructive" }); setIsReplying(false); return; }
-            const needsReview = finalDecision === ModerationDecision.FLAG; if (needsReview) { toast({ title: "Reply Under Review", description: rejectionReason || "Submitted but requires moderator review.", variant: "default" }); /*console.warn("Reply content flagged:", rejectionReason, contentModeration.flags);*/ }
-            let profile: UserProfile | null = null; try { profile = await getUserProfile(user.$id); } catch (err) { /*console.warn("Profile fetch error", err);*/ }
+            if (finalDecision === ModerationDecision.FLAG) { toast({ title: "Reply Under Review", description: rejectionReason || "Submitted but requires moderator review.", variant: "default" }); }
+            let profile: UserProfile | null = null; try { profile = await getUserProfile(user.$id); } catch (err) { /* ignore error, fallback to user object */ }
             const replierName = profile?.name || user.name || 'Anonymous'; const replierAvatar = profile?.profilePhotoUrl;
-            // Create post - the backend will receive this via Appwrite function and broadcast via WebSocket
-            await createForumPost(user.$id, replierName, replierAvatar, { topicId: topicId, content: replyContent, /* needsReview: needsReview */ });
+            await createForumPost(user.$id, replierName, replierAvatar, { topicId: topicId, content: replyContent });
             setReplyContent(''); toast({ title: "Reply Posted" });
-            // Update topic details (like reply count) - might still be needed if not included in WS message
-            await fetchTopicDetails(topicId);
-            // No need to manually fetchPosts here, WebSocket should handle it
-        } catch (error: any) { /*console.error("Error posting reply:", error);*/ toast({ title: "Reply Failed", description: error.message || "Could not post reply.", variant: "destructive" }); }
+        } catch (error: any) { toast({ title: "Reply Failed", description: error.message || "Could not post reply.", variant: "destructive" }); }
         finally { setIsModerating(false); setIsReplying(false); }
     };
 
     const handleVoteAction = useCallback(async (targetId: string, targetType: 'topic' | 'post', voteType: 'up' | 'down' | 'remove') => {
         if (!user || !isAuthenticated) { toast({ title: "Login Required", description: "Please log in to vote.", variant: "default" }); throw new Error("User not authenticated"); }
         try {
-            // Cast vote - backend will receive via Appwrite function and broadcast via WebSocket
             await castForumVote(user.$id, targetId, targetType, voteType);
-            // Optimistic update handled in child components, WebSocket handles final state
         }
-        catch (error: any) { /*console.error(`Error casting vote:`, error);*/ toast({ title: "Vote Error", description: error.message || "Could not cast vote.", variant: "destructive" }); throw error; }
+        catch (error: any) { toast({ title: "Vote Error", description: error.message || "Could not cast vote.", variant: "destructive" }); throw error; }
     }, [user, isAuthenticated, toast]);
 
     const handleTopicVote = useCallback((topicId: string, voteType: 'up' | 'down' | 'remove') => handleVoteAction(topicId, 'topic', voteType), [handleVoteAction]);
@@ -484,15 +474,9 @@ const ForumPage: React.FC = () => {
         try {
             const postToDelete = posts.find(p => p.$id === deletingPostId);
             if (postToDelete?.userId !== user.$id) { toast({ title: "Unauthorized", description: "Cannot delete others' posts.", variant: "destructive" }); throw new Error("Unauthorized"); }
-            // Delete post - Appwrite function might trigger a 'delete' event (if configured)
             await deleteForumPost(deletingPostId, topicId);
             toast({ title: "Post Deleted" });
-            // Optimistic UI removal
-            setPosts(prev => prev.filter(p => p.$id !== deletingPostId));
-            // Refresh topic details (counts)
-            await fetchTopicDetails(topicId);
-            // Optional: If backend sends a 'delete_post' message, handle it in onmessage
-        } catch (error: any) { if (error.message !== "Unauthorized") { toast({ title: "Deletion Failed", description: error.message || "Could not delete post.", variant: "destructive" }); } /*console.error("Delete post error:", error);*/ }
+        } catch (error: any) { if (error.message !== "Unauthorized") { toast({ title: "Deletion Failed", description: error.message || "Could not delete post.", variant: "destructive" }); } }
         finally { setShowDeletePostDialog(false); setDeletingPostId(null); setIsDeletingPostConfirmed(false); }
     };
 
@@ -509,15 +493,12 @@ const ForumPage: React.FC = () => {
             const result = await deleteForumTopicAndPosts(deletingTopicId);
             toast({ title: "Topic Deletion Processed", description: `Topic deleted: ${result.topicDeleted}. Posts deleted: ${result.postsDeleted}, Failed: ${result.postsFailed}.`, variant: result.topicDeleted && result.postsFailed === 0 ? "default" : "destructive" });
             if (result.topicDeleted) { navigate('/forum', { replace: true }); }
-            // Optional: If backend sends a 'delete_topic' message, handle it
-        } catch (error: any) { if (error.message !== "Unauthorized") { toast({ title: "Deletion Failed", description: error.message || "Could not delete topic.", variant: "destructive" }); } /*console.error("Delete topic error:", error); */}
+        } catch (error: any) { if (error.message !== "Unauthorized") { toast({ title: "Deletion Failed", description: error.message || "Could not delete topic.", variant: "destructive" }); } }
         finally { setShowDeleteTopicDialog(false); setDeletingTopicId(null); setIsDeletingTopicConfirmed(false); }
     };
 
-    // --- Render Logic ---
     const renderTopicList = () => (
         <div className="space-y-6">
-            {/* Control Bar */}
             <Card className="sticky top-[var(--header-height,60px)] z-10 shadow-sm border dark:border-gray-700 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <CardContent className="p-3 md:p-4">
                     <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-4">
@@ -532,7 +513,6 @@ const ForumPage: React.FC = () => {
                 </CardContent>
             </Card>
 
-            {/* Create Topic Form */}
             {showCreateTopicForm && (
                 <Card className="border-mamasaheli-secondary/50 bg-mamasaheli-light/20 dark:bg-gray-800/50 dark:border-gray-700/80 animate-fade-in">
                     <CardHeader> <CardTitle>Create a New Forum Topic</CardTitle> <CardDescription>Start a new discussion. Markdown is supported for formatting.</CardDescription> </CardHeader>
@@ -547,7 +527,6 @@ const ForumPage: React.FC = () => {
                 </Card>
             )}
 
-            {/* Topics List */}
             <div className="min-h-[300px]">
                 {topicsLoading && topics.length === 0 && (<div className="text-center py-20"><Loader2 className="h-10 w-10 animate-spin text-mamasaheli-primary mx-auto" /></div>)}
                 {topicsError && (<div className="text-center py-20 text-red-600 dark:text-red-400">{topicsError}</div>)}
@@ -576,7 +555,6 @@ const ForumPage: React.FC = () => {
                         </div>
                     </CardHeader>
                     <CardContent className="pt-4 pb-6">
-                        {/* Original Post Content */}
                         <div className="flex space-x-3 py-4 px-2 border-b dark:border-gray-700">
                             <Avatar className="h-9 w-9 border flex-shrink-0 mt-1"> <AvatarImage src={currentTopic.userAvatarUrl || undefined} alt={currentTopic.userName} /> <AvatarFallback>{getInitials(currentTopic.userName)}</AvatarFallback> </Avatar>
                             <div className="flex-grow min-w-0">
@@ -587,7 +565,6 @@ const ForumPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Replies Section */}
                         <div className="mt-6 mb-4 flex flex-col sm:flex-row justify-between items-center gap-3">
                             <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">Replies ({postsTotal})</h3>
                             <div className="relative w-full sm:w-auto sm:max-w-xs"> <Label htmlFor="search-posts" className="sr-only">Search Replies</Label> <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" /> <Input id="search-posts" type="search" placeholder="Search replies..." value={postSearchQuery} onChange={(e) => setPostSearchQuery(e.target.value)} className="pl-10 h-9 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" /> {postSearchQuery && (<Button variant="ghost" size="icon" className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7" onClick={() => setPostSearchQuery('')}><X className="h-4 w-4 text-gray-400" /></Button>)} </div>
@@ -596,13 +573,11 @@ const ForumPage: React.FC = () => {
                             {postsLoading && posts.length === 0 && (<div className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin text-mamasaheli-primary mx-auto" /></div>)}
                             {postsError && (<div className="text-center py-10 text-red-600 dark:text-red-400">{postsError}</div>)}
                             {!postsLoading && !postsError && posts.length === 0 && (<div className="text-center py-10 text-gray-500 dark:text-gray-400">{postSearchQuery ? 'No replies match your search.' : 'No replies yet. Be the first to reply!'}</div>)}
-                            {/* Ensure posts are sorted correctly before mapping */}
                             {posts.length > 0 && (<div className="space-y-0">{posts.sort((a, b) => parseISO(a.$createdAt ?? '1970-01-01').getTime() - parseISO(b.$createdAt ?? '1970-01-01').getTime()).map(post => (<PostItem key={post.$id} post={post} currentUserId={user?.$id || null} isAuthenticated={!!isAuthenticated} onDelete={handleDeletePostClick} isDeleting={deletingPostId === post.$id && isDeletingPostConfirmed} onVote={handlePostVote} />))}</div>)}
                             {!postsLoading && posts.length > 0 && posts.length < postsTotal && (<div className="text-center mt-6"><Button variant="outline" onClick={() => fetchPosts(topicId!, postsPage + 1, false)} disabled={postsLoading}>Load More Replies ({postsTotal - posts.length} remaining)</Button></div>)}
                             {postsLoading && posts.length > 0 && (<div className="text-center mt-6"><Loader2 className="h-6 w-6 animate-spin text-mamasaheli-primary mx-auto" /></div>)}
                         </div>
 
-                        {/* Reply Form */}
                         {!currentTopic.isLocked ? (
                             <Card className="mt-8 bg-gray-50/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700">
                                 <CardHeader><CardTitle className="text-base font-semibold">Post a Reply</CardTitle></CardHeader>
@@ -627,14 +602,12 @@ const ForumPage: React.FC = () => {
         </div>
     );
 
-    // --- Main Return JSX ---
     return (
         <MainLayout requireAuth={false}>
             <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6 md:py-8">
                 {topicId ? renderTopicDetail() : renderTopicList()}
             </div>
 
-            {/* Delete Post Dialog */}
             <AlertDialog open={showDeletePostDialog} onOpenChange={setShowDeletePostDialog}>
                  <AlertDialogContent>
                     <AlertDialogHeader> <AlertDialogTitle>Confirm Post Deletion</AlertDialogTitle> <AlertDialogDescription>Are you sure you want to delete this post? This action cannot be undone.</AlertDialogDescription> </AlertDialogHeader>
@@ -642,7 +615,6 @@ const ForumPage: React.FC = () => {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Delete Topic Dialog */}
             <AlertDialog open={showDeleteTopicDialog} onOpenChange={setShowDeleteTopicDialog}>
                  <AlertDialogContent>
                     <AlertDialogHeader> <AlertDialogTitle>Confirm Topic Deletion</AlertDialogTitle> <AlertDialogDescription> Are you sure you want to delete this entire topic, including all its replies? This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader>
