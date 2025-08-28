@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, FormEvent, useRef } f
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import {
-    MessageSquare, PlusCircle, List, Tag, Clock, User, Loader2, ArrowLeft, Send, Trash2, Edit, Lock, Pin, Search, ThumbsUp, ThumbsDown, Filter, Sparkles, X, ShieldAlert
+    MessageSquare, PlusCircle, List, Tag, CheckCircle, User, Loader2, ArrowLeft, Send, Trash2, Edit, Lock, Pin, Search, ThumbsUp, ThumbsDown, Filter, Sparkles, X, ShieldAlert
 } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import ReactMarkdown, { Options as ReactMarkdownOptions } from 'react-markdown';
@@ -154,7 +154,18 @@ const TopicListItem: React.FC<{
                     </h3>
                 </Link>
                 <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span>By <span className="font-medium hover:underline">{topic.userName}</span></span>
+                    <span>
+  By <span className="font-medium hover:underline">{topic.userName}</span>
+  {topic.isDoctor && (
+    <Badge 
+  variant="secondary" 
+  className="ml-1 border-green-200 bg-green-100 text-green-800 dark:border-green-500/30 dark:bg-green-900/40 dark:text-green-300 hover:bg-green-200 hover:border-green-300 dark:hover:bg-green-800/50 dark:hover:border-green-500/50 transition-colors duration-200"
+>
+      <CheckCircle className="h-3 w-3 mr-1.5" />
+      Verified Doctor
+    </Badge>
+  )}
+</span>
                     {topic.category && <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{topic.category}</Badge>}
                     <span>{topic.replyCount || 0} replies</span>
                     <span title={topic.lastReplyAt ? new Date(topic.lastReplyAt).toLocaleString() : ''}>Last activity: {formatRelativeTime(topic.lastReplyAt)}</span>
@@ -219,7 +230,23 @@ const PostItem: React.FC<{
             </Avatar>
             <div className="flex-grow min-w-0">
                 <div className="flex justify-between items-center mb-1 flex-wrap gap-x-2">
-                    <span className="font-semibold text-sm text-gray-800 dark:text-gray-200 hover:underline">{post.userName}</span>
+                    <div className="flex justify-between items-center mb-1 flex-wrap gap-x-2">
+  <div className="flex items-center gap-2">
+    <span className="font-semibold text-sm text-gray-800 dark:text-gray-200 hover:underline">{post.userName}</span>
+    {post.isDoctor && (
+      <Badge 
+  variant="secondary" 
+  className="ml-1 border-green-200 bg-green-100 text-green-800 dark:border-green-500/30 dark:bg-green-900/40 dark:text-green-300 hover:bg-green-200 hover:border-green-300 dark:hover:bg-green-800/50 dark:hover:border-green-500/50 transition-colors duration-200"
+>
+        <CheckCircle className="h-3 w-3 mr-1.5" />
+        Verified Doctor
+      </Badge>
+    )}
+  </div>
+  <span className="text-xs text-gray-500 dark:text-gray-400" title={post.$createdAt ? new Date(post.$createdAt).toLocaleString() : ''}>
+    {formatRelativeTime(post.$createdAt)}
+  </span>
+</div>
                     <span className="text-xs text-gray-500 dark:text-gray-400" title={post.$createdAt ? new Date(post.$createdAt).toLocaleString() : ''}>
                         {formatRelativeTime(post.$createdAt)}
                     </span>
@@ -558,7 +585,21 @@ const ForumPage: React.FC = () => {
                         <div className="flex space-x-3 py-4 px-2 border-b dark:border-gray-700">
                             <Avatar className="h-9 w-9 border flex-shrink-0 mt-1"> <AvatarImage src={currentTopic.userAvatarUrl || undefined} alt={currentTopic.userName} /> <AvatarFallback>{getInitials(currentTopic.userName)}</AvatarFallback> </Avatar>
                             <div className="flex-grow min-w-0">
-                                <div className="flex justify-between items-center mb-1 flex-wrap gap-x-2"> <span className="font-semibold text-sm text-gray-800 dark:text-gray-200 hover:underline">{currentTopic.userName} (OP)</span> <span className="text-xs text-gray-500 dark:text-gray-400" title={currentTopic.$createdAt ? new Date(currentTopic.$createdAt).toLocaleString() : ''}>{formatRelativeTime(currentTopic.$createdAt)}</span> </div>
+                                <div className="flex justify-between items-center mb-1 flex-wrap gap-x-2">
+  <div className="flex items-center gap-2">
+    <span className="font-semibold text-sm text-gray-800 dark:text-gray-200 hover:underline">{currentTopic.userName} (OP)</span>
+    {currentTopic.isDoctor && (
+      <Badge 
+  variant="secondary" 
+  className="ml-1 border-green-200 bg-green-100 text-green-800 dark:border-green-500/30 dark:bg-green-900/40 dark:text-green-300 hover:bg-green-200 hover:border-green-300 dark:hover:bg-green-800/50 dark:hover:border-green-500/50 transition-colors duration-200"
+>
+        <CheckCircle className="h-3 w-3 mr-1.5" />
+        Verified Doctor
+      </Badge>
+    )}
+  </div>
+  <span className="text-xs text-gray-500 dark:text-gray-400" title={currentTopic.$createdAt ? new Date(currentTopic.$createdAt).toLocaleString() : ''}>{formatRelativeTime(currentTopic.$createdAt)}</span>
+</div>
                                 <div className="prose prose-sm dark:prose-invert max-w-none mb-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }: AnchorProps) => (<a target="_blank" rel="noopener noreferrer" {...props} />) }}>{currentTopic.content}</ReactMarkdown>
                                 </div>

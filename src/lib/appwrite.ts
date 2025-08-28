@@ -1377,7 +1377,7 @@ export const createForumTopic = async (
             isLocked: false,
             isPinned: false,
             voteScore: 0, 
-            isDoctor,
+            isDoctor: isDoctor,
         };
 
         const userRole = Role.user(userId);
@@ -1503,7 +1503,7 @@ let profile: UserProfile | null = null;
             topicId: data.topicId,
             content: data.content.trim(),
             voteScore: 0,
-            isDoctor,
+            isDoctor: isDoctor,
         };
 
         const userRole = Role.user(userId);
