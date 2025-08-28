@@ -211,7 +211,11 @@ const Navbar: React.FC = () => {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate(isDoctor ? '/doctor' : '/dashboard')}><LayoutDashboard className="mr-2 h-4 w-4" /><span>Dashboard</span></DropdownMenuItem>
+                  {isDoctor && (
+                    <DropdownMenuItem onClick={() => navigate('/doctor')}>
+                      <LayoutDashboard className="mr-2 h-4 w-4" /><span>Dashboard</span>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => navigate('/profile')}><Settings className="mr-2 h-4 w-4" /><span>Profile Settings</span></DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/medicaldocs')}><FileText className="mr-2 h-4 w-4" /><span>Medical Documents</span></DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/contact')}><MessageSquare className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
