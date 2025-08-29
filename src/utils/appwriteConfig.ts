@@ -21,7 +21,7 @@ export const appwriteEnvConfig = {
   symptomLogsCollectionId: import.meta.env.VITE_APPWRITE_SYMPTOM_LOGS_COLLECTION_ID || 'symptomLogs',
   kickCounterCollectionId: import.meta.env.VITE_APPWRITE_KICK_COUNTER_COLLECTION_ID || 'kickCounterSessions',
   contractionSessionsCollectionId: import.meta.env.VITE_APPWRITE_CONTRACTION_SESSIONS_COLLECTION_ID || 'contractionSessions',
-  weeklyPhotosCollectionId: import.meta.env.VITE_APPWRITE_WEEKLY_PHOTOS_COLLECTION_ID || 'weeklyPhotoLogs',
+  weeklyPhotosCollectionId: import.meta.env.VITE_APPWRITE_WEEKLY_PHOTOS_BUCKET_ID || 'weeklyPhotoLogs',
   doctorChatMessagesCollectionId: import.meta.env.VITE_APPWRITE_DRCHAT_KEY || 'doctorChatMessages',
 
   profileBucketId: import.meta.env.VITE_APPWRITE_PROFILE_BUCKET_ID || 'profilePhotos',

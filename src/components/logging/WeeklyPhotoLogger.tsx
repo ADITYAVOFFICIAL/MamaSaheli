@@ -1,10 +1,9 @@
-// src/components/logging/WeeklyPhotoLogger.tsx
 import React, { useState, useEffect, useCallback, ChangeEvent, useMemo, memo } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
 import {
     createWeeklyPhotoLog, getWeeklyPhotoLogs, deleteWeeklyPhotoLog, getUserProfile,
-    getFilePreview, medicalBucketId, WeeklyPhotoLog,
+    getFilePreview, weeklyPhotosBucketId, WeeklyPhotoLog,
 } from '@/lib/appwrite';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,10 +13,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-    AlertDialogDescription, AlertDialogHeader, AlertDialogTitle,AlertDialogFooter,
+    AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter,
 } from "@/components/ui/alert-dialog";
 import { Loader2, UploadCloud, Trash2, Camera, Inbox, Plus, ImageOff, Download, Replace } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 
 const UploadModal: React.FC<{
     isOpen: boolean;
@@ -142,17 +141,14 @@ const ViewAndManageModal: React.FC<{
         if (isOpen && log?.photoFileId) {
             setIsLoadingUrl(true);
             setErrorUrl(false);
-            const fetchUrl = async () => {
-                try {
-                    const url = getFilePreview(medicalBucketId, log.photoFileId).href;
-                    setImageUrl(url);
-                } catch {
-                    setErrorUrl(true);
-                } finally {
-                    setIsLoadingUrl(false);
-                }
-            };
-            fetchUrl();
+            try {
+                const url = getFilePreview(weeklyPhotosBucketId, log.photoFileId).href;
+                setImageUrl(url);
+            } catch {
+                setErrorUrl(true);
+            } finally {
+                setIsLoadingUrl(false);
+            }
         }
     }, [isOpen, log]);
 
@@ -199,34 +195,22 @@ const WeeklyPhotoTile: React.FC<{
     const [isLoadingUrl, setIsLoadingUrl] = useState(true);
     const [errorUrl, setErrorUrl] = useState(false);
 
-    const fetchUrlWithRetry = useCallback(async (fileId: string, retries = 4, delay = 1500) => {
-        for (let i = 0; i < retries; i++) {
-            try {
-                const url = getFilePreview(medicalBucketId, fileId).href;
-                setImageUrl(url);
-                setErrorUrl(false);
-                setIsLoadingUrl(false);
-                return;
-            } catch (error) {
-                if (i < retries - 1) {
-                    await new Promise(res => setTimeout(res, delay * (i + 1)));
-                } else {
-                    setErrorUrl(true);
-                    setIsLoadingUrl(false);
-                }
-            }
-        }
-    }, []);
-
     useEffect(() => {
         if (log?.photoFileId) {
             setIsLoadingUrl(true);
             setErrorUrl(false);
-            fetchUrlWithRetry(log.photoFileId);
+            try {
+                const url = getFilePreview(weeklyPhotosBucketId, log.photoFileId).href;
+                setImageUrl(url);
+            } catch (error) {
+                setErrorUrl(true);
+            } finally {
+                setIsLoadingUrl(false);
+            }
         } else {
             setIsLoadingUrl(false);
         }
-    }, [log, fetchUrlWithRetry]);
+    }, [log]);
 
     if (log) {
         return (
@@ -346,20 +330,15 @@ export const WeeklyPhotoLogger = () => {
 
         return (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {weeksArray.map(week => {
-                    const log = historyMap.get(week);
-                    return (
-                        <WeeklyPhotoTile
-                            key={week}
-                            weekNumber={week}
-                            log={log}
-                            onAdd={handleOpenUploadModal}
-                            onView={handleOpenViewModal}
-                            onDelete={() => {}}
-                            deletingLogId={deletingLogId}
-                        />
-                    );
-                })}
+                {weeksArray.map(week => (
+                    <WeeklyPhotoTile
+                        key={week}
+                        weekNumber={week}
+                        log={historyMap.get(week)}
+                        onAdd={handleOpenUploadModal}
+                        onView={handleOpenViewModal}
+                    />
+                ))}
             </div>
         );
     };

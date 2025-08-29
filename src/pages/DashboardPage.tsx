@@ -29,7 +29,7 @@ import MedReminder from '@/components/dashboard/MedReminder';
 import EditMedReminderModal from '@/components/dashboard/EditMedReminderModal';
 import AddMedReminderModal from '@/components/dashboard/AddMedReminderModal';
 import PregnancyWeekInfo from '@/components/dashboard/PregnancyWeekInfo';
-
+import { DashboardCalendar } from '@/components/dashboard/DashboardCalendar';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
 
@@ -788,39 +788,8 @@ const DashboardPage: React.FC = () => {
                                 />
                             </div>
 
-                            <Card className="border border-gray-200 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
-                                <CardHeader className="bg-gray-50 border-b border-gray-200 dark:bg-gray-700/50 dark:border-gray-600">
-                                    <CardTitle className="flex items-center text-gray-700 dark:text-gray-300 text-lg font-semibold">
-                                        <ListChecks className="mr-2 h-5 w-5 text-mamasaheli-primary" />All Upcoming Appointments ({isLoadingAppointments ? '...' : totalUpcomingAppointments})
-                                    </CardTitle>
-                                    <CardDescription className="text-sm text-gray-500 dark:text-gray-400 mt-1">Your scheduled visits and classes, sorted by date.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    {isLoadingAppointments ? ( <div className="flex justify-center items-center py-10"><Loader2 className="h-8 w-8 animate-spin text-mamasaheli-primary" /></div> )
-                                    : totalUpcomingAppointments > 0 ? (
-                                        <div className="flow-root">
-                                            <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                {allSortedUpcomingAppointments.map((appointment) => (
-                                                    <AppointmentItem
-                                                        key={appointment.$id} appointment={appointment} onEdit={handleEditAppointment}
-                                                        onDelete={handleDeleteAppointmentClick} isDeleting={deletingAppointmentId === appointment.$id}
-                                                        type={appointment.appointmentType && classTypes.includes(appointment.appointmentType as ClassAppointmentType) ? 'class' : 'doctor'}
-                                                    />
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-10 px-6">
-                                            <Inbox className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-3" />
-                                            <p className="text-gray-500 dark:text-gray-400 font-medium">No upcoming appointments found.</p>
-                                            <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Use the 'Schedule Appointment' page to add new ones.</p>
-                                            <Button asChild size="sm" className="mt-4 bg-mamasaheli-primary hover:bg-mamasaheli-dark dark:bg-mamasaheli-accent dark:hover:bg-pink-700"><a href="/appointment">Schedule Now</a></Button>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <DashboardCalendar/>
                                 <Card className="border border-gray-200 shadow-sm lg:col-span-2 bg-white dark:bg-gray-800 dark:border-gray-700">
                                     <CardHeader className="bg-gray-50 border-b border-gray-200 dark:bg-gray-700/50 dark:border-gray-600"><CardTitle className="text-gray-700 dark:text-gray-300 text-lg font-semibold">Helpful Resources</CardTitle><CardDescription className="text-sm text-gray-500 dark:text-gray-400 mt-1">Information to support your journey.</CardDescription></CardHeader>
                                     <CardContent className="pt-6 px-5">
