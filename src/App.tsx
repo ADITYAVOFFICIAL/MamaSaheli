@@ -46,6 +46,7 @@ const PasswordForgot = lazy(() => import("./pages/verifi/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/verifi/ResPass"));
 const EmailVerificationPage = lazy(() => import("./pages/verifi/VerifyEmailPage"));
 const DoctorChatPage = lazy(() => import("./pages/doctor/DoctorChatPage"));
+const LoggingPage = lazy(() => import("./pages/LoggingPage"));
 // A loading component to show while lazy chunks are fetched
 const LoadingFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -103,6 +104,7 @@ const App = () => {
               {/* Protected Routes */}
               <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
               <Route path="/doctor-chat" element={<PrivateRoute><DoctorChatPage /></PrivateRoute>} />
+              <Route path="/logging" element={<PrivateRoute><LoggingPage /></PrivateRoute>} />
               <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
               <Route path="/appointment" element={<PrivateRoute><AppointmentPage /></PrivateRoute>} />
               <Route path="/medicaldocs" element={<PrivateRoute><MedicalDocsPage /></PrivateRoute>} />

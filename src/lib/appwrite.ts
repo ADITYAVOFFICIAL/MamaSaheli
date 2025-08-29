@@ -70,6 +70,9 @@ const forumPostsCollectionId: string = import.meta.env.VITE_APPWRITE_FORUM_POSTS
 const bookmarkedProductsCollectionId: string = import.meta.env.VITE_APPWRITE_BOOKMARKED_PRODUCTS_COLLECTION_ID as string || 'bookmarkedProducts';
 const forumVotesCollectionId: string = import.meta.env.VITE_APPWRITE_FORUM_VOTES_COLLECTION_ID as string || 'forumVotes';
 const userCountFunctionId: string = import.meta.env.VITE_APPWRITE_USER_COUNT_FUNCTION_ID as string;
+const symptomLogsCollectionId: string = import.meta.env.VITE_APPWRITE_SYMPTOM_LOGS_COLLECTION_ID as string;
+const kickCounterCollectionId: string = import.meta.env.VITE_APPWRITE_KICK_COUNTER_COLLECTION_ID as string;
+const contractionSessionsCollectionId: string = import.meta.env.VITE_APPWRITE_CONTRACTION_SESSIONS_COLLECTION_ID as string;
 // --- Bucket IDs ---
 // Ensure these Storage Buckets exist in your Appwrite project.
 export const profileBucketId: string = import.meta.env.VITE_APPWRITE_PROFILE_BUCKET_ID as string;
@@ -2344,4 +2347,102 @@ export { databaseId, forumPostsCollectionId };
 
 export const isUserDoctor = (profile: UserProfile | null): boolean => {
     return Array.isArray(profile?.labels) && profile.labels.includes('doctor');
+};
+
+export type Symptom =
+    | 'Back pain' | 'Bloating' | 'Contractions' | 'Sore breasts' | 'Constipation'
+    | 'Cramping' | 'Diarrhea' | 'Dizziness' | 'Exhaustion' | 'Food aversions'
+    | 'Food cravings' | 'Frequent urination' | 'Headaches' | 'Heartburn'
+    | 'Itching' | 'Insomnia' | 'Morning sickness' | 'Pelvic pain' | 'Spotting'
+    | 'Stuffy nose' | 'Swelling' | 'Discharge' | 'Other';
+
+export interface SymptomLog extends Models.Document {
+    userId: string;
+    symptoms: Symptom[];
+    notes?: string;
+    loggedAt: string;
+}
+
+export interface KickCounterSession extends Models.Document {
+    userId: string;
+    startTime: string;
+    endTime: string;
+    durationSeconds: number;
+    kickCount: number;
+}
+
+export interface Contraction {
+    startTime: string;
+    endTime: string;
+    durationSeconds: number;
+    frequencySeconds: number;
+}
+
+export interface ContractionSession extends Models.Document {
+    userId: string;
+    sessionDate: string;
+    contractions: Contraction[];
+}
+export const createSymptomLog = async (data: Omit<SymptomLog, keyof Models.Document>) => {
+    return await databases.createDocument(
+        databaseId,
+        symptomLogsCollectionId,
+        ID.unique(),
+        data
+    );
+};
+
+export const createKickCounterSession = async (data: Omit<KickCounterSession, keyof Models.Document>) => {
+    return await databases.createDocument(
+        databaseId,
+        kickCounterCollectionId,
+        ID.unique(),
+        data
+    );
+};
+
+export const createContractionSession = async (data: Omit<ContractionSession, keyof Models.Document>) => {
+    const payload = {
+        ...data,
+        contractions: JSON.stringify(data.contractions), // Stringify array of objects
+    };
+    return await databases.createDocument(
+        databaseId,
+        contractionSessionsCollectionId,
+        ID.unique(),
+        payload
+    );
+};
+
+// Functions to get recent sessions (optional, but good for a history view)
+export const getRecentKickSessions = async (userId: string, limit = 5): Promise<KickCounterSession[]> => {
+    const response = await databases.listDocuments(
+        databaseId,
+        kickCounterCollectionId,
+        [Query.equal('userId', userId), Query.orderDesc('startTime'), Query.limit(limit)]
+    );
+    // Safely cast each document
+    return response.documents.map(doc => doc as unknown as KickCounterSession);
+};
+
+export const getRecentContractionSessions = async (userId: string, limit = 5): Promise<ContractionSession[]> => {
+    const response = await databases.listDocuments(
+        databaseId,
+        contractionSessionsCollectionId,
+        [Query.equal('userId', userId), Query.orderDesc('sessionDate'), Query.limit(limit)]
+    );
+    // Safely cast and parse contractions
+    return response.documents.map(doc => ({
+        ...(doc as unknown as ContractionSession),
+        contractions: JSON.parse((doc as any).contractions)
+    }));
+};
+
+// Delete functions
+export const deleteKickSession = async (sessionId: string) => {
+    return await databases.deleteDocument(databaseId, kickCounterCollectionId, sessionId);
+};
+
+export const deleteContractionSession = async (sessionId: string) => {
+    return await databases.deleteDocument(databaseId, contractionSessionsCollectionId, sessionId);
 };
