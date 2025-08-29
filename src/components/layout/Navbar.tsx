@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import {
   Menu, X, User, LogOut, LayoutDashboard, Settings, FileText, Gamepad2, ListCheck,
   Salad, MessageSquare, Calendar, Users, TestTube2, Package, HeartPulse,
-  AlertTriangle, BookOpen, LogIn, UserPlus
+  AlertTriangle, BookOpen, LogIn, UserPlus, Landmark
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
@@ -47,6 +47,7 @@ const navItems: NavItem[] = [
   { path: '/milestones', label: 'Milestones', icon: ListCheck, requiresAuth: true, isMobileOnly: true },
   { path: '/resources', label: 'Knowledge', icon: BookOpen, requiresAuth: true },
   { path: '/emergency', label: 'Emergency', icon: AlertTriangle, requiresAuth: false },
+  { path: '/govschemes', label: 'Govt. Schemes', icon: Landmark, requiresAuth: true, isMobileOnly: true },
 ];
 
 const doctorNavItems: NavItem[] = [
@@ -57,6 +58,7 @@ const doctorNavItems: NavItem[] = [
   { path: '/emergency', label: 'Emergency', icon: AlertTriangle, requiresAuth: false },
   { path: '/resources', label: 'Knowledge', icon: BookOpen, requiresAuth: true },
   { path: '/forum', label: 'Forum', icon: Users, requiresAuth: true },
+  { path: '/govschemes', label: 'Govt. Schemes', icon: Landmark, requiresAuth: true },
 ];
 
 const Navbar: React.FC = () => {
@@ -227,7 +229,10 @@ const Navbar: React.FC = () => {
                       <DropdownMenuItem onClick={() => navigate('/meals')}><Salad className="mr-2 h-4 w-4" /><span>Meals & Exercises</span></DropdownMenuItem>
                     </>
                   )}
-                  
+                  <DropdownMenuItem onClick={() => navigate('/govschemes')}>
+  <Landmark className="mr-2 h-4 w-4" />
+  <span>Govt. Schemes</span>
+</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/contact')}><MessageSquare className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:bg-red-100 focus:text-red-700 dark:focus:bg-red-900/50 dark:focus:text-red-400">
