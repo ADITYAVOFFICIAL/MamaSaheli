@@ -142,7 +142,7 @@ const ViewAndManageModal: React.FC<{
             setIsLoadingUrl(true);
             setErrorUrl(false);
             try {
-                const url = getFilePreview(weeklyPhotosBucketId, log.photoFileId).href;
+                const url = getFilePreview(log.photoFileId, weeklyPhotosBucketId)?.href; // <-- FIXED ARG ORDER
                 setImageUrl(url);
             } catch {
                 setErrorUrl(true);
@@ -200,7 +200,7 @@ const WeeklyPhotoTile: React.FC<{
             setIsLoadingUrl(true);
             setErrorUrl(false);
             try {
-                const url = getFilePreview(weeklyPhotosBucketId, log.photoFileId).href;
+                const url = getFilePreview(log.photoFileId, weeklyPhotosBucketId)?.href; // <-- FIXED ARG ORDER
                 setImageUrl(url);
             } catch (error) {
                 setErrorUrl(true);
