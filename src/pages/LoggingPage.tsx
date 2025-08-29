@@ -22,24 +22,24 @@ const LoggingPage: React.FC = () => {
                     </p>
                 </header>
                 <Tabs defaultValue="symptoms" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4 h-auto">
-                        <TabsTrigger value="symptoms" className="flex-col sm:flex-row h-auto py-2 gap-1 sm:gap-2">
-                            <Smile className="h-5 w-5" />
-                            <span>Symptoms</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="vitals" className="flex-col sm:flex-row h-auto py-2 gap-1 sm:gap-2">
-                            <HeartPulse className="h-5 w-5" />
-                            <span>Health Vitals</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="kicks" className="flex-col sm:flex-row h-auto py-2 gap-1 sm:gap-2">
-                            <Footprints className="h-5 w-5" />
-                            <span>Kick Counter</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="contractions" className="flex-col sm:flex-row h-auto py-2 gap-1 sm:gap-2">
-                            <Timer className="h-5 w-5" />
-                            <span>Contraction Timer</span>
-                        </TabsTrigger>
-                    </TabsList>
+                    <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-2">
+    <TabsTrigger value="symptoms" className="flex flex-col sm:flex-row items-center justify-center h-auto py-2 gap-1 sm:gap-2 text-xs sm:text-base whitespace-normal">
+        <Smile className="h-5 w-5" />
+        <span className="text-center">Symptoms</span>
+    </TabsTrigger>
+    <TabsTrigger value="vitals" className="flex flex-col sm:flex-row items-center justify-center h-auto py-2 gap-1 sm:gap-2 text-xs sm:text-base whitespace-normal">
+        <HeartPulse className="h-5 w-5" />
+        <span className="text-center">Health Vitals</span>
+    </TabsTrigger>
+    <TabsTrigger value="kicks" className="flex flex-col sm:flex-row items-center justify-center h-auto py-2 gap-1 sm:gap-2 text-xs sm:text-base whitespace-normal">
+        <Footprints className="h-5 w-5" />
+        <span className="text-center">Kick Counter</span>
+    </TabsTrigger>
+    <TabsTrigger value="contractions" className="flex flex-col sm:flex-row items-center justify-center h-auto py-2 gap-1 sm:gap-2 text-xs sm:text-base whitespace-normal">
+        <Timer className="h-5 w-5" />
+        <span className="text-center">Contraction Timer</span>
+    </TabsTrigger>
+</TabsList>
                     <TabsContent value="symptoms" className="mt-6"><SymptomLogger /></TabsContent>
                     <TabsContent value="vitals" className="mt-6"><VitalsLogger /></TabsContent>
                     <TabsContent value="kicks" className="mt-6"><KickCounter /></TabsContent>
