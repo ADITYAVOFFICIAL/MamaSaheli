@@ -1,3 +1,4 @@
+// components/logging/SymptomLogger.tsx
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { Save, Loader2 } from 'lucide-react';
@@ -77,27 +78,34 @@ export const SymptomLogger = () => {
                 <CardDescription>Select all symptoms that apply for today, {format(new Date(), 'MMMM d, yyyy')}.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 mb-6">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 mb-6">
                     {symptomsList.map(({ name, icon }) => (
                         <Button
                             key={name}
                             variant={selectedSymptoms.has(name) ? 'default' : 'outline'}
                             onClick={() => toggleSymptom(name)}
-                            className={`h-auto p-2 sm:p-3 justify-start text-left transition-all duration-200 ${selectedSymptoms.has(name) ? 'bg-mamasaheli-primary text-white' : ''}`}
+                            className={`h-auto min-h-[5rem] p-3 flex items-center justify-start text-left transition-all duration-200 ${
+                                selectedSymptoms.has(name) ? 'bg-mamasaheli-primary text-white' : ''
+                            }`}
                         >
-                            <span className="text-lg sm:text-xl mr-2">{icon}</span>
-                            <span className="text-xs sm:text-sm leading-tight">{name}</span>
+                            <span className="text-2xl mr-3">{icon}</span>
+                            <span
+    className="flex-1 text-sm font-medium leading-snug break-words whitespace-normal"
+>
+    {name}
+</span>
                         </Button>
                     ))}
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="symptom-notes">Notes (Optional)</Label>
                     <Textarea
-                        id="symptom-notes"
-                        placeholder="Write down what's going on for you..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={3}
+    id="symptom-notes"
+    placeholder="Write down what's going on for you..."
+    value={notes}
+    onChange={(e) => setNotes(e.target.value)}
+    rows={3}
+    className="break-words whitespace-normal"
                     />
                 </div>
             </CardContent>

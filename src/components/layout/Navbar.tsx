@@ -1,3 +1,4 @@
+// components/layout/Navbar.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ const navItems: NavItem[] = [
   { path: '/doctor-chat', label: 'Doctor Chat', icon: HeartPulse, requiresAuth: true },
   { path: '/appointment', label: 'Appointments', icon: Calendar, requiresAuth: true },
   { path: '/forum', label: 'Forum', icon: Users, requiresAuth: true },
-  { path: '/bloodwork', label: 'Bloodwork', icon: TestTube2, requiresAuth: true },
+  { path: '/logging', label: 'Logging', icon: ListCheck, requiresAuth: true },
   { path: '/products', label: 'Products', icon: Package, requiresAuth: true },
   { path: '/meals', label: 'Meals & Exe.', icon: Salad, requiresAuth: true, isMobileOnly: true },
   { path: '/profile', label: 'Profile', icon: Settings, requiresAuth: true, isMobileOnly: true },
@@ -218,8 +219,16 @@ const Navbar: React.FC = () => {
                   )}
                   <DropdownMenuItem onClick={() => navigate('/profile')}><Settings className="mr-2 h-4 w-4" /><span>Profile Settings</span></DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/medicaldocs')}><FileText className="mr-2 h-4 w-4" /><span>Medical Documents</span></DropdownMenuItem>
+                  
+                  {!isDoctor && (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/bloodwork')}><TestTube2 className="mr-2 h-4 w-4" /><span>Bloodwork</span></DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/games')}><Gamepad2 className="mr-2 h-4 w-4" /><span>Games</span></DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/meals')}><Salad className="mr-2 h-4 w-4" /><span>Meals & Exercises</span></DropdownMenuItem>
+                    </>
+                  )}
+                  
                   <DropdownMenuItem onClick={() => navigate('/contact')}><MessageSquare className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
-                  {!isDoctor && <DropdownMenuItem onClick={() => navigate('/meals')}><Salad className="mr-2 h-4 w-4" /><span>Meals & Exercises</span></DropdownMenuItem>}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:bg-red-100 focus:text-red-700 dark:focus:bg-red-900/50 dark:focus:text-red-400">
                     <LogOut className="mr-2 h-4 w-4" /><span>Log out</span>
