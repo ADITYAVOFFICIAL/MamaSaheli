@@ -1,3 +1,4 @@
+// src/utils/appwriteConfig.ts
 export const appwriteEnvConfig = {
   endpoint: import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1',
   projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID || 'YOUR_PROJECT_ID',
@@ -17,6 +18,11 @@ export const appwriteEnvConfig = {
   forumPostsCollectionId: import.meta.env.VITE_APPWRITE_FORUM_POSTS_COLLECTION_ID || 'forumPosts',
   forumVotesCollectionId: import.meta.env.VITE_APPWRITE_FORUM_VOTES_COLLECTION_ID || 'forumVotes',
   bloodworksCollectionId: import.meta.env.VITE_BLOODWORKS_COLLECTION_ID || 'bloodworks',
+  symptomLogsCollectionId: import.meta.env.VITE_APPWRITE_SYMPTOM_LOGS_COLLECTION_ID || 'symptomLogs',
+  kickCounterCollectionId: import.meta.env.VITE_APPWRITE_KICK_COUNTER_COLLECTION_ID || 'kickCounterSessions',
+  contractionSessionsCollectionId: import.meta.env.VITE_APPWRITE_CONTRACTION_SESSIONS_COLLECTION_ID || 'contractionSessions',
+  weeklyPhotosCollectionId: import.meta.env.VITE_APPWRITE_WEEKLY_PHOTOS_COLLECTION_ID || 'weeklyPhotoLogs',
+  doctorChatMessagesCollectionId: import.meta.env.VITE_APPWRITE_DRCHAT_KEY || 'doctorChatMessages',
 
   profileBucketId: import.meta.env.VITE_APPWRITE_PROFILE_BUCKET_ID || 'profilePhotos',
   medicalBucketId: import.meta.env.VITE_APPWRITE_MEDICAL_BUCKET_ID || 'medicalFiles',
@@ -49,241 +55,92 @@ export const appwriteSchemaConfig = {
         { key: 'chatTonePreference', type: 'string', required: false, size: 50, array: false },
         { key: 'languagePreference', type: 'string', required: false, size: 10, array: false, default: 'en' },
         { key: 'hospitalId', type: 'string', required: false, size: 255, array: false },
-        { key: 'hospitalName', type: 'string', required: false, size: 255, array: false }
+        { key: 'hospitalName', type: 'string', required: false, size: 255, array: false },
+        { key: 'assignedDoctorId', type: 'string', required: false, size: 255, array: false },
+        { key: 'assignedDoctorName', type: 'string', required: false, size: 255, array: false },
+        { key: 'lmpDate', type: 'datetime', required: false, array: false },
+        { key: 'estimatedDueDate', type: 'datetime', required: false, array: false },
       ],
       indexes: [
         { key: 'userId_unique', type: 'unique', attributes: ['userId'], orders: ['ASC'] },
+        { key: 'email_idx', type: 'key', attributes: ['email'], orders: ['ASC'] },
+        { key: 'hospitalId_idx', type: 'key', attributes: ['hospitalId'], orders: ['ASC'] },
+        { key: 'assignedDoctorId_idx', type: 'key', attributes: ['assignedDoctorId'], orders: ['ASC'] },
+        { key: 'name_fulltext', type: 'fulltext', attributes: ['name'], orders: [] },
       ],
     },
-    appointments: {
-      id: appwriteEnvConfig.appointmentsCollectionId,
-      name: 'User Appointments',
+    symptomLogs: {
+      id: appwriteEnvConfig.symptomLogsCollectionId,
+      name: 'Symptom Logs',
       attributes: [
         { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'date', type: 'datetime', required: true, array: false },
-        { key: 'appointmentType', type: 'string', required: false, size: 100, array: false, default: 'General' },
-        { key: 'notes', type: 'string', required: false, size: 2000, array: false },
-        { key: 'isCompleted', type: 'boolean', required: false, default: false, array: false },
+        { key: 'symptoms', type: 'string', required: true, size: 255, array: true },
+        { key: 'notes', type: 'string', required: false, size: 5000, array: false },
+        { key: 'loggedAt', type: 'datetime', required: true, array: false },
       ],
       indexes: [
-        { key: 'userId_date_idx', type: 'key', attributes: ['userId', 'date'], orders: ['ASC', 'ASC'] },
-        { key: 'userId_isCompleted_idx', type: 'key', attributes: ['userId', 'isCompleted'], orders: ['ASC', 'ASC'] },
+        { key: 'userId_loggedAt_idx', type: 'key', attributes: ['userId', 'loggedAt'], orders: ['ASC', 'DESC'] },
       ],
     },
-    medicalDocuments: {
-      id: appwriteEnvConfig.medicalDocumentsCollectionId,
-      name: 'Medical Documents',
+    kickCounterSessions: {
+      id: appwriteEnvConfig.kickCounterCollectionId,
+      name: 'Kick Counter Sessions',
       attributes: [
         { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'fileId', type: 'string', required: true, size: 255, array: false },
-        { key: 'fileName', type: 'string', required: true, size: 255, array: false },
-        { key: 'documentType', type: 'string', required: false, size: 255, array: false },
-        { key: 'description', type: 'string', required: false, size: 1000, array: false },
+        { key: 'startTime', type: 'datetime', required: true, array: false },
+        { key: 'endTime', type: 'datetime', required: true, array: false },
+        { key: 'durationSeconds', type: 'integer', required: true, min: 0, array: false },
+        { key: 'kickCount', type: 'integer', required: true, min: 0, array: false },
       ],
       indexes: [
-        { key: 'userId_idx', type: 'key', attributes: ['userId'], orders: ['ASC'] },
+        { key: 'userId_startTime_idx', type: 'key', attributes: ['userId', 'startTime'], orders: ['ASC', 'DESC'] },
       ],
     },
-    blogs: {
-      id: appwriteEnvConfig.blogsCollectionId,
-      name: 'Blog Posts',
-      attributes: [
-        { key: 'title', type: 'string', required: true, size: 255, array: false },
-        { key: 'slug', type: 'string', required: true, size: 255, array: false },
-        { key: 'content', type: 'string', required: true, size: 16777216, array: false },
-        { key: 'author', type: 'string', required: true, size: 255, array: false },
-        { key: 'category', type: 'string', required: false, size: 255, array: false },
-        { key: 'imageUrl', type: 'string', required: false, size: 1024, array: false },
-        { key: 'imageFileId', type: 'string', required: false, size: 255, array: false },
-        { key: 'tags', type: 'string', required: false, size: 100, array: true },
-        { key: 'publishedAt', type: 'datetime', required: false, array: false },
-      ],
-      indexes: [
-        { key: 'slug_unique', type: 'unique', attributes: ['slug'], orders: ['ASC'] },
-        { key: 'category_idx', type: 'key', attributes: ['category'], orders: ['ASC'] },
-        { key: 'published_idx', type: 'key', attributes: ['publishedAt'], orders: ['DESC'] },
-        { key: 'tags_idx', type: 'key', attributes: ['tags'], orders: [] },
-        { key: 'title_fulltext', type: 'fulltext', attributes: ['title'], orders: [] },
-      ],
-    },
-    bloodPressure: {
-      id: appwriteEnvConfig.bpCollectionId,
-      name: 'Blood Pressure Readings',
+    contractionSessions: {
+      id: appwriteEnvConfig.contractionSessionsCollectionId,
+      name: 'Contraction Sessions',
       attributes: [
         { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'systolic', type: 'integer', required: true, min: 0, max: 300, array: false },
-        { key: 'diastolic', type: 'integer', required: true, min: 0, max: 200, array: false },
-        { key: 'recordedAt', type: 'datetime', required: true, array: false },
+        { key: 'sessionDate', type: 'datetime', required: true, array: false },
+        { key: 'contractions', type: 'string', required: true, size: 10000, array: false },
       ],
       indexes: [
-        { key: 'userId_recordedAt_idx', type: 'key', attributes: ['userId', 'recordedAt'], orders: ['ASC', 'DESC'] },
+        { key: 'userId_sessionDate_idx', type: 'key', attributes: ['userId', 'sessionDate'], orders: ['ASC', 'DESC'] },
       ],
     },
-    bloodSugar: {
-      id: appwriteEnvConfig.sugarCollectionId,
-      name: 'Blood Sugar Readings',
+    weeklyPhotoLogs: {
+      id: appwriteEnvConfig.weeklyPhotosCollectionId,
+      name: 'Weekly Photo Logs',
       attributes: [
         { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'level', type: 'float', required: true, min: 0, max: 1000, array: false },
-        { key: 'measurementType', type: 'string', required: true, size: 50, array: false },
-        { key: 'recordedAt', type: 'datetime', required: true, array: false },
-      ],
-      indexes: [
-        { key: 'userId_recordedAt_idx', type: 'key', attributes: ['userId', 'recordedAt'], orders: ['ASC', 'DESC'] },
-      ],
-        doctorChatMessages: {
-          id: 'doctorChatMessages', // Or use an environment variable like appwriteEnvConfig.doctorChatMessagesCollectionId
-          name: 'Doctor Chat Messages',
-          attributes: [
-            { key: 'userId', type: 'string', required: true, size: 255, array: false },
-            { key: 'doctorId', type: 'string', required: true, size: 255, array: false },
-            { key: 'sessionId', type: 'string', required: true, size: 255, array: false },
-            { key: 'senderId', type: 'string', required: true, size: 255, array: false }, // To know who sent the message (patient or doctor)
-            { key: 'role', type: 'string', required: true, size: 10, array: false }, // 'user' for patient, 'doctor' for doctor
-            { key: 'content', type: 'string', required: true, size: 65535, array: false },
-            { key: 'timestamp', type: 'datetime', required: true, array: false },
-            { key: 'isRead', type: 'boolean', required: false, default: false, array: false }, // To track if the message has been read
-          ],
-          indexes: [
-            { key: 'userId_doctorId_timestamp_idx', type: 'key', attributes: ['userId', 'doctorId', 'timestamp'], orders: ['ASC', 'ASC', 'ASC'] },
-            { key: 'sessionId_timestamp_idx', type: 'key', attributes: ['sessionId', 'timestamp'], orders: ['ASC', 'ASC'] },
-          ],
-        },
-    },
-    weight: {
-      id: appwriteEnvConfig.weightCollectionId,
-      name: 'Weight Readings',
-      attributes: [
-        { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'weight', type: 'float', required: true, min: 0, max: 500, array: false },
-        { key: 'unit', type: 'string', required: true, size: 10, array: false },
-        { key: 'recordedAt', type: 'datetime', required: true, array: false },
-      ],
-      indexes: [
-        { key: 'userId_recordedAt_idx', type: 'key', attributes: ['userId', 'recordedAt'], orders: ['ASC', 'DESC'] },
-      ],
-    },
-    medications: {
-      id: appwriteEnvConfig.medsCollectionId,
-      name: 'Medication Reminders',
-      attributes: [
-        { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'medicationName', type: 'string', required: true, size: 255, array: false },
-        { key: 'dosage', type: 'string', required: true, size: 100, array: false },
-        { key: 'frequency', type: 'string', required: true, size: 100, array: false },
-        { key: 'times', type: 'string', required: false, size: 20, array: true },
+        { key: 'weekNumber', type: 'integer', required: true, min: 1, max: 42, array: false },
+        { key: 'photoFileId', type: 'string', required: true, size: 255, array: false },
         { key: 'notes', type: 'string', required: false, size: 1000, array: false },
-        { key: 'isActive', type: 'boolean', required: false, default: true, array: false },
+        { key: 'loggedAt', type: 'datetime', required: true, array: false },
       ],
       indexes: [
-        { key: 'userId_isActive_idx', type: 'key', attributes: ['userId', 'isActive'], orders: ['ASC', 'ASC'] },
+        { key: 'userId_weekNumber_idx', type: 'key', attributes: ['userId', 'weekNumber'], orders: ['ASC', 'DESC'] },
       ],
     },
-    bloodworks: {
-      id: appwriteEnvConfig.bloodworksCollectionId,
-      name: 'Bloodwork Results',
+    doctorChatMessages: {
+      id: appwriteEnvConfig.doctorChatMessagesCollectionId,
+      name: 'Doctor Chat Messages',
       attributes: [
         { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'testName', type: 'string', required: true, size: 255, array: false },
-        { key: 'summary', type: 'string', required: false, size: 5000, array: false },
-        { key: 'recordedAt', type: 'datetime', required: true, array: false },
-        { key: 'fileId', type: 'string', required: true, size: 255, array: false },
-        { key: 'fileName', type: 'string', required: true, size: 255, array: false },
-        { key: 'results', type: 'string', required: false, size: 10000, array: false, description: 'JSON string of extracted key-value pairs from the report' },
-      ],
-      indexes: [
-        { key: 'userId_recordedAt_idx', type: 'key', attributes: ['userId', 'recordedAt'], orders: ['ASC', 'DESC'] },
-      ],
-    },
-    forumTopics: {
-      id: appwriteEnvConfig.forumTopicsCollectionId,
-      name: 'Forum Topics',
-      attributes: [
-        { key: 'title', type: 'string', required: true, size: 255, array: false },
-        { key: 'content', type: 'string', required: true, size: 65535, array: false },
-        { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'userName', type: 'string', required: true, size: 255, array: false },
-        { key: 'userAvatarUrl', type: 'string', required: false, size: 2048, array: false },
-        { key: 'category', type: 'string', required: false, size: 100, array: false },
-        { key: 'lastReplyAt', type: 'datetime', required: false, array: false },
-        { key: 'replyCount', type: 'integer', required: false, default: 0, min: 0, array: false },
-        { key: 'isLocked', type: 'boolean', required: false, default: false, array: false },
-        { key: 'isPinned', type: 'boolean', required: false, default: false, array: false },
-        { key: 'voteScore', type: 'integer', required: false, default: 0, array: false },
-      ],
-      indexes: [
-        { key: 'lastReplyAt_desc_idx', type: 'key', attributes: ['lastReplyAt'], orders: ['DESC'] },
-        { key: 'pinned_lastReply_idx', type: 'key', attributes: ['isPinned', 'lastReplyAt'], orders: ['DESC', 'DESC'] },
-        { key: 'category_idx', type: 'key', attributes: ['category'], orders: ['ASC'] },
-        { key: 'userId_idx', type: 'key', attributes: ['userId'], orders: ['ASC'] },
-        { key: 'title_fulltext_idx', type: 'fulltext', attributes: ['title'], orders: [] },
-        { key: 'voteScore_idx', type: 'key', attributes: ['voteScore'], orders: ['DESC'] },
-        { key: 'title_fulltext', type: 'fulltext', attributes: ['title'], orders: [] },
-        { key: 'content_fulltext', type: 'fulltext', attributes: ['content'], orders: [] },
-      ],
-    },
-    forumPosts: {
-      id: appwriteEnvConfig.forumPostsCollectionId,
-      name: 'Forum Posts',
-      attributes: [
-        { key: 'topicId', type: 'string', required: true, size: 255, array: false },
-        { key: 'content', type: 'string', required: true, size: 65535, array: false },
-        { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'userName', type: 'string', required: true, size: 255, array: false },
-        { key: 'userAvatarUrl', type: 'string', required: false, size: 2048, array: false },
-        { key: 'voteScore', type: 'integer', required: false, default: 0, array: false },
-      ],
-      indexes: [
-        { key: 'topicId_createdAt_asc_idx', type: 'key', attributes: ['topicId', '$createdAt'], orders: ['ASC', 'ASC'] },
-        { key: 'userId_idx', type: 'key', attributes: ['userId'], orders: ['ASC'] },
-        { key: 'content_fulltext', type: 'fulltext', attributes: ['content'], orders: [] },
-        { key: 'topicId_voteScore_idx', type: 'key', attributes: ['topicId', 'voteScore'], orders: ['ASC', 'DESC'] },
-      ],
-    },
-    forumVotes: {
-      id: appwriteEnvConfig.forumVotesCollectionId,
-      name: "Forum Votes",
-      attributes: [
-          { key: 'userId', type: 'string', required: true, size: 255, array: false },
-          { key: 'targetId', type: 'string', required: true, size: 255, array: false },
-          { key: 'targetType', type: 'string', required: true, size: 10, array: false },
-          { key: 'voteType', type: 'string', required: true, size: 4, array: false },
-      ],
-      indexes: [
-          { key: 'user_target_unique', type: 'unique', attributes: ['userId', 'targetId'], orders: ['ASC', 'ASC'] },
-          { key: 'target_vote_idx', type: 'key', attributes: ['targetId', 'voteType'], orders: ['ASC', 'ASC'] },
-          { key: 'user_idx', type: 'key', attributes: ['userId'], orders: ['ASC'] },
-      ],
-    },
-    chatHistory: {
-      id: appwriteEnvConfig.chatHistoryCollectionId,
-      name: 'Chat History',
-      attributes: [
-        { key: 'userId', type: 'string', required: true, size: 255, array: false },
+        { key: 'doctorId', type: 'string', required: true, size: 255, array: false },
         { key: 'sessionId', type: 'string', required: true, size: 255, array: false },
+        { key: 'senderId', type: 'string', required: true, size: 255, array: false },
         { key: 'role', type: 'string', required: true, size: 10, array: false },
         { key: 'content', type: 'string', required: true, size: 65535, array: false },
         { key: 'timestamp', type: 'datetime', required: true, array: false },
+        { key: 'isRead', type: 'boolean', required: false, default: false, array: false },
       ],
       indexes: [
-        { key: 'userId_sessionId_timestamp_idx', type: 'key', attributes: ['userId', 'sessionId', 'timestamp'], orders: ['ASC', 'ASC', 'ASC'] },
-        { key: 'userId_timestamp_idx', type: 'key', attributes: ['userId', 'timestamp'], orders: ['ASC', 'DESC'] },
-      ],
-    },
-    bookmarks: {
-      id: appwriteEnvConfig.bookmarksCollectionId,
-      name: 'Bookmarked Messages',
-      attributes: [
-        { key: 'userId', type: 'string', required: true, size: 255, array: false },
-        { key: 'messageContent', type: 'string', required: true, size: 65535, array: false },
-        { key: 'bookmarkedAt', type: 'datetime', required: true, array: false },
-      ],
-      indexes: [
-        { key: 'userId_bookmarkedAt_idx', type: 'key', attributes: ['userId', 'bookmarkedAt'], orders: ['ASC', 'DESC'] },
+        { key: 'userId_doctorId_timestamp_idx', type: 'key', attributes: ['userId', 'doctorId', 'timestamp'], orders: ['ASC', 'ASC', 'ASC'] },
+        { key: 'sessionId_timestamp_idx', type: 'key', attributes: ['sessionId', 'timestamp'], orders: ['ASC', 'ASC'] },
       ],
     },
   },
-  
   buckets: {
     profileBucket: {
       id: appwriteEnvConfig.profileBucketId,

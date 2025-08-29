@@ -79,12 +79,12 @@ export const profileBucketId: string = import.meta.env.VITE_APPWRITE_PROFILE_BUC
 export const medicalBucketId: string = import.meta.env.VITE_APPWRITE_MEDICAL_BUCKET_ID as string;
 export const chatImagesBucketId: string = import.meta.env.VITE_APPWRITE_CHAT_IMAGES_BUCKET_ID as string;
 export const generatedImageBucketId: string = import.meta.env.VITE_APPWRITE_CHAT_IMAGES_BUCKET_ID as string;
-// Checks if essential configuration variables are present and not placeholders.
+export const weeklyPhotosCollectionId: string = import.meta.env.VITE_APPWRITE_WEEKLY_PHOTOS_COLLECTION_ID as string;
+
 const requiredConfigs: Record<string, string | undefined> = {
     endpoint,
     projectId,
     databaseId,
-    // blogCollectionId is optional based on usage
     profilesCollectionId,
     medicalDocumentsCollectionId,
     appointmentsCollectionId,
@@ -97,11 +97,15 @@ const requiredConfigs: Record<string, string | undefined> = {
     chatHistoryCollectionId,
     bookmarkedMessagesCollectionId,
     chatImagesBucketId,
-    forumTopicsCollectionId, 
+    forumTopicsCollectionId,
     forumVotesCollectionId,
     forumPostsCollectionId,
     bookmarkedProductsCollectionId,
     userCountFunctionId,
+    symptomLogsCollectionId,
+    kickCounterCollectionId,
+    contractionSessionsCollectionId,
+    weeklyPhotosCollectionId,
 };
 
 const missingConfigs: string[] = Object.entries(requiredConfigs)
@@ -141,6 +145,20 @@ export const functions = new Functions(client);
  * Includes $id, $createdAt, $updatedAt, $permissions, $collectionId, $databaseId
  */
 export type AppwriteDocument = Models.Document;
+export interface WeeklyPhotoLog extends AppwriteDocument {
+    userId: string;
+    weekNumber: number;
+    photoFileId: string;
+    notes?: string;
+    loggedAt: string;
+}
+
+export type CreateWeeklyPhotoLogData = {
+    userId: string;
+    weekNumber: number;
+    photoFile: File;
+    notes?: string;
+};
 // --- NEW: Forum Types ---
 /** Represents a forum topic document. */
 export interface ForumTopic extends AppwriteDocument {
@@ -2445,4 +2463,71 @@ export const deleteKickSession = async (sessionId: string) => {
 
 export const deleteContractionSession = async (sessionId: string) => {
     return await databases.deleteDocument(databaseId, contractionSessionsCollectionId, sessionId);
+};
+export const createWeeklyPhotoLog = async (data: CreateWeeklyPhotoLogData): Promise<WeeklyPhotoLog> => {
+    if (!medicalBucketId) throw new Error("Medical files storage bucket ID is not configured.");
+    if (!weeklyPhotosCollectionId) throw new Error("Weekly photos collection ID is not configured.");
+
+    let uploadedFile: Models.File | null = null;
+    try {
+        const userRole = Role.user(data.userId);
+        const filePermissions = [Permission.read(userRole), Permission.delete(userRole)];
+        uploadedFile = await storage.createFile(medicalBucketId, ID.unique(), data.photoFile, filePermissions);
+
+        const docData: Omit<WeeklyPhotoLog, keyof AppwriteDocument> = {
+            userId: data.userId,
+            weekNumber: data.weekNumber,
+            photoFileId: uploadedFile.$id,
+            notes: data.notes || undefined,
+            loggedAt: new Date().toISOString(),
+        };
+
+        const docPermissions = [Permission.read(userRole), Permission.update(userRole), Permission.delete(userRole)];
+        return await databases.createDocument<WeeklyPhotoLog>(
+            databaseId,
+            weeklyPhotosCollectionId,
+            ID.unique(),
+            docData,
+            docPermissions
+        );
+    } catch (error) {
+        if (uploadedFile?.$id) {
+            try {
+                await storage.deleteFile(medicalBucketId, uploadedFile.$id);
+            } catch (deleteError) {
+                console.error(`CRITICAL: Failed to delete orphaned weekly photo file ${uploadedFile.$id}.`, deleteError);
+            }
+        }
+        handleAppwriteError(error, `creating weekly photo log for user ${data.userId}`);
+        throw error;
+    }
+};
+
+export const getWeeklyPhotoLogs = async (userId: string): Promise<WeeklyPhotoLog[]> => {
+    if (!weeklyPhotosCollectionId) return [];
+    try {
+        const response = await databases.listDocuments<WeeklyPhotoLog>(
+            databaseId,
+            weeklyPhotosCollectionId,
+            [Query.equal('userId', userId), Query.orderDesc('weekNumber'), Query.limit(50)]
+        );
+        return response.documents;
+    } catch (error) {
+        handleAppwriteError(error, `fetching weekly photo logs for user ${userId}`, false);
+        return [];
+    }
+};
+
+export const deleteWeeklyPhotoLog = async (logId: string, fileId: string): Promise<void> => {
+    if (!weeklyPhotosCollectionId) throw new Error("Weekly photos collection ID not configured.");
+    if (!medicalBucketId) throw new Error("Medical files storage bucket ID is not configured.");
+    try {
+        await Promise.all([
+            databases.deleteDocument(databaseId, weeklyPhotosCollectionId, logId),
+            storage.deleteFile(medicalBucketId, fileId)
+        ]);
+    } catch (error) {
+        handleAppwriteError(error, `deleting weekly photo log (LogID: ${logId}, FileID: ${fileId})`);
+        throw error;
+    }
 };
