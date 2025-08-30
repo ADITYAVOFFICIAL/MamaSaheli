@@ -29,18 +29,8 @@ import {
     uploadProfilePhoto,
     getFilePreview,
     profileBucketId,
-    UserProfile, // Ensure this includes the latest fields
-    // Health Reading Imports (remain unchanged)
-    getBloodPressureReadings,
-    createBloodPressureReading,
-    BloodPressureReading,
-    getBloodSugarReadings,
-    createBloodSugarReading,
-    BloodSugarReading,
-    getWeightReadings,
-    createWeightReading,
-    WeightReading,
-    AppwriteDocument, // Ensure AppwriteDocument is imported
+    UserProfile, 
+    AppwriteDocument, 
     getDoctorsByHospital
 } from '@/lib/appwrite';
 import { Hospital, User as AuthUserIcon, UploadCloud, Save, Loader2, HeartPulse, Info, Settings, HeartHandshake, Briefcase, Utensils, Activity, MessageCircle } from 'lucide-react'; // Added Hospital icon
@@ -122,16 +112,6 @@ function ProfilePage() {
     const [hospitalFetchError, setHospitalFetchError] = useState<string | null>(null);
     const [hospitalSearchTerm, setHospitalSearchTerm] = useState('');
 
-
-    // --- Health Input State (remains unchanged) ---
-    const [isSavingHealthData, setIsSavingHealthData] = useState<'bp' | 'sugar' | 'weight' | null>(null);
-    const [systolic, setSystolic] = useState('');
-    const [diastolic, setDiastolic] = useState('');
-    const [sugarLevel, setSugarLevel] = useState('');
-    const [sugarType, setSugarType] = useState<'fasting' | 'post_meal' | 'random'>('fasting');
-    const [weight, setWeight] = useState('');
-    const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
-
     // --- Fetch Doctors for Selected Hospital ---
     useEffect(() => {
         const fetchDoctors = async () => {
@@ -194,12 +174,8 @@ function ProfilePage() {
 
         try {
             // Fetch profile (health data fetches remain unchanged)
-            const [profileData, bpData, sugarData, weightData] = await Promise.all([
-                getUserProfile(user.$id),
-                getBloodPressureReadings(user.$id),
-                getBloodSugarReadings(user.$id),
-                getWeightReadings(user.$id)
-            ]);
+            const profileData = await getUserProfile(user.$id);
+
 
             // Process Profile Data
             setProfile(profileData);
@@ -491,40 +467,6 @@ function ProfilePage() {
         setHospitalSearchTerm('');
     };
 
-    // --- Health Data Save Handlers (Keep existing) ---
-    const handleSaveBP = async () => {
-        if (!user?.$id || !systolic || !diastolic) { toast({ title: "Missing Information", description: "Please enter both Systolic and Diastolic values.", variant: "destructive" }); return; }
-        const sysNum = parseInt(systolic, 10); const diaNum = parseInt(diastolic, 10);
-        if (isNaN(sysNum) || isNaN(diaNum) || sysNum <= 0 || diaNum <= 0) { toast({ title: "Invalid Input", description: "Please enter valid positive numbers for BP.", variant: "destructive" }); return; }
-        setIsSavingHealthData('bp');
-        try {
-            await createBloodPressureReading(user.$id, { systolic: sysNum, diastolic: diaNum });
-            toast({ title: "BP Reading Saved" }); setSystolic(''); setDiastolic('');
-        } catch (error) { console.error("Error saving BP:", error); toast({ title: "Save Failed", description: "Could not save BP reading.", variant: "destructive" }); }
-        finally { setIsSavingHealthData(null); }
-    };
-    const handleSaveSugar = async () => {
-        if (!user?.$id || !sugarLevel) { toast({ title: "Missing Information", description: "Please enter the Blood Sugar level.", variant: "destructive" }); return; }
-        const levelNum = parseFloat(sugarLevel);
-        if (isNaN(levelNum) || levelNum <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid positive number for blood sugar.", variant: "destructive" }); return; }
-        setIsSavingHealthData('sugar');
-        try {
-            await createBloodSugarReading(user.$id, { level: levelNum, measurementType: sugarType });
-            toast({ title: "Blood Sugar Reading Saved" }); setSugarLevel('');
-        } catch (error) { console.error("Error saving Sugar:", error); toast({ title: "Save Failed", description: "Could not save Blood Sugar reading.", variant: "destructive" }); }
-        finally { setIsSavingHealthData(null); }
-    };
-    const handleSaveWeight = async () => {
-        if (!user?.$id || !weight) { toast({ title: "Missing Information", description: "Please enter your weight.", variant: "destructive" }); return; }
-        const weightNum = parseFloat(weight);
-        if (isNaN(weightNum) || weightNum <= 0) { toast({ title: "Invalid Input", description: "Please enter a valid positive number for weight.", variant: "destructive" }); return; }
-        setIsSavingHealthData('weight');
-        try {
-            await createWeightReading(user.$id, { weight: weightNum, unit: weightUnit });
-            toast({ title: "Weight Reading Saved" }); setWeight('');
-        } catch (error) { console.error("Error saving Weight:", error); toast({ title: "Save Failed", description: "Could not save Weight reading.", variant: "destructive" }); }
-        finally { setIsSavingHealthData(null); }
-    };
 
     // --- Helper for Avatar Fallback (Keep existing) ---
     const getInitials = (nameStr: string | undefined | null): string => {
@@ -939,66 +881,6 @@ function ProfilePage() {
                                 </CardContent>
                             </Card>
                             <ChangePasswordCard/>
-                            {/* Health Reading Input Card (remains unchanged) */}
-                            <Card className="border-mamasaheli-secondary/20">
-                                <CardHeader className="bg-mamasaheli-secondary/10">
-                                    <CardTitle className="flex items-center text-mamasaheli-secondary">
-                                        <HeartPulse className="mr-2 h-5 w-5" /> Add New Health Reading
-                                    </CardTitle>
-                                    <CardDescription>Enter your latest BP, Blood Sugar, or Weight readings.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="pt-6 space-y-6">
-                                    {/* BP Input */}
-                                    <div className="space-y-3 p-4 border rounded-md bg-red-50/30 border-red-100">
-                                        <Label className="font-semibold text-red-700">Blood Pressure (mmHg)</Label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Input type="number" placeholder="Systolic (e.g., 120)" value={systolic} onChange={e => setSystolic(e.target.value)} disabled={isSavingHealthData === 'bp'} />
-                                            <Input type="number" placeholder="Diastolic (e.g., 80)" value={diastolic} onChange={e => setDiastolic(e.target.value)} disabled={isSavingHealthData === 'bp'} />
-                                        </div>
-                                        <Button onClick={handleSaveBP} size="sm" className="bg-red-500 hover:bg-red-600 text-white" disabled={isSavingHealthData === 'bp' || !systolic || !diastolic}>
-                                            {isSavingHealthData === 'bp' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save BP"}
-                                        </Button>
-                                    </div>
-
-                                    {/* Sugar Input */}
-                                    <div className="space-y-3 p-4 border rounded-md bg-blue-50/30 border-blue-100">
-                                        <Label className="font-semibold text-blue-700">Blood Sugar (mg/dL)</Label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Input type="number" placeholder="Level (e.g., 95)" value={sugarLevel} onChange={e => setSugarLevel(e.target.value)} disabled={isSavingHealthData === 'sugar'} />
-                                            <Select value={sugarType} onValueChange={(v) => setSugarType(v as 'fasting' | 'post_meal' | 'random')} disabled={isSavingHealthData === 'sugar'}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="fasting">Fasting</SelectItem>
-                                                    <SelectItem value="post_meal">Post-Meal</SelectItem>
-                                                    <SelectItem value="random">Random</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <Button onClick={handleSaveSugar} size="sm" className="bg-blue-500 hover:bg-blue-600 text-white" disabled={isSavingHealthData === 'sugar' || !sugarLevel}>
-                                            {isSavingHealthData === 'sugar' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save Sugar"}
-                                        </Button>
-                                    </div>
-
-                                    {/* Weight Input */}
-                                    <div className="space-y-3 p-4 border rounded-md bg-green-50/30 border-green-100">
-                                        <Label className="font-semibold text-green-700">Weight</Label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Input type="number" placeholder="Weight (e.g., 65.5)" value={weight} onChange={e => setWeight(e.target.value)} disabled={isSavingHealthData === 'weight'} />
-                                            <Select value={weightUnit} onValueChange={(v) => setWeightUnit(v as 'kg' | 'lbs')} disabled={isSavingHealthData === 'weight'}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="kg">kg</SelectItem>
-                                                    <SelectItem value="lbs">lbs</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <Button onClick={handleSaveWeight} size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={isSavingHealthData === 'weight' || !weight}>
-                                            {isSavingHealthData === 'weight' ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save Weight"}
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                                
-                            </Card>
                              <div className="space-y-8">
                                  <DataPrivacyCard /></div>
                         </div>
