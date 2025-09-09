@@ -32,10 +32,11 @@ import PregnancyWeekInfo from '@/components/dashboard/PregnancyWeekInfo';
 import { DashboardCalendar } from '@/components/dashboard/DashboardCalendar';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/use-toast';
-
+import DailyMealRecommendation from '@/components/dashboard/DailyMealRecommendation';
+import ToolsAccessCard from '@/components/dashboard/ToolsAccessCard';
 import {
     UserProfile, getUserProfile,
-    Appointment, getUserAppointments, updateAppointment, deleteAppointment,
+    Appointment, getUserAppointments, deleteAppointment,
     BloodPressureReading, BloodSugarReading, WeightReading,
     getBloodPressureReadings, getBloodSugarReadings, getWeightReadings,
     MedicationReminder, CreateMedicationReminderData,
@@ -596,6 +597,9 @@ const DashboardPage: React.FC = () => {
                                     )}
                                 </CardContent>
                             </Card>
+                             <div className="lg:col-span-1">
+        <DailyMealRecommendation />
+    </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <Card className="border border-mamasaheli-primary/30 shadow-sm h-full bg-white dark:bg-gray-800 dark:border-gray-700">
                                     <CardHeader className="bg-mamasaheli-primary/5 border-b border-mamasaheli-primary/10 dark:bg-gray-700/30 dark:border-gray-600">
@@ -759,6 +763,10 @@ const DashboardPage: React.FC = () => {
                                     </CardContent>
                                 </Card>
                             </div>
+                            <div className="lg:col-span-1">
+        <ToolsAccessCard />
+    </div>
+
 <SamsungHealthMock/>
 
                              <MedReminder

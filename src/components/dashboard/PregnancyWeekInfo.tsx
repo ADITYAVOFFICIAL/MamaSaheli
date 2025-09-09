@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { pregnancyWeekData, PregnancyWeekInfo as WeekInfoType } from '@/lib/pregnancyWeekData';
-import { Baby, Scale, Ruler, Lightbulb } from 'lucide-react';
+import { Baby, Scale, Ruler, Lightbulb, CalendarDays } from 'lucide-react';
 
 interface PregnancyWeekInfoProps {
   weeksPregnant: number | null | undefined;
@@ -54,9 +54,18 @@ const PregnancyWeekInfo: React.FC<PregnancyWeekInfoProps> = ({ weeksPregnant }) 
             Your Baby This Week
           </CardTitle>
           <div className="flex flex-col items-end gap-1.5">
-            <Badge variant="secondary" className="text-sm">Week {weekData.week}</Badge>
-            <Badge variant="outline" className="text-xs">Trimester {weekData.trimester}</Badge>
-          </div>
+  <Badge variant="secondary" className="text-sm">Week {weekData.week}</Badge>
+  <Badge variant="outline" className="text-xs">Trimester {weekData.trimester}</Badge>
+  {weeksPregnant < 40 && weeksPregnant >= 4 && (
+    <Badge
+      variant="outline"
+      className="flex items-center gap-1 text-xs px-2 py-1 mt-1 bg-mamasaheli-light/40 dark:bg-gray-900/30 border-mamasaheli-primary/30 text-mamasaheli-primary dark:text-mamasaheli-light"
+    >
+      <CalendarDays className="h-3 w-3 mr-1 text-mamasaheli-secondary" />
+      {((40 - weeksPregnant) * 7)} days left until due date
+    </Badge>
+  )}
+</div>
         </div>
       </CardHeader>
       <CardContent className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
