@@ -625,7 +625,7 @@ function ProfilePage() {
                                                 <div className="space-y-1.5"><Label htmlFor="gender">Gender</Label><Select value={gender} onValueChange={setGender}><SelectTrigger id="gender"><SelectValue placeholder="Select gender" /></SelectTrigger><SelectContent><SelectItem value="female">Female</SelectItem><SelectItem value="male">Male</SelectItem><SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
                                                 <div className="space-y-1.5"><Label htmlFor="phone">Phone Number</Label><Input id="phone" type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="Optional phone number" /></div>
                                             </div>
-                                            <div className="mt-4 space-y-1.5"><Label htmlFor="address">Address</Label><Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Optional address" className="min-h-[80px]" /></div>
+                                            <div className="mt-4 space-y-1.5"><Label htmlFor="address">City</Label><Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Optional city" className="min-h-[80px]" /></div>
                                         </div>
 
                                         {/* --- Primary Hospital Section --- */}
