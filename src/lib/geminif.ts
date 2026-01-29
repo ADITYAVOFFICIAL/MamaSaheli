@@ -9,7 +9,7 @@ import {
 
 // --- Configuration ---
 const API_KEY: string | undefined = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL_NAME = "gemini-1.5-flash-latest"; // Use a powerful and efficient model
+const MODEL_NAME = "gemini-flash-latest"; // Use a powerful and efficient model
 
 // Initialize the Gemini client directly for this specialized service.
 // This allows us to use a custom configuration tailored for this task.
