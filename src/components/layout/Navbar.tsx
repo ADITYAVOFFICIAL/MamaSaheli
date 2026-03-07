@@ -48,6 +48,7 @@ const navItems: NavItem[] = [
   { path: '/resources', label: 'Knowledge', icon: BookOpen, requiresAuth: true },
   { path: '/emergency', label: 'Emergency', icon: AlertTriangle, requiresAuth: false },
   { path: '/govschemes', label: 'Govt. Schemes', icon: Landmark, requiresAuth: true, isMobileOnly: true },
+  { path: '/risk', label: 'Risk', icon: AlertTriangle, requiresAuth: true, isMobileOnly: false },
 ];
 
 const doctorNavItems: NavItem[] = [

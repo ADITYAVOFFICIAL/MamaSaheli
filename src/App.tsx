@@ -48,6 +48,7 @@ const EmailVerificationPage = lazy(() => import("./pages/verifi/VerifyEmailPage"
 const DoctorChatPage = lazy(() => import("./pages/doctor/DoctorChatPage"));
 const LoggingPage = lazy(() => import("./pages/LoggingPage"));
 const GovtSchemesPage = lazy(() => import("./pages/GovtSchemesPage"));
+const RiskPage = lazy(() => import("./pages/RiskPage"));
 
 // A loading component to show while lazy chunks are fetched
 const LoadingFallback = () => (
@@ -106,7 +107,8 @@ const App = () => {
               {/* Protected Routes */}
               <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
               <Route path="/doctor-chat" element={<PrivateRoute><DoctorChatPage /></PrivateRoute>} />
-<Route path="/govschemes" element={<PrivateRoute><GovtSchemesPage /></PrivateRoute>} />
+              <Route path="/govschemes" element={<PrivateRoute><GovtSchemesPage /></PrivateRoute>} />
+              <Route path="/risk" element={<PrivateRoute><RiskPage /></PrivateRoute>} />
               <Route path="/logging" element={<PrivateRoute><LoggingPage /></PrivateRoute>} />
               <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
               <Route path="/appointment" element={<PrivateRoute><AppointmentPage /></PrivateRoute>} />
