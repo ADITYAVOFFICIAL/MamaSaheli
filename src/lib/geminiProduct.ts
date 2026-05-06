@@ -34,7 +34,7 @@ interface ProductResponse {
 
 // --- Configuration ---
 const API_KEY: string | undefined = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL_NAME = "gemini-3-flash-preview";
+const MODEL_NAME = "gemini-3.1-flash-lite-preview";
 
 // Initialize the Gemini client directly for this specialized service.
 const genAI: GoogleGenerativeAI | null = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;

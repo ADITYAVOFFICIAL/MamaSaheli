@@ -23,12 +23,12 @@ export const analyzePregnancyRisk = async (
     let model;
     try {
       model = genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview", 
+        model: "gemini-3.1-flash-lite-preview", 
         generationConfig: { responseMimeType: "application/json" },
       });
     } catch (e) {
       // Fallback if 1.5 flash isn't supported on your API key yet
-      model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
     }
 
     const prompt = `
