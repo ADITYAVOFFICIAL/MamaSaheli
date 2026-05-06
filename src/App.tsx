@@ -8,7 +8,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import PWAInstallPrompt from "@/components/ui/PWAInstallPrompt";
 
-// Auth and Store (Keep these static imports)
+// Auth and Store (Keep these static imports).
 import { useAuthStore } from "@/store/authStore";
 import { PublicRoute, PrivateRoute } from '@/components/auth/AuthRoute.tsx';
 
